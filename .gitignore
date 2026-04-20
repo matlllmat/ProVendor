@@ -1,1 +1,3 @@
-docs/
+notes/
+uploads/*
+!uploads/.gitkeep

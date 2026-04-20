@@ -1,0 +1,70 @@
+/* assets/global_css/app.css
+   Global styles for ProVendor — loaded on every page.
+   Page-specific styles live in pages/css/<page>.css */
+
+/* ── Base ── */
+* {
+    font-family: 'Lora', serif;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+input::placeholder {
+    color: #a89f8a;
+}
+
+/* ── Background dot patterns ── */
+.dot-pattern {
+    background-image: radial-gradient(circle, rgba(240,232,208,0.06) 1px, transparent 1px);
+    background-size: 22px 22px;
+}
+
+.dot-pattern-right {
+    background-image: radial-gradient(circle, rgba(38,31,14,0.10) 1px, transparent 1px);
+    background-size: 22px 22px;
+}
+
+.dot-pattern-light {
+    background-image: radial-gradient(circle, rgba(38,31,14,0.07) 1px, transparent 1px);
+    background-size: 22px 22px;
+}
+
+/* ── Scroll-reveal animations ── */
+.sa {
+    opacity: 0;
+    transform: translateY(36px);
+    transition: opacity 0.75s ease, transform 0.75s ease;
+}
+
+.sa.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.sa.d1 { transition-delay: 0.10s; }
+.sa.d2 { transition-delay: 0.20s; }
+.sa.d3 { transition-delay: 0.30s; }
+.sa.d4 { transition-delay: 0.40s; }
+
+/* ── Reveal line (draws left to right on scroll) ── */
+.reveal-line {
+    transform-origin: left;
+    transform: scaleX(0);
+    transition: transform 0.9s ease;
+}
+
+.reveal-line.visible {
+    transform: scaleX(1);
+}
+
+/* ── Scroll indicator bounce ── */
+@keyframes nudge {
+    0%, 100% { transform: translateY(0); }
+    50%       { transform: translateY(6px); }
+}
+
+.nudge {
+    animation: nudge 2s ease-in-out infinite;
+}
