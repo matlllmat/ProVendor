@@ -38,10 +38,10 @@ $_navClass = function(string $keyword) use ($_navFile): string {
                    class="<?php echo $_navClass('forecast'); ?>">Forecast</a>
                 <a href="<?php echo BASE_URL; ?>/pages/events.view.php"
                    class="<?php echo $_navClass('event'); ?>">Events</a>
-                <a href="<?php echo BASE_URL; ?>/pages/import.view.php"
-                   class="<?php echo $_navClass('import'); ?>">My Store</a>
                 <a href="<?php echo BASE_URL; ?>/pages/reports.view.php"
                    class="<?php echo $_navClass('reports'); ?>">Reports</a>
+                <a href="<?php echo BASE_URL; ?>/pages/import.view.php"
+                   class="<?php echo $_navClass('import'); ?>">My Store</a>
                 <a href="<?php echo BASE_URL; ?>/pages/about.view.php"
                    class="<?php echo $_navClass('about'); ?>">About</a>
             </nav>

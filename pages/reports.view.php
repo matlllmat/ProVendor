@@ -19,9 +19,9 @@ require_once __DIR__ . '/../includes/header.php';
 
     <!-- Page heading -->
     <div class="mb-6">
-        <h1 class="text-2xl font-semibold text-[#261F0E] tracking-tight">Saved Forecasts</h1>
+        <h1 class="text-2xl font-semibold text-[#261F0E] tracking-tight">Demand Plans</h1>
         <p class="text-sm text-[#261F0E] mt-1" style="opacity:0.5">
-            Every forecast you've saved from the Forecast page. Click View to see the chart.
+            Every demand plan you've saved from the Forecast page. Click View to see the chart.
         </p>
     </div>
 
@@ -96,7 +96,7 @@ require_once __DIR__ . '/../includes/header.php';
                             data-product-name="<?php echo htmlspecialchars($s['product_name']); ?>"
                             data-generated-at="<?php echo htmlspecialchars($s['generated_at']); ?>"
                             onclick="confirmDeleteSession(this)"
-                            title="Delete this forecast">
+                            title="Delete this demand plan">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="3 6 5 6 21 6"/>
@@ -132,7 +132,7 @@ require_once __DIR__ . '/../includes/header.php';
         <!-- Header -->
         <div class="rpt-modal-header">
             <div style="min-width:0">
-                <p class="rpt-modal-label">Saved Forecast</p>
+                <p class="rpt-modal-label">Demand Plan</p>
                 <h2 id="rpt-modal-title" class="rpt-modal-title">—</h2>
             </div>
             <button class="rpt-modal-close" onclick="closeDetailModal()" title="Close">
@@ -167,13 +167,15 @@ require_once __DIR__ . '/../includes/header.php';
                                 <line x1="0" y1="5" x2="18" y2="5" stroke="#1A6933" stroke-width="2"/>
                             </svg>
                             Historical
+                            <span class="rpt-legend-info" data-tip="Actual units sold each day before this plan was created — the real demand pattern the model learned from.">ⓘ</span>
                         </span>
                         <span class="rpt-legend-item">
                             <svg width="18" height="10" viewBox="0 0 18 10">
                                 <line x1="0" y1="5" x2="18" y2="5" stroke="#FF5722" stroke-width="2"
                                       stroke-dasharray="5 3"/>
                             </svg>
-                            Saved Forecast
+                            Projected Demand
+                            <span class="rpt-legend-info" data-tip="Units the model predicts will be needed each day. This drives the recommended order quantity.">ⓘ</span>
                         </span>
                     </div>
                     <div class="rpt-chart-btns">
@@ -492,19 +494,37 @@ function renderDetailChart(historical, forecast) {
     const visibleTo   = forecast.length   ? forecast[forecast.length - 1].date : null;
     const annotations = forecast.length ? { forecastStart: buildForecastStartAnnotation(forecast[0].date) } : {};
 
+    // Default view: 6 months before forecast start so the chart opens on recent
+    // history + the full forecast rather than years of old data on the left.
+    let initialMin = visibleFrom;
+    if (forecast.length) {
+        const d = new Date(forecast[0].date);
+        d.setMonth(d.getMonth() - 6);
+        initialMin = d.toISOString().slice(0, 10);
+    }
+
     rptChart = new Chart(document.getElementById('rpt-chart'), {
         type: 'line',
         data: {
             datasets: [
                 {
                     label: 'Historical',
-                    data: historical.map(function (r) { return { x: r.date, y: r.actual }; }),
+                    data: (function () {
+                        const map = {};
+                        historical.forEach(function (r) { map[r.date] = r.actual; });
+                        return Object.keys(map).sort().map(function (d) { return { x: d, y: map[d] }; });
+                    }()),
                     borderColor: '#1A6933', borderWidth: 2, backgroundColor: 'transparent',
                     pointRadius: 0, fill: false, tension: 0.3,
                 },
                 {
-                    label: 'Saved Forecast',
-                    data: forecast.map(function (r) { return { x: r.date, y: r.predicted }; }),
+                    label: 'Projected Demand',
+                    data: (function () {
+                        // Guard against duplicate dates from the DB — keep last value per date.
+                        const map = {};
+                        forecast.forEach(function (r) { map[r.date] = r.predicted; });
+                        return Object.keys(map).sort().map(function (d) { return { x: d, y: map[d] }; });
+                    }()),
                     borderColor: '#FF5722', borderWidth: 2, borderDash: [6,3],
                     backgroundColor: 'transparent', pointRadius: 0, fill: false, tension: 0.3,
                 },
@@ -512,7 +532,7 @@ function renderDetailChart(historical, forecast) {
         },
         options: {
             responsive: true,
-            interaction: { mode: 'index', intersect: false },
+            interaction: { mode: 'x', intersect: false },
             plugins: {
                 legend: { display: false },
                 zoom: {
@@ -533,6 +553,7 @@ function renderDetailChart(historical, forecast) {
             scales: {
                 x: {
                     type: 'time',
+                    min: initialMin,
                     time: { minUnit: 'day', tooltipFormat: 'yyyy-MM-dd', displayFormats: { day: 'MMM d', week: 'MMM d', month: 'MMM yyyy' } },
                     ticks: { color: 'rgba(38,31,14,0.45)', font: { family: 'Lora', size: 11 }, maxTicksLimit: 10, maxRotation: 0 },
                     grid: { color: 'rgba(38,31,14,0.06)' },
@@ -648,8 +669,8 @@ function confirmDeleteSession(btn) {
     const generatedAt = btn.dataset.generatedAt;
 
     showConfirm({
-        title:        'Delete this forecast?',
-        message:      'The saved forecast for "' + productName + '" will be permanently removed.',
+        title:        'Delete this demand plan?',
+        message:      'The demand plan for "' + productName + '" will be permanently removed.',
         confirmText:  'Delete',
         confirmStyle: 'danger',
         onConfirm:    function () { deleteSession(btn, productId, generatedAt); },

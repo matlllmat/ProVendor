@@ -38,12 +38,15 @@ function getForecastSessions(PDO $pdo, int $userId): array
 function getForecastSessionRows(PDO $pdo, int $productId, string $generatedAt, int $userId): array
 {
     $stmt = $pdo->prepare(
-        'SELECT f.forecast_date AS date, f.predicted_demand AS predicted,
-                f.restock_qty, f.cost_price, f.selling_price, f.current_stock,
-                f.total_std, f.optimal_total, f.est_profit
+        'SELECT f.forecast_date AS date, MAX(f.predicted_demand) AS predicted,
+                MAX(f.restock_qty) AS restock_qty, MAX(f.cost_price) AS cost_price,
+                MAX(f.selling_price) AS selling_price, MAX(f.current_stock) AS current_stock,
+                MAX(f.total_std) AS total_std, MAX(f.optimal_total) AS optimal_total,
+                MAX(f.est_profit) AS est_profit
          FROM forecasts f
          JOIN products p ON p.id = f.product_id
          WHERE f.product_id = ? AND f.generated_at = ? AND p.user_id = ?
+         GROUP BY f.forecast_date
          ORDER BY f.forecast_date'
     );
     $stmt->execute([$productId, $generatedAt, $userId]);
@@ -54,10 +57,11 @@ function getForecastSessionRows(PDO $pdo, int $productId, string $generatedAt, i
 function getProductSalesUpTo(PDO $pdo, int $productId, string $cutoffDate, int $userId): array
 {
     $stmt = $pdo->prepare(
-        'SELECT s.sale_date AS date, s.quantity_sold AS actual
+        'SELECT s.sale_date AS date, SUM(s.quantity_sold) AS actual
          FROM sales s
          JOIN products p ON p.id = s.product_id
          WHERE s.product_id = ? AND s.sale_date < ? AND p.user_id = ?
+         GROUP BY s.sale_date
          ORDER BY s.sale_date'
     );
     $stmt->execute([$productId, $cutoffDate, $userId]);

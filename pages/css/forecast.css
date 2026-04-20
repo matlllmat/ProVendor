@@ -829,6 +829,39 @@
     opacity: 0.55;
 }
 
+.fc-legend-info {
+    position: relative;
+    font-size: 0.65rem;
+    cursor: default;
+    opacity: 0.6;
+    line-height: 1;
+}
+
+.fc-legend-info::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 200px;
+    background: #261F0E;
+    color: #F0E8D0;
+    font-size: 0.68rem;
+    font-family: 'Lora', serif;
+    line-height: 1.45;
+    padding: 7px 10px;
+    border-radius: 5px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 10;
+    white-space: normal;
+    text-align: left;
+}
+
+.fc-legend-info:hover { opacity: 1; }
+.fc-legend-info:hover::after { opacity: 1; }
+
 /* ── Results: stat cards ── */
 .fc-stats-grid {
     display: grid;

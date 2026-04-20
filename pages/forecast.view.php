@@ -741,7 +741,7 @@ function renderChart(historical) {
         },
         options: {
             responsive: true,
-            interaction: { mode: 'index', intersect: false },
+            interaction: { mode: 'x', intersect: false },
             plugins: {
                 // Legend hidden — selected product is shown via #chart-selected-product instead.
                 legend: { display: false },
@@ -1034,6 +1034,13 @@ function renderForecastResults(historical, forecast, opt) {
     // Rebuild main chart
     if (fcChart) fcChart.destroy();
 
+    let initialMin = historical.length ? historical[0].date : (forecast.length ? forecast[0].date : null);
+    if (forecast.length) {
+        const d = new Date(forecast[0].date);
+        d.setMonth(d.getMonth() - 6);
+        initialMin = d.toISOString().slice(0, 10);
+    }
+
     fcChart = new Chart(document.getElementById('fc-chart'), {
         type: 'line',
         data: {
@@ -1041,7 +1048,11 @@ function renderForecastResults(historical, forecast, opt) {
                 // Historical — solid green line
                 {
                     label: 'Historical',
-                    data: historical.map(function (r) { return { x: r.date, y: r.actual }; }),
+                    data: (function () {
+                        const map = {};
+                        historical.forEach(function (r) { map[r.date] = r.actual; });
+                        return Object.keys(map).sort().map(function (d) { return { x: d, y: map[d] }; });
+                    }()),
                     borderColor: '#1A6933',
                     borderWidth: 2,
                     backgroundColor: 'transparent',
@@ -1070,10 +1081,14 @@ function renderForecastResults(historical, forecast, opt) {
                     fill: false,
                     tension: 0.3,
                 },
-                // Forecast — dashed orange line on top of band
+                // Projected Demand — dashed orange line on top of band
                 {
-                    label: 'Forecast',
-                    data: forecast.map(function (r) { return { x: r.date, y: r.predicted }; }),
+                    label: 'Projected Demand',
+                    data: (function () {
+                        const map = {};
+                        forecast.forEach(function (r) { map[r.date] = r.predicted; });
+                        return Object.keys(map).sort().map(function (d) { return { x: d, y: map[d] }; });
+                    }()),
                     borderColor: '#FF5722',
                     borderWidth: 2,
                     borderDash: [6, 3],
@@ -1086,7 +1101,7 @@ function renderForecastResults(historical, forecast, opt) {
         },
         options: {
             responsive: true,
-            interaction: { mode: 'index', intersect: false },
+            interaction: { mode: 'x', intersect: false },
             plugins: {
                 legend: { display: false },
                 zoom: {
@@ -1122,6 +1137,7 @@ function renderForecastResults(historical, forecast, opt) {
             scales: {
                 x: {
                     type: 'time',
+                    min: initialMin,
                     time: {
                         minUnit: 'day',
                         tooltipFormat: 'yyyy-MM-dd',
@@ -1495,13 +1511,15 @@ function saveForecast() {
                                 <line x1="0" y1="5" x2="18" y2="5" stroke="#1A6933" stroke-width="2"/>
                             </svg>
                             Historical
+                            <span class="fc-legend-info" data-tip="Actual units sold each day before this forecast — the real demand pattern the model learned from.">ⓘ</span>
                         </span>
                         <span class="fc-legend-item">
                             <svg width="18" height="10" viewBox="0 0 18 10">
                                 <line x1="0" y1="5" x2="18" y2="5" stroke="#FF5722" stroke-width="2"
                                       stroke-dasharray="5 3"/>
                             </svg>
-                            Forecast
+                            Projected Demand
+                            <span class="fc-legend-info" data-tip="Units the model predicts will be needed each day. This drives the recommended order quantity.">ⓘ</span>
                         </span>
                         <span class="fc-legend-item">
                             <span style="display:inline-block;width:18px;height:10px;border-radius:3px;background:rgba(255,87,34,0.2)"></span>

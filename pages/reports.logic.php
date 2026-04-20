@@ -14,6 +14,10 @@ if (!isset($_SESSION['user_id'])) {
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../queries/reports.query.php';
 require_once __DIR__ . '/../queries/events.query.php';
+require_once __DIR__ . '/../queries/user.query.php';
+
+$_rUser   = getUserById($pdo, $_SESSION['user_id']);
+$userName = $_rUser ? $_rUser['name'] : 'Store Owner';
 
 $sessions = getForecastSessions($pdo, $_SESSION['user_id']);
 
