@@ -30,48 +30,6 @@ require_once __DIR__ . '/../includes/header.php';
 
         <div class="flex items-center justify-between mb-0">
             <p class="chart-title" style="margin-bottom:0">Demand Analysis</p>
-
-            <!-- Controls: Events toggle + per-event filter + Reset Zoom -->
-            <div class="flex items-center gap-3" style="flex-shrink:0; margin-left:1rem">
-
-                <!-- Events toggle + filter dropdown grouped as a split button -->
-                <div class="event-btn-group">
-                    <button id="events-toggle-btn" onclick="toggleHighlight()"
-                        class="text-xs flex items-center gap-1.5"
-                        style="padding:0.3rem 0.7rem; border-radius:999px 0 0 999px;
-                               border:1px solid #D2C8AE; border-right:none; font-weight:600">
-                        <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                            <line x1="16" y1="2" x2="16" y2="6"/>
-                            <line x1="8" y1="2" x2="8" y2="6"/>
-                            <line x1="3" y1="10" x2="21" y2="10"/>
-                        </svg>
-                        Events
-                    </button>
-                    <button id="event-filter-trigger" onclick="toggleEventFilter(event)"
-                            class="event-filter-trigger" title="Filter individual events">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="6 9 12 15 18 9"/>
-                        </svg>
-                    </button>
-
-                    <!-- Per-event filter panel — content built by buildEventFilterPanel() -->
-                    <div id="event-filter-panel" class="event-filter-panel" style="display:none"></div>
-                </div>
-
-                <button onclick="resetZoom()"
-                    class="text-xs text-[#261F0E] flex items-center gap-1.5 hover:opacity-70 transition-opacity"
-                    style="opacity:0.45">
-                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-                        <path d="M3 3v5h5"/>
-                    </svg>
-                    Reset Zoom
-                </button>
-            </div>
         </div>
 
         <!-- Category tabs — filter both the chart AND the product list below -->
@@ -84,15 +42,8 @@ require_once __DIR__ . '/../includes/header.php';
             <?php endforeach; ?>
         </div>
 
-        <!-- Date range filter -->
-        <div class="date-filter-bar">
-            <span class="date-filter-label">Date Range</span>
-            <input type="date" id="date-from" class="date-filter-input">
-            <span class="date-filter-sep">—</span>
-            <input type="date" id="date-to" class="date-filter-input">
-            <button onclick="applyDateFilter()" class="date-filter-btn">Apply</button>
-            <button onclick="resetDateFilter()" class="date-filter-btn date-filter-btn-ghost">All</button>
-        </div>
+        <!-- Year overlay selector — pills built by buildYearSelector() after data loads -->
+        <div class="year-selector" id="year-selector"></div>
 
         <!-- Selected product indicator — replaces the Chart.js legend.
              Hidden until a product row is clicked. Includes a deselect button. -->
@@ -200,6 +151,7 @@ const EVENT_COLOR         = '#FF5722';
 const INITIAL_PRODUCT_ID  = <?php echo json_encode($initialProductId); ?>;
 const INITIAL_EVENT_ID    = <?php echo json_encode($initialEventId); ?>;
 </script>
+<script src="<?php echo BASE_URL; ?>/pages/js/chart.shared.js"></script>
 <script>
 // Spin animation for the loading icon
 const spinStyle = document.createElement('style');
@@ -212,10 +164,9 @@ let activeCategory    = '';
 let activeProductId   = null;
 let activeProductName = '';
 let fullHistorical    = [];
-let currentHist       = [];
-let highlightEnabled  = localStorage.getItem('pv_highlight_events') === 'true';
+let activeYears       = new Set(); // empty = all years active
 
-// Per-event filter: stores IDs of DISABLED events (empty = all visible by default).
+// Per-event filter: stores IDs of DISABLED events (used by forecast modal annotations).
 function loadDisabledEvents() {
     const saved = localStorage.getItem('pv_disabled_events');
     return saved ? new Set(JSON.parse(saved)) : new Set();
@@ -228,7 +179,6 @@ function saveDisabledEvents() {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
-    // Wire up product row clicks via delegation to avoid inline-onclick quoting issues.
     document.querySelectorAll('.product-row[data-product-id]').forEach(function(row) {
         row.addEventListener('click', function() {
             selectProduct(
@@ -238,20 +188,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // When arriving from an event_detail product row, pre-configure the page:
-    // enable event highlighting and show only the linked event.
-    if (INITIAL_EVENT_ID !== null) {
-        const uniqueIds = new Set(CHART_EVENTS.map(function(ev) { return ev.id; }));
-        uniqueIds.delete(INITIAL_EVENT_ID);
-        disabledEventIds = uniqueIds;
-        saveDisabledEvents();
-        highlightEnabled = true;
-        localStorage.setItem('pv_highlight_events', 'true');
-    }
-
-    updateHighlightBtn();
-
-    // Pre-select the product if one was passed, otherwise load the default chart.
     if (INITIAL_PRODUCT_ID !== null) {
         const row = document.querySelector(
             '.product-row[data-product-id="' + INITIAL_PRODUCT_ID + '"]'
@@ -265,12 +201,6 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         loadSalesChart('', null);
     }
-
-    // Close event filter panel on outside click.
-    document.addEventListener('click', function(e) {
-        const group = document.querySelector('.event-btn-group');
-        if (group && !group.contains(e.target)) closeEventFilter();
-    });
 });
 
 // ── Category tabs ─────────────────────────────────────────────────────────────
@@ -281,6 +211,7 @@ document.querySelectorAll('.category-tab').forEach(function(btn) {
         activeCategory    = btn.dataset.category;
         activeProductId   = null;
         activeProductName = '';
+        activeYears       = new Set();
         updateProductRows();
         updateChartContext();
         filterProductList(activeCategory);
@@ -308,6 +239,7 @@ function selectProduct(productId, productName) {
     }
     activeProductId   = productId;
     activeProductName = productName;
+    activeYears       = new Set();
     loadSalesChart(activeCategory, productId);
     updateProductRows();
     updateChartContext();
@@ -316,6 +248,7 @@ function selectProduct(productId, productName) {
 function deselectProduct() {
     activeProductId   = null;
     activeProductName = '';
+    activeYears       = new Set();
     loadSalesChart(activeCategory, null);
     updateProductRows();
     updateChartContext();
@@ -353,15 +286,8 @@ function loadSalesChart(category, productId) {
         .then(function(data) {
             if (data.error) { showChartState('error', data.error); return; }
             fullHistorical = data.historical;
-            initDateFilter();
-            updateHighlightBtn();
-            const from = document.getElementById('date-from').value;
-            const to   = document.getElementById('date-to').value;
-            renderChart(
-                (from || to)
-                    ? fullHistorical.filter(r => (!from || r.date >= from) && (!to || r.date <= to))
-                    : fullHistorical
-            );
+            buildYearSelector(fullHistorical);
+            renderYearOverlay(fullHistorical);
         })
         .catch(() => showChartState('error', 'Network error. Please refresh.'));
 }
@@ -373,464 +299,175 @@ function showChartState(state, msg) {
     if (state === 'error') document.getElementById('chart-error').textContent = msg;
 }
 
-// ── Date range filter ─────────────────────────────────────────────────────────
-function initDateFilter() {
-    if (!fullHistorical.length) return;
-    const dates = fullHistorical.map(r => r.date);
-    const min = dates[0], max = dates[dates.length - 1];
-    const fromEl = document.getElementById('date-from');
-    const toEl   = document.getElementById('date-to');
-    fromEl.min = min; fromEl.max = max;
-    toEl.min   = min; toEl.max   = max;
-    const sf = localStorage.getItem('pv_date_from') || '';
-    const st = localStorage.getItem('pv_date_to')   || '';
-    fromEl.value = (sf && sf >= min && sf <= max) ? sf : '';
-    toEl.value   = (st && st >= min && st <= max) ? st : '';
-}
+// ── Year overlay: selector pills ──────────────────────────────────────────────
+function buildYearSelector(historical) {
+    const container = document.getElementById('year-selector');
+    if (!container) return;
+    container.innerHTML = '';
 
-function applyDateFilter() {
-    const from = document.getElementById('date-from').value;
-    const to   = document.getElementById('date-to').value;
-    localStorage.setItem('pv_date_from', from);
-    localStorage.setItem('pv_date_to',   to);
-    renderChart(fullHistorical.filter(r => (!from || r.date >= from) && (!to || r.date <= to)));
-}
+    const years = [...new Set(historical.map(function(r) { return r.date.slice(0, 4); }))].sort();
 
-function resetDateFilter() {
-    document.getElementById('date-from').value = '';
-    document.getElementById('date-to').value   = '';
-    localStorage.removeItem('pv_date_from');
-    localStorage.removeItem('pv_date_to');
-    renderChart(fullHistorical);
-}
-
-// ── Events toggle ─────────────────────────────────────────────────────────────
-function toggleHighlight() {
-    highlightEnabled = !highlightEnabled;
-    localStorage.setItem('pv_highlight_events', highlightEnabled);
-    updateHighlightBtn();
-    renderChart(currentHist);
-}
-
-function updateHighlightBtn() {
-    const btn     = document.getElementById('events-toggle-btn');
-    const trigger = document.getElementById('event-filter-trigger');
-    const on      = highlightEnabled;
-    if (!btn) return;
-    [btn, trigger].forEach(function(el) {
-        if (!el) return;
-        el.style.background  = on ? '#261F0E'     : 'transparent';
-        el.style.color       = on ? '#F0E8D0'     : '#261F0E';
-        el.style.borderColor = on ? '#261F0E'     : '#D2C8AE';
-        el.style.opacity     = on ? '1'           : '0.5';
-    });
-}
-
-// ── Per-event filter panel ────────────────────────────────────────────────────
-// Builds the dropdown content from CHART_EVENTS on demand.
-// Events are deduplicated by id, shown as a flat alphabetical list.
-function buildEventFilterPanel() {
-    const panel = document.getElementById('event-filter-panel');
-    if (!panel) return;
-    panel.innerHTML = '';
-
-    // Deduplicate: same event can have many yearly/monthly instances.
-    const seen = {};
-    CHART_EVENTS.forEach(function(ev) {
-        if (!seen[ev.id]) seen[ev.id] = { id: ev.id, name: ev.name, color: ev.color || '#FF5722' };
-    });
-    const unique = Object.values(seen).sort(function(a, b) {
-        return a.name.localeCompare(b.name);
-    });
-
-    if (!unique.length) {
-        const msg = document.createElement('p');
-        msg.className   = 'event-filter-empty';
-        msg.textContent = 'No events found.';
-        panel.appendChild(msg);
-        return;
+    if (years.length > 1) {
+        years.forEach(function(year, i) {
+            const btn = document.createElement('button');
+            btn.className    = 'year-pill';
+            btn.textContent  = year;
+            btn.dataset.year = year;
+            btn.style.setProperty('--yc', YEAR_COLORS[i % YEAR_COLORS.length]);
+            btn.addEventListener('click', function() { toggleYear(year); });
+            container.appendChild(btn);
+        });
+        updateYearPills();
     }
 
-    const inner = document.createElement('div');
-    inner.className = 'event-filter-inner';
-
-    // ── Header row with Show/Hide all ─────────────────────────────────────
-    const header = document.createElement('div');
-    header.className = 'event-filter-group-header';
-
-    const dot = document.createElement('span');
-    dot.className        = 'event-filter-dot';
-    dot.style.background = EVENT_COLOR;
-
-    const allLabel = document.createElement('span');
-    allLabel.textContent = 'Events';
-
-    const toggleBtn = document.createElement('button');
-    toggleBtn.className = 'event-filter-group-toggle';
-    refreshGroupToggle(toggleBtn, unique);
-    toggleBtn.addEventListener('click', function() {
-        toggleTypeAll(unique);
-        refreshGroupToggle(toggleBtn, unique);
-        unique.forEach(function(ev) {
-            const cb = panel.querySelector('input[data-event-id="' + ev.id + '"]');
-            if (cb) cb.checked = !disabledEventIds.has(ev.id);
-        });
-        if (highlightEnabled) renderChart(currentHist);
-    });
-
-    header.appendChild(dot);
-    header.appendChild(allLabel);
-    header.appendChild(toggleBtn);
-    inner.appendChild(header);
-
-    // ── Individual event checkboxes ───────────────────────────────────────
-    unique.forEach(function(ev) {
-        const lbl = document.createElement('label');
-        lbl.className = 'event-filter-row event-filter-row-child';
-
-        const cb = document.createElement('input');
-        cb.type            = 'checkbox';
-        cb.dataset.eventId = ev.id;
-        cb.checked         = !disabledEventIds.has(ev.id);
-
-        cb.addEventListener('change', function() {
-            if (this.checked) {
-                disabledEventIds.delete(ev.id);
-            } else {
-                disabledEventIds.add(ev.id);
-            }
-            saveDisabledEvents();
-            refreshGroupToggle(toggleBtn, unique);
-            if (highlightEnabled) renderChart(currentHist);
-        });
-
-        const evDot = document.createElement('span');
-        evDot.className        = 'event-filter-dot';
-        evDot.style.background = ev.color;
-
-        const nameSpan = document.createElement('span');
-        nameSpan.textContent = ev.name;
-
-        lbl.appendChild(cb);
-        lbl.appendChild(evDot);
-        lbl.appendChild(nameSpan);
-        inner.appendChild(lbl);
-    });
-
-    panel.appendChild(inner);
+    const resetBtn = document.createElement('button');
+    resetBtn.className   = 'chart-zoom-reset';
+    resetBtn.textContent = 'Reset Zoom';
+    resetBtn.addEventListener('click', function() { if (demandChart) demandChart.resetZoom(); });
+    container.appendChild(resetBtn);
 }
 
-// Updates the "Show all / Hide all" text on the group toggle button.
-function refreshGroupToggle(btn, evs) {
-    const allVisible = evs.every(ev => !disabledEventIds.has(ev.id));
-    btn.textContent  = allVisible ? 'Hide all' : 'Show all';
-}
-
-// Enables or disables all events.
-function toggleTypeAll(evs) {
-    const allVisible = evs.every(ev => !disabledEventIds.has(ev.id));
-    evs.forEach(function(ev) {
-        if (allVisible) {
-            disabledEventIds.add(ev.id);
-        } else {
-            disabledEventIds.delete(ev.id);
-        }
-    });
-    saveDisabledEvents();
-}
-
-function toggleEventFilter(e) {
-    e.stopPropagation();
-    const panel = document.getElementById('event-filter-panel');
-    if (!panel) return;
-    if (panel.style.display === 'none') {
-        buildEventFilterPanel(); // always rebuild to reflect latest state
-        panel.style.display = '';
+function toggleYear(year) {
+    if (activeYears.has(year)) {
+        activeYears.delete(year);
     } else {
-        panel.style.display = 'none';
+        activeYears.add(year);
     }
-}
-
-function closeEventFilter() {
-    const panel = document.getElementById('event-filter-panel');
-    if (panel) panel.style.display = 'none';
-}
-
-// ── Chart annotations ─────────────────────────────────────────────────────────
-// Compact mode (>8 events in range): thin line + small lettered circle.
-// Full mode   (≤8 events in range): labeled line or shaded box.
-// buildAnnotations is called on first render AND after every zoom/pan.
-
-function buildAnnotations(visibleFrom, visibleTo) {
-    const visible = CHART_EVENTS.filter(function(ev) {
-        if (disabledEventIds.has(ev.id)) return false;
-        const evEnd = ev.instance_end || ev.instance_start;
-        if (visibleFrom && evEnd             < visibleFrom) return false;
-        if (visibleTo   && ev.instance_start > visibleTo)   return false;
-        return true;
+    updateYearPills();
+    if (!demandChart) return;
+    const allActive = activeYears.size === 0;
+    demandChart.data.datasets.forEach(function(ds) {
+        ds.hidden = !(allActive || activeYears.has(ds.label));
     });
-
-    const compact = visible.length > 8;
-
-    // ── Lane assignment — stagger labels so nearby events don't pile up ───────
-    // Two events share a lane if the earlier one's end + proximityDays >= later one's start.
-    // proximityDays scales with the visible window so it works at any zoom level.
-    const totalDays     = (visibleFrom && visibleTo)
-        ? Math.max(1, (new Date(visibleTo) - new Date(visibleFrom)) / 86400000)
-        : 365;
-    const proximityDays = Math.max(3, Math.floor(totalDays * 0.04));
-    const laneH         = compact ? 18 : 26;   // px gap between lanes
-    const baseY         = compact ?  4 : -4;   // top-most label yAdjust
-
-    // Sort chronologically, assign each event to the first free lane.
-    const sorted = visible.slice().sort(function(a, b) {
-        return a.instance_start < b.instance_start ? -1 : 1;
-    });
-    const laneEnd  = [];   // laneEnd[l] = last occupied date in lane l
-    const yAdjOf   = [];   // parallel to sorted[]
-
-    sorted.forEach(function(ev) {
-        const evEnd = ev.instance_end || ev.instance_start;
-        let lane    = -1;
-        for (let l = 0; l < laneEnd.length; l++) {
-            const gap = (new Date(ev.instance_start) - new Date(laneEnd[l])) / 86400000;
-            if (gap >= proximityDays) { lane = l; break; }
-        }
-        if (lane === -1) { lane = laneEnd.length; laneEnd.push(''); }
-        laneEnd[lane] = evEnd;
-        yAdjOf.push(baseY + lane * laneH);
-    });
-
-    const annotations = {};
-
-    sorted.forEach(function(ev, i) {
-        const color = ev.color || EVENT_COLOR;
-        const start = ev.instance_start;
-        const end   = ev.instance_end;
-        const yAdj  = yAdjOf[i];
-        const key   = 'evt-' + i;
-
-        if (compact) {
-            // ── Compact: subtle line + small circle badge ────────────────────
-            annotations[key] = {
-                type: 'line',
-                scaleID: 'x',
-                value: start,
-                borderColor: hexToRgba(color, 0.25),
-                borderWidth: 1,
-                borderDash: [2, 5],
-                label: {
-                    display: true,
-                    content: '●',
-                    position: 'start',
-                    backgroundColor: color,
-                    color: '#fff',
-                    font: { size: 7, weight: '700', family: 'Lora' },
-                    padding: { x: 3, y: 2 },
-                    borderRadius: 99,
-                    yAdjust: yAdj,
-                },
-            };
-        } else if (end && end !== start) {
-            // ── Full: multi-day shaded box ───────────────────────────────────
-            annotations[key] = {
-                type: 'box',
-                xMin: start,
-                xMax: end,
-                backgroundColor: hexToRgba(color, 0.08),
-                borderColor: color,
-                borderWidth: 1,
-                label: {
-                    display: true,
-                    content: ev.name,
-                    position: { x: 'start', y: 'start' },
-                    backgroundColor: hexToRgba(color, 0.88),
-                    color: '#fff',
-                    font: { size: 9, family: 'Lora' },
-                    padding: { x: 5, y: 3 },
-                    borderRadius: 3,
-                    yAdjust: yAdj,
-                },
-            };
-        } else {
-            // ── Full: single-day vertical line ───────────────────────────────
-            annotations[key] = {
-                type: 'line',
-                scaleID: 'x',
-                value: start,
-                borderColor: color,
-                borderWidth: 1.5,
-                borderDash: [4, 3],
-                label: {
-                    display: true,
-                    content: ev.name,
-                    position: 'start',
-                    backgroundColor: hexToRgba(color, 0.88),
-                    color: '#fff',
-                    font: { size: 9, family: 'Lora' },
-                    padding: { x: 5, y: 3 },
-                    borderRadius: 3,
-                    yAdjust: yAdj,
-                },
-            };
-        }
-    });
-
-    return annotations;
+    demandChart.update();
 }
 
-// Rebuilds annotations for the current visible date range after zoom or pan.
-// This triggers the compact ↔ full switch automatically.
-function updateAnnotationsOnZoom({ chart }) {
-    if (!highlightEnabled || !chart.scales.x) return;
-    const tsToDate = function(ts) {
-        const d = new Date(ts);
-        return d.getFullYear()
-            + '-' + String(d.getMonth() + 1).padStart(2, '0')
-            + '-' + String(d.getDate()).padStart(2, '0');
-    };
-    chart.options.plugins.annotation.annotations = buildAnnotations(
-        tsToDate(chart.scales.x.min),
-        tsToDate(chart.scales.x.max)
-    );
-    chart.update('none');
+function updateYearPills() {
+    const allActive = activeYears.size === 0;
+    document.querySelectorAll('.year-pill[data-year]').forEach(function(btn) {
+        const selected = activeYears.has(btn.dataset.year);
+        btn.classList.toggle('year-pill-active', allActive || selected);
+        btn.classList.toggle('year-pill-muted',  !allActive && !selected);
+    });
 }
 
-function hexToRgba(hex, alpha) {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
-}
-
-// ── Render chart ──────────────────────────────────────────────────────────────
-function renderChart(historical) {
-    currentHist = historical;
-
+// ── Year overlay: render ──────────────────────────────────────────────────────
+function renderYearOverlay(historical) {
     if (!historical.length) {
         showChartState('error', 'No sales data for this selection.');
         return;
     }
-
     showChartState('chart');
 
-    const labels      = historical.map(r => r.date);
-    const values      = historical.map(r => r.actual);
-    const visibleFrom = labels[0]                 ?? null;
-    const visibleTo   = labels[labels.length - 1] ?? null;
+    const byYear    = groupByYearNorm(historical);
+    const years     = Object.keys(byYear).sort();
+    const allActive = activeYears.size === 0;
 
-    // Dataset label shown in tooltips (not in the legend — legend is hidden).
-    const datasetLabel = activeProductId ? activeProductName : 'Sales';
+    const datasets = years.map(function(year, i) {
+        const color    = YEAR_COLORS[i % YEAR_COLORS.length];
+        const isActive = allActive || activeYears.has(year);
+        return {
+            label:               year,
+            data:                byYear[year],
+            hidden:              !isActive,
+            borderColor:         color,
+            backgroundColor:     hexToRgba(color, 0.06),
+            borderWidth:         2,
+            pointRadius:         0,
+            pointHoverRadius:    4,
+            pointBackgroundColor: color,
+            fill:                false,
+            tension:             0.3,
+        };
+    });
+
+    // Compute the normalised data extent so zoom/pan can't go outside the data.
+    // Add 3 days of padding on each side so the first/last points aren't clipped.
+    let minNorm = '2000-12-31', maxNorm = '2000-01-01';
+    datasets.forEach(function(ds) {
+        ds.data.forEach(function(pt) {
+            if (pt.x < minNorm) minNorm = pt.x;
+            if (pt.x > maxNorm) maxNorm = pt.x;
+        });
+    });
+    const PAD    = 3 * 86400000;
+    const minTs  = new Date(minNorm).getTime() - PAD;
+    const maxTs  = new Date(maxNorm).getTime() + PAD;
 
     if (demandChart) demandChart.destroy();
 
     demandChart = new Chart(document.getElementById('demand-chart'), {
         type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: datasetLabel,
-                data: values,
-                borderColor: '#1A6933',
-                backgroundColor: 'rgba(26,105,51,0.08)',
-                borderWidth: 2,
-                pointRadius: 0,
-                fill: true,
-                tension: 0.3,
-            }],
-        },
+        data: { datasets: datasets },
         options: {
             responsive: true,
             interaction: { mode: 'x', intersect: false },
             plugins: {
-                // Legend hidden — selected product is shown via #chart-selected-product instead.
                 legend: { display: false },
                 zoom: {
                     zoom: {
-                        wheel:          { enabled: true },
-                        pinch:          { enabled: true },
-                        mode:           'x',
-                        onZoomComplete: updateAnnotationsOnZoom,
+                        wheel: { enabled: true },
+                        pinch: { enabled: true },
+                        mode:  'x',
                     },
                     pan: {
-                        enabled:        true,
-                        mode:           'x',
-                        onPanComplete:  updateAnnotationsOnZoom,
+                        enabled: true,
+                        mode:    'x',
+                    },
+                    limits: {
+                        x: { min: minTs, max: maxTs },
                     },
                 },
                 tooltip: {
                     backgroundColor: '#261F0E',
-                    titleColor: '#D2C8AE',
-                    bodyColor: '#F0E8D0',
-                    padding: 10,
+                    titleColor:      '#D2C8AE',
+                    bodyColor:       '#F0E8D0',
+                    padding:         10,
                     callbacks: {
+                        title: function(items) {
+                            if (!items.length) return '';
+                            const d = new Date(items[0].parsed.x);
+                            return d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+                        },
                         label: function(ctx) {
                             if (ctx.parsed.y === null) return null;
-                            return ' ' + ctx.dataset.label + ': ' + ctx.parsed.y + ' units sold';
-                        }
-                    }
+                            return ' ' + ctx.dataset.label + ': ' + Math.round(ctx.parsed.y) + ' units';
+                        },
+                    },
                 },
-                annotation: {
-                    annotations: highlightEnabled
-                        ? buildAnnotations(visibleFrom, visibleTo)
-                        : {},
-                },
+                annotation: { annotations: {} },
             },
             scales: {
                 x: {
                     type: 'time',
                     time: {
                         minUnit: 'day',
-                        tooltipFormat: 'yyyy-MM-dd',
+                        tooltipFormat: 'MMM d',
                         displayFormats: {
                             day:   'MMM d',
                             week:  'MMM d',
-                            month: 'MMM yyyy',
+                            month: 'MMM',
+                            year:  'MMM',
                         },
                     },
+                    min: minTs,
+                    max: maxTs,
                     ticks: {
                         color: 'rgba(38,31,14,0.45)',
                         font: { family: 'Lora', size: 11 },
                         maxTicksLimit: 10,
                         maxRotation: 0,
-                        callback: function(value, index, ticks) {
-                            const d = new Date(value);
-                            // Only show two-line format at day unit; at week/month
-                            // the default formatted string is used instead.
-                            const span = ticks.length > 1
-                                ? ticks[ticks.length - 1].value - ticks[0].value
-                                : 0;
-                            const avgGap = ticks.length > 1
-                                ? span / (ticks.length - 1)
-                                : Infinity;
-                            // avgGap < ~10 days → we're at day-level granularity
-                            if (avgGap < 10 * 86400000) {
-                                const month   = d.toLocaleString('default', { month: 'short' });
-                                const day     = d.getDate();
-                                const weekday = d.toLocaleString('default', { weekday: 'short' });
-                                return [month + ' ' + day, weekday];
-                            }
-                            // week / month level — let Chart.js use the displayFormat string
-                            return this.getLabelForValue(value);
-                        },
                     },
                     grid: { color: 'rgba(38,31,14,0.06)' },
                 },
                 y: {
                     beginAtZero: true,
-                    ticks: {
-                        color: 'rgba(38,31,14,0.45)',
-                        font: { family: 'Lora', size: 11 },
-                    },
-                    grid: { color: 'rgba(38,31,14,0.06)' },
+                    ticks: { color: 'rgba(38,31,14,0.45)', font: { family: 'Lora', size: 11 } },
+                    grid:  { color: 'rgba(38,31,14,0.06)' },
                 },
             },
         },
     });
-}
-
-function resetZoom() {
-    if (demandChart) demandChart.resetZoom();
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -847,6 +484,8 @@ let fcCostPrice        = 0;
 let fcSellingPrice     = 0;
 let fcHighlightEnabled = false; // events overlay on modal chart (off by default)
 let fcNvOpen           = true;  // newsvendor section expanded by default
+let fcActiveYears      = new Set(); // empty = all years visible
+let fcForecastOnly     = false; // when true, only the projected-demand line is shown
 
 // ── Modal keyboard + date-warning wiring ──────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function () {
@@ -923,6 +562,10 @@ function resetForecastModal() {
     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save Forecast'; }
     fcForecastRows   = [];
     fcOptimizeResult = null;
+    fcActiveYears    = new Set();
+    fcForecastOnly   = false;
+    const fcYearSel  = document.getElementById('fc-year-selector');
+    if (fcYearSel) fcYearSel.innerHTML = '';
     setFcPanel('input');
 }
 
@@ -1023,82 +666,93 @@ function renderForecastResults(historical, forecast, opt) {
     fcHighlightEnabled = false;
     updateFcEventsBtn();
 
-    // Build initial annotations: forecast-start line + any visible events if toggled
-    const visibleFrom = historical.length ? historical[0].date    : forecast[0].date;
-    const visibleTo   = forecast.length   ? forecast[forecast.length - 1].date : null;
+    // Normalise dates to 2000 base year so all years overlap (same axis as main chart)
+    const nd = function(d) { return d ? '2000' + d.slice(4) : null; };
+
+    // Historical: one line per year, normalized
+    const byYearFc     = groupByYearNorm(historical);
+    const fcYears      = Object.keys(byYearFc).sort();
+    const histDatasets = fcYears.map(function(year, i) {
+        const color = YEAR_COLORS[i % YEAR_COLORS.length];
+        return {
+            label:            year,
+            data:             byYearFc[year],
+            borderColor:      color,
+            backgroundColor:  'transparent',
+            borderWidth:      1.5,
+            pointRadius:      0,
+            pointHoverRadius: 3,
+            fill:             false,
+            tension:          0.3,
+        };
+    });
+
+    // Forecast datasets — normalized; projected-demand line is thicker and fully opaque
+    const fcNormStart = nd(forecast[0].date);
+    const datasets = histDatasets.concat([
+        {
+            label:           '_upper',
+            data:            forecast.map(function(r) { return { x: nd(r.date), y: r.upper }; }),
+            borderColor:     'transparent',
+            backgroundColor: 'rgba(255,87,34,0.13)',
+            borderWidth:     0,
+            pointRadius:     0,
+            fill:            '+1',
+            tension:         0.3,
+        },
+        {
+            label:       '_lower',
+            data:        forecast.map(function(r) { return { x: nd(r.date), y: r.lower }; }),
+            borderColor: 'transparent',
+            borderWidth: 0,
+            pointRadius: 0,
+            fill:        false,
+            tension:     0.3,
+        },
+        {
+            label:            'Projected Demand',
+            data:             forecast.map(function(r) { return { x: nd(r.date), y: r.predicted }; }),
+            borderColor:      '#FF5722',
+            borderWidth:      3,
+            borderDash:       [6, 3],
+            backgroundColor:  'transparent',
+            pointRadius:      0,
+            pointHoverRadius: 4,
+            fill:             false,
+            tension:          0.3,
+        },
+    ]);
+
+    // Zoom limits: normalised data extent + 3-day padding
+    let minNormFc = '2000-12-31', maxNormFc = '2000-01-01';
+    datasets.forEach(function(ds) {
+        if (ds.label === '_upper' || ds.label === '_lower') return;
+        ds.data.forEach(function(pt) {
+            if (pt.x < minNormFc) minNormFc = pt.x;
+            if (pt.x > maxNormFc) maxNormFc = pt.x;
+        });
+    });
+    const PAD_FC  = 3 * 86400000;
+    const fcMinTs = new Date(minNormFc).getTime() - PAD_FC;
+    const fcMaxTs = new Date(maxNormFc).getTime() + PAD_FC;
+
+    // Initial view: 6 months before the normalised forecast start
+    const initD = new Date(fcNormStart);
+    initD.setMonth(initD.getMonth() - 6);
+    const initialMin = initD.toISOString().slice(0, 10);
+
+    // Annotations use normalised dates so they land correctly on the 2000 axis
     const annotations = Object.assign(
-        { forecastStart: buildForecastStartAnnotation(forecast[0].date) },
-        fcHighlightEnabled ? buildAnnotations(visibleFrom, visibleTo) : {}
+        { forecastStart: buildForecastStartAnnotation(fcNormStart) },
+        fcHighlightEnabled ? buildChartAnnotations(tsToDateStr(fcMinTs), tsToDateStr(fcMaxTs), true, disabledEventIds) : {}
     );
 
     // Rebuild main chart
     if (fcChart) fcChart.destroy();
 
-    let initialMin = historical.length ? historical[0].date : (forecast.length ? forecast[0].date : null);
-    if (forecast.length) {
-        const d = new Date(forecast[0].date);
-        d.setMonth(d.getMonth() - 6);
-        initialMin = d.toISOString().slice(0, 10);
-    }
-
     fcChart = new Chart(document.getElementById('fc-chart'), {
         type: 'line',
-        data: {
-            datasets: [
-                // Historical — solid green line
-                {
-                    label: 'Historical',
-                    data: (function () {
-                        const map = {};
-                        historical.forEach(function (r) { map[r.date] = r.actual; });
-                        return Object.keys(map).sort().map(function (d) { return { x: d, y: map[d] }; });
-                    }()),
-                    borderColor: '#1A6933',
-                    borderWidth: 2,
-                    backgroundColor: 'transparent',
-                    pointRadius: 0,
-                    fill: false,
-                    tension: 0.3,
-                },
-                // Confidence upper — invisible border, fills DOWN to the lower dataset
-                {
-                    label: '_upper',
-                    data: forecast.map(function (r) { return { x: r.date, y: r.upper }; }),
-                    borderColor: 'transparent',
-                    backgroundColor: 'rgba(255,87,34,0.13)',
-                    borderWidth: 0,
-                    pointRadius: 0,
-                    fill: '+1',
-                    tension: 0.3,
-                },
-                // Confidence lower — no fill, marks the bottom of the band
-                {
-                    label: '_lower',
-                    data: forecast.map(function (r) { return { x: r.date, y: r.lower }; }),
-                    borderColor: 'transparent',
-                    borderWidth: 0,
-                    pointRadius: 0,
-                    fill: false,
-                    tension: 0.3,
-                },
-                // Projected Demand — dashed orange line on top of band
-                {
-                    label: 'Projected Demand',
-                    data: (function () {
-                        const map = {};
-                        forecast.forEach(function (r) { map[r.date] = r.predicted; });
-                        return Object.keys(map).sort().map(function (d) { return { x: d, y: map[d] }; });
-                    }()),
-                    borderColor: '#FF5722',
-                    borderWidth: 2,
-                    borderDash: [6, 3],
-                    backgroundColor: 'transparent',
-                    pointRadius: 0,
-                    fill: false,
-                    tension: 0.3,
-                },
-            ],
-        },
+        data: { datasets: datasets },
         options: {
             responsive: true,
             interaction: { mode: 'x', intersect: false },
@@ -1116,17 +770,25 @@ function renderForecastResults(historical, forecast, opt) {
                         mode:          'x',
                         onPanComplete: updateFcAnnotationsOnZoom,
                     },
+                    limits: {
+                        x: { min: fcMinTs, max: fcMaxTs },
+                    },
                 },
                 tooltip: {
                     backgroundColor: '#261F0E',
-                    titleColor: '#D2C8AE',
-                    bodyColor: '#F0E8D0',
-                    padding: 10,
-                    filter: function (item) {
+                    titleColor:      '#D2C8AE',
+                    bodyColor:       '#F0E8D0',
+                    padding:         10,
+                    filter: function(item) {
                         return item.dataset.label !== '_upper' && item.dataset.label !== '_lower';
                     },
                     callbacks: {
-                        label: function (ctx) {
+                        title: function(items) {
+                            if (!items.length) return '';
+                            const d = new Date(items[0].parsed.x);
+                            return d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+                        },
+                        label: function(ctx) {
                             if (ctx.parsed.y === null) return null;
                             return ' ' + ctx.dataset.label + ': ' + Math.round(ctx.parsed.y) + ' units';
                         },
@@ -1137,11 +799,17 @@ function renderForecastResults(historical, forecast, opt) {
             scales: {
                 x: {
                     type: 'time',
-                    min: initialMin,
+                    min:  initialMin,
+                    max:  fcMaxTs,
                     time: {
                         minUnit: 'day',
-                        tooltipFormat: 'yyyy-MM-dd',
-                        displayFormats: { day: 'MMM d', week: 'MMM d', month: 'MMM yyyy' },
+                        tooltipFormat: 'MMM d',
+                        displayFormats: {
+                            day:   'MMM d',
+                            week:  'MMM d',
+                            month: 'MMM',
+                            year:  'MMM',
+                        },
                     },
                     ticks: {
                         color: 'rgba(38,31,14,0.45)',
@@ -1154,37 +822,16 @@ function renderForecastResults(historical, forecast, opt) {
                 y: {
                     beginAtZero: true,
                     ticks: { color: 'rgba(38,31,14,0.45)', font: { family: 'Lora', size: 11 } },
-                    grid: { color: 'rgba(38,31,14,0.06)' },
+                    grid:  { color: 'rgba(38,31,14,0.06)' },
                 },
             },
         },
     });
 
+    fcActiveYears = new Set();
+    buildFcYearSelector(fcYears);
     renderWeeklyChart(forecast);
     renderNewsvendorExplanation(opt, fcCostPrice, fcSellingPrice, fcCurrentStock);
-}
-
-// ── Forecast-start annotation (always shown) ──────────────────────────────────
-function buildForecastStartAnnotation(startDate) {
-    return {
-        type: 'line',
-        scaleID: 'x',
-        value: startDate,
-        borderColor: 'rgba(38,31,14,0.25)',
-        borderWidth: 1,
-        borderDash: [4, 4],
-        label: {
-            display: true,
-            content: 'Forecast',
-            position: 'start',
-            backgroundColor: 'rgba(38,31,14,0.72)',
-            color: '#F0E8D0',
-            font: { size: 9, family: 'Lora' },
-            padding: { x: 5, y: 3 },
-            borderRadius: 3,
-            yAdjust: -4,
-        },
-    };
 }
 
 // ── Events toggle on modal chart ──────────────────────────────────────────────
@@ -1192,13 +839,12 @@ function toggleFcEvents() {
     fcHighlightEnabled = !fcHighlightEnabled;
     updateFcEventsBtn();
     if (!fcChart) return;
-    const visibleFrom = fcChart.scales.x
-        ? tsToDateStr(fcChart.scales.x.min) : null;
-    const visibleTo = fcChart.scales.x
-        ? tsToDateStr(fcChart.scales.x.max) : null;
+    const fcNormStart = '2000' + fcForecastRows[0].date.slice(4);
+    const visibleFrom = fcChart.scales.x ? tsToDateStr(fcChart.scales.x.min) : null;
+    const visibleTo   = fcChart.scales.x ? tsToDateStr(fcChart.scales.x.max) : null;
     fcChart.options.plugins.annotation.annotations = Object.assign(
-        { forecastStart: buildForecastStartAnnotation(fcForecastRows[0].date) },
-        fcHighlightEnabled ? buildAnnotations(visibleFrom, visibleTo) : {}
+        { forecastStart: buildForecastStartAnnotation(fcNormStart) },
+        fcHighlightEnabled ? buildChartAnnotations(visibleFrom, visibleTo, true, disabledEventIds) : {}
     );
     fcChart.update('none');
 }
@@ -1215,19 +861,77 @@ function updateFcEventsBtn() {
 // Rebuilds event annotations after zoom/pan (compact ↔ full switch).
 function updateFcAnnotationsOnZoom({ chart }) {
     if (!fcHighlightEnabled || !chart.scales.x) return;
+    const fcNormStart = '2000' + fcForecastRows[0].date.slice(4);
     chart.options.plugins.annotation.annotations = Object.assign(
-        { forecastStart: buildForecastStartAnnotation(fcForecastRows[0].date) },
-        buildAnnotations(tsToDateStr(chart.scales.x.min), tsToDateStr(chart.scales.x.max))
+        { forecastStart: buildForecastStartAnnotation(fcNormStart) },
+        buildChartAnnotations(tsToDateStr(chart.scales.x.min), tsToDateStr(chart.scales.x.max), true, disabledEventIds)
     );
     chart.update('none');
 }
 
-// Shared timestamp → 'YYYY-MM-DD' helper used by both chart zoom handlers.
-function tsToDateStr(ts) {
-    const d = new Date(ts);
-    return d.getFullYear()
-        + '-' + String(d.getMonth() + 1).padStart(2, '0')
-        + '-' + String(d.getDate()).padStart(2, '0');
+// ── Forecast modal year filter pills ─────────────────────────────────────────
+function buildFcYearSelector(years) {
+    const container = document.getElementById('fc-year-selector');
+    if (!container || years.length <= 1) return;
+    container.innerHTML = '';
+
+    years.forEach(function(year, i) {
+        const btn = document.createElement('button');
+        btn.className    = 'year-pill';
+        btn.textContent  = year;
+        btn.dataset.year = year;
+        btn.style.setProperty('--yc', YEAR_COLORS[i % YEAR_COLORS.length]);
+        btn.addEventListener('click', function() { toggleFcYear(year); });
+        container.appendChild(btn);
+    });
+
+    updateFcYearPills();
+}
+
+function toggleFcYear(year) {
+    if (fcActiveYears.has(year)) {
+        fcActiveYears.delete(year);
+    } else {
+        fcActiveYears.add(year);
+    }
+    updateFcYearPills();
+    if (!fcChart) return;
+    const allActive = fcActiveYears.size === 0;
+    fcChart.data.datasets.forEach(function(ds) {
+        if (ds.label === 'Projected Demand' || ds.label === '_upper' || ds.label === '_lower') return;
+        ds.hidden = !(allActive || fcActiveYears.has(ds.label));
+    });
+    fcChart.update();
+}
+
+function updateFcYearPills() {
+    const allActive = fcActiveYears.size === 0;
+    document.querySelectorAll('#fc-year-selector .year-pill[data-year]').forEach(function(btn) {
+        const selected = fcActiveYears.has(btn.dataset.year);
+        btn.classList.toggle('year-pill-active', allActive || selected);
+        btn.classList.toggle('year-pill-muted',  !allActive && !selected);
+    });
+}
+
+function toggleFcForecastOnly() {
+    fcForecastOnly = !fcForecastOnly;
+    updateFcForecastOnlyBtn();
+    if (!fcChart) return;
+    const allActive = fcActiveYears.size === 0;
+    fcChart.data.datasets.forEach(function(ds) {
+        if (ds.label === 'Projected Demand' || ds.label === '_upper' || ds.label === '_lower') return;
+        ds.hidden = fcForecastOnly ? true : !(allActive || fcActiveYears.has(ds.label));
+    });
+    fcChart.update();
+}
+
+function updateFcForecastOnlyBtn() {
+    const btn = document.getElementById('fc-forecast-only-btn');
+    if (!btn) return;
+    btn.style.background  = fcForecastOnly ? '#261F0E' : 'transparent';
+    btn.style.color       = fcForecastOnly ? '#F0E8D0' : '#261F0E';
+    btn.style.borderColor = fcForecastOnly ? '#261F0E' : '#D2C8AE';
+    btn.style.opacity     = fcForecastOnly ? '1'       : '0.45';
 }
 
 // ── Weekly forecast bar chart ─────────────────────────────────────────────────
@@ -1527,6 +1231,9 @@ function saveForecast() {
                         </span>
                     </div>
                     <div class="fc-chart-btns">
+                        <button id="fc-forecast-only-btn" class="fc-events-btn" onclick="toggleFcForecastOnly()">
+                            Forecast Only
+                        </button>
                         <button id="fc-events-btn" class="fc-events-btn" onclick="toggleFcEvents()">
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1547,6 +1254,9 @@ function saveForecast() {
                         </button>
                     </div>
                 </div>
+
+                <!-- Year filter pills — built by buildFcYearSelector() after chart loads -->
+                <div id="fc-year-selector" class="fc-year-selector"></div>
 
                 <canvas id="fc-chart" style="max-height:280px"></canvas>
             </div>

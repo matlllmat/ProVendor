@@ -469,6 +469,37 @@
     line-height: 1.5;
 }
 
+/* ── Year filter pills row ── */
+.rpt-year-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-bottom: 0.6rem;
+    min-height: 0;
+}
+
+.rpt-year-selector .year-pill {
+    padding: 0.22rem 0.6rem;
+    border-radius: 999px;
+    border: 1.5px solid var(--yc, #1A6933);
+    background: transparent;
+    color: var(--yc, #1A6933);
+    font-size: 0.67rem;
+    font-weight: 700;
+    font-family: 'Lora', serif;
+    cursor: pointer;
+    opacity: 0.35;
+    transition: opacity 0.15s, background 0.15s;
+}
+.rpt-year-selector .year-pill.year-pill-active {
+    background: var(--yc, #1A6933);
+    color: #F0E8D0;
+    opacity: 1;
+}
+.rpt-year-selector .year-pill.year-pill-muted {
+    opacity: 0.2;
+}
+
 /* ── Weekly forecast bar chart section ── */
 .rpt-weekly-wrap {
     padding: 0 1.5rem 1.5rem;

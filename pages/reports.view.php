@@ -179,6 +179,9 @@ require_once __DIR__ . '/../includes/header.php';
                         </span>
                     </div>
                     <div class="rpt-chart-btns">
+                        <button id="rpt-forecast-only-btn" class="rpt-events-btn" onclick="toggleRptForecastOnly()">
+                            Forecast Only
+                        </button>
                         <button id="rpt-events-btn" class="rpt-events-btn" onclick="toggleRptEvents()">
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -199,6 +202,9 @@ require_once __DIR__ . '/../includes/header.php';
                         </button>
                     </div>
                 </div>
+                <!-- Year filter pills — built by buildRptYearSelector() after chart loads -->
+                <div id="rpt-year-selector" class="rpt-year-selector"></div>
+
                 <canvas id="rpt-chart" style="max-height:280px"></canvas>
             </div>
 
@@ -262,16 +268,20 @@ require_once __DIR__ . '/../includes/header.php';
 const CHART_EVENTS = <?php echo json_encode($chartEvents); ?>;
 const EVENT_COLOR  = '#FF5722';
 </script>
+<script src="<?php echo BASE_URL; ?>/pages/js/chart.shared.js"></script>
 <script>
 // Spin animation for loading icons
 const spinStyle = document.createElement('style');
 spinStyle.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
 document.head.appendChild(spinStyle);
 
-let rptChart        = null;
-let rptWeeklyChart  = null;
-let rptHighlight    = false;
-let rptNvOpen       = true;
+let rptChart           = null;
+let rptWeeklyChart     = null;
+let rptHighlight       = false;
+let rptNvOpen          = true;
+let rptActiveYears     = new Set();
+let rptForecastOnly    = false;
+let rptForecastStart   = null; // normalised forecast-start date (2000-MM-DD)
 
 // ── Open detail modal ─────────────────────────────────────────────────────────
 function openDetailModal(btn) {
@@ -292,8 +302,14 @@ function openDetailModal(btn) {
 
     if (rptChart)       { rptChart.destroy();       rptChart       = null; }
     if (rptWeeklyChart) { rptWeeklyChart.destroy();  rptWeeklyChart = null; }
-    rptHighlight = false;
+    rptHighlight     = false;
+    rptActiveYears   = new Set();
+    rptForecastOnly  = false;
+    rptForecastStart = null;
+    const rptYearSel = document.getElementById('rpt-year-selector');
+    if (rptYearSel) rptYearSel.innerHTML = '';
     updateRptEventsBtn();
+    updateRptForecastOnlyBtn();
 
     // Fetch chart data + session metadata
     const body = new FormData();
@@ -350,116 +366,13 @@ function closeDetailModal() {
     if (rptWeeklyChart) { rptWeeklyChart.destroy();  rptWeeklyChart = null; }
 }
 
-// ── Helpers shared with annotation logic ─────────────────────────────────────
-function hexToRgba(hex, alpha) {
-    const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
-    return 'rgba('+r+','+g+','+b+','+alpha+')';
-}
-function tsToDateStr(ts) {
-    const d = new Date(ts);
-    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-}
-
-// ── Event annotations (all events shown — no per-event filter in reports) ────
-function buildRptAnnotations(visibleFrom, visibleTo) {
-    const visible = CHART_EVENTS.filter(function (ev) {
-        const evEnd = ev.instance_end || ev.instance_start;
-        if (visibleFrom && evEnd             < visibleFrom) return false;
-        if (visibleTo   && ev.instance_start > visibleTo)   return false;
-        return true;
-    });
-    const compact = visible.length > 8;
-
-    // ── Lane assignment — stagger labels so nearby events don't pile up ───────
-    const totalDays     = (visibleFrom && visibleTo)
-        ? Math.max(1, (new Date(visibleTo) - new Date(visibleFrom)) / 86400000)
-        : 365;
-    const proximityDays = Math.max(3, Math.floor(totalDays * 0.04));
-    const laneH         = compact ? 18 : 26;
-    const baseY         = compact ?  4 : -4;
-
-    const sorted = visible.slice().sort(function (a, b) {
-        return a.instance_start < b.instance_start ? -1 : 1;
-    });
-    const laneEnd = [];
-    const yAdjOf  = [];
-
-    sorted.forEach(function (ev) {
-        const evEnd = ev.instance_end || ev.instance_start;
-        let lane    = -1;
-        for (let l = 0; l < laneEnd.length; l++) {
-            const gap = (new Date(ev.instance_start) - new Date(laneEnd[l])) / 86400000;
-            if (gap >= proximityDays) { lane = l; break; }
-        }
-        if (lane === -1) { lane = laneEnd.length; laneEnd.push(''); }
-        laneEnd[lane] = evEnd;
-        yAdjOf.push(baseY + lane * laneH);
-    });
-
-    const annotations = {};
-    sorted.forEach(function (ev, i) {
-        const color = ev.color || EVENT_COLOR;
-        const yAdj  = yAdjOf[i];
-        const key   = 'evt-' + i;
-        if (compact) {
-            annotations[key] = {
-                type: 'line', scaleID: 'x', value: ev.instance_start,
-                borderColor: hexToRgba(color, 0.25), borderWidth: 1, borderDash: [2,5],
-                label: {
-                    display: true, content: '●', position: 'start',
-                    backgroundColor: color, color: '#fff',
-                    font: { size: 7, weight: '700', family: 'Lora' },
-                    padding: { x: 3, y: 2 }, borderRadius: 99, yAdjust: yAdj,
-                },
-            };
-        } else if (ev.instance_end && ev.instance_end !== ev.instance_start) {
-            annotations[key] = {
-                type: 'box', xMin: ev.instance_start, xMax: ev.instance_end,
-                backgroundColor: hexToRgba(color, 0.08), borderColor: color, borderWidth: 1,
-                label: {
-                    display: true, content: ev.name, position: { x: 'start', y: 'start' },
-                    backgroundColor: hexToRgba(color, 0.88), color: '#fff',
-                    font: { size: 9, family: 'Lora' }, padding: { x: 5, y: 3 }, borderRadius: 3,
-                    yAdjust: yAdj,
-                },
-            };
-        } else {
-            annotations[key] = {
-                type: 'line', scaleID: 'x', value: ev.instance_start,
-                borderColor: color, borderWidth: 1.5, borderDash: [4,3],
-                label: {
-                    display: true, content: ev.name, position: 'start',
-                    backgroundColor: hexToRgba(color, 0.88), color: '#fff',
-                    font: { size: 9, family: 'Lora' }, padding: { x: 5, y: 3 }, borderRadius: 3,
-                    yAdjust: yAdj,
-                },
-            };
-        }
-    });
-    return annotations;
-}
-
 function updateRptAnnotationsOnZoom({ chart }) {
     if (!rptHighlight || !chart.scales.x) return;
-    const forecastStartDate = chart.data.datasets[1] && chart.data.datasets[1].data.length
-        ? chart.data.datasets[1].data[0].x : null;
-    const base = forecastStartDate ? { forecastStart: buildForecastStartAnnotation(forecastStartDate) } : {};
+    const base = rptForecastStart ? { forecastStart: buildForecastStartAnnotation(rptForecastStart) } : {};
     chart.options.plugins.annotation.annotations = Object.assign(
-        base, buildRptAnnotations(tsToDateStr(chart.scales.x.min), tsToDateStr(chart.scales.x.max))
+        base, buildChartAnnotations(tsToDateStr(chart.scales.x.min), tsToDateStr(chart.scales.x.max), true, new Set())
     );
     chart.update('none');
-}
-
-function buildForecastStartAnnotation(startDate) {
-    return {
-        type: 'line', scaleID: 'x', value: startDate,
-        borderColor: 'rgba(38,31,14,0.25)', borderWidth: 1, borderDash: [4,4],
-        label: {
-            display: true, content: 'Forecast', position: 'start',
-            backgroundColor: 'rgba(38,31,14,0.72)', color: '#F0E8D0',
-            font: { size: 9, family: 'Lora' }, padding: { x: 5, y: 3 }, borderRadius: 3, yAdjust: -4,
-        },
-    };
 }
 
 // ── Events toggle ─────────────────────────────────────────────────────────────
@@ -467,12 +380,10 @@ function toggleRptEvents() {
     rptHighlight = !rptHighlight;
     updateRptEventsBtn();
     if (!rptChart || !rptChart.scales.x) return;
-    const forecastDs = rptChart.data.datasets[1];
-    const fStart = forecastDs && forecastDs.data.length ? forecastDs.data[0].x : null;
-    const base = fStart ? { forecastStart: buildForecastStartAnnotation(fStart) } : {};
+    const base = rptForecastStart ? { forecastStart: buildForecastStartAnnotation(rptForecastStart) } : {};
     rptChart.options.plugins.annotation.annotations = rptHighlight
         ? Object.assign(base, buildRptAnnotations(
-            tsToDateStr(rptChart.scales.x.min), tsToDateStr(rptChart.scales.x.max)))
+            tsToDateStr(rptChart.scales.x.min), tsToDateStr(rptChart.scales.x.max), true, new Set()))
         : base;
     rptChart.update('none');
 }
@@ -490,59 +401,106 @@ function updateRptEventsBtn() {
 function renderDetailChart(historical, forecast) {
     if (rptChart) rptChart.destroy();
 
-    const visibleFrom = historical.length ? historical[0].date : (forecast.length ? forecast[0].date : null);
-    const visibleTo   = forecast.length   ? forecast[forecast.length - 1].date : null;
-    const annotations = forecast.length ? { forecastStart: buildForecastStartAnnotation(forecast[0].date) } : {};
+    // Normalize all dates to 2000 base year so all years overlap on the same Jan–Dec axis.
+    const nd = function(d) { return d ? '2000' + d.slice(4) : null; };
 
-    // Default view: 6 months before forecast start so the chart opens on recent
-    // history + the full forecast rather than years of old data on the left.
-    let initialMin = visibleFrom;
-    if (forecast.length) {
-        const d = new Date(forecast[0].date);
+    // Historical: one dataset per year, dates normalized
+    const byYear    = groupByYearNorm(historical);
+    const rptYears  = Object.keys(byYear).sort();
+    const allActive = rptActiveYears.size === 0;
+
+    const histDatasets = rptYears.map(function(year, i) {
+        const color    = YEAR_COLORS[i % YEAR_COLORS.length];
+        const isActive = allActive || rptActiveYears.has(year);
+        return {
+            label:            year,
+            data:             byYear[year],
+            hidden:           !isActive,
+            borderColor:      color,
+            backgroundColor:  'transparent',
+            borderWidth:      1.5,
+            pointRadius:      0,
+            pointHoverRadius: 3,
+            fill:             false,
+            tension:          0.3,
+        };
+    });
+
+    // Forecast dataset — normalized, thicker dashed orange line
+    rptForecastStart = forecast.length ? nd(forecast[0].date) : null;
+    const fcDataset = {
+        label:            'Projected Demand',
+        data:             forecast.map(function(r) { return { x: nd(r.date), y: r.predicted }; }),
+        borderColor:      '#FF5722',
+        borderWidth:      3,
+        borderDash:       [6, 3],
+        backgroundColor:  'transparent',
+        pointRadius:      0,
+        pointHoverRadius: 4,
+        fill:             false,
+        tension:          0.3,
+    };
+    const datasets = histDatasets.concat([fcDataset]);
+
+    // Zoom limits: normalized data extent + 3-day padding
+    let minNorm = '2000-12-31', maxNorm = '2000-01-01';
+    datasets.forEach(function(ds) {
+        ds.data.forEach(function(pt) {
+            if (pt.x && pt.x < minNorm) minNorm = pt.x;
+            if (pt.x && pt.x > maxNorm) maxNorm = pt.x;
+        });
+    });
+    const PAD   = 3 * 86400000;
+    const minTs = new Date(minNorm).getTime() - PAD;
+    const maxTs = new Date(maxNorm).getTime() + PAD;
+
+    // Initial view: 6 months before normalized forecast start
+    let initialMin = minNorm;
+    if (rptForecastStart) {
+        const d = new Date(rptForecastStart);
         d.setMonth(d.getMonth() - 6);
         initialMin = d.toISOString().slice(0, 10);
     }
 
+    const annotations = rptForecastStart
+        ? { forecastStart: buildForecastStartAnnotation(rptForecastStart) } : {};
+
     rptChart = new Chart(document.getElementById('rpt-chart'), {
         type: 'line',
-        data: {
-            datasets: [
-                {
-                    label: 'Historical',
-                    data: (function () {
-                        const map = {};
-                        historical.forEach(function (r) { map[r.date] = r.actual; });
-                        return Object.keys(map).sort().map(function (d) { return { x: d, y: map[d] }; });
-                    }()),
-                    borderColor: '#1A6933', borderWidth: 2, backgroundColor: 'transparent',
-                    pointRadius: 0, fill: false, tension: 0.3,
-                },
-                {
-                    label: 'Projected Demand',
-                    data: (function () {
-                        // Guard against duplicate dates from the DB — keep last value per date.
-                        const map = {};
-                        forecast.forEach(function (r) { map[r.date] = r.predicted; });
-                        return Object.keys(map).sort().map(function (d) { return { x: d, y: map[d] }; });
-                    }()),
-                    borderColor: '#FF5722', borderWidth: 2, borderDash: [6,3],
-                    backgroundColor: 'transparent', pointRadius: 0, fill: false, tension: 0.3,
-                },
-            ],
-        },
+        data: { datasets: datasets },
         options: {
             responsive: true,
             interaction: { mode: 'x', intersect: false },
             plugins: {
                 legend: { display: false },
                 zoom: {
-                    zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x', onZoomComplete: updateRptAnnotationsOnZoom },
-                    pan:  { enabled: true, mode: 'x', onPanComplete: updateRptAnnotationsOnZoom },
+                    zoom: {
+                        wheel:          { enabled: true },
+                        pinch:          { enabled: true },
+                        mode:           'x',
+                        onZoomComplete: updateRptAnnotationsOnZoom,
+                    },
+                    pan: {
+                        enabled:       true,
+                        mode:          'x',
+                        onPanComplete: updateRptAnnotationsOnZoom,
+                    },
+                    limits: {
+                        x: { min: minTs, max: maxTs },
+                    },
                 },
                 tooltip: {
-                    backgroundColor: '#261F0E', titleColor: '#D2C8AE', bodyColor: '#F0E8D0', padding: 10,
+                    backgroundColor: '#261F0E',
+                    titleColor:      '#D2C8AE',
+                    bodyColor:       '#F0E8D0',
+                    padding:         10,
                     callbacks: {
-                        label: function (ctx) {
+                        title: function(items) {
+                            if (!items.length) return '';
+                            const d = new Date(items[0].parsed.x);
+                            return d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+                        },
+                        label: function(ctx) {
                             if (ctx.parsed.y === null) return null;
                             return ' ' + ctx.dataset.label + ': ' + Math.round(ctx.parsed.y) + ' units';
                         },
@@ -553,19 +511,102 @@ function renderDetailChart(historical, forecast) {
             scales: {
                 x: {
                     type: 'time',
-                    min: initialMin,
-                    time: { minUnit: 'day', tooltipFormat: 'yyyy-MM-dd', displayFormats: { day: 'MMM d', week: 'MMM d', month: 'MMM yyyy' } },
-                    ticks: { color: 'rgba(38,31,14,0.45)', font: { family: 'Lora', size: 11 }, maxTicksLimit: 10, maxRotation: 0 },
+                    min:  initialMin,
+                    max:  maxTs,
+                    time: {
+                        minUnit: 'day',
+                        tooltipFormat: 'MMM d',
+                        displayFormats: {
+                            day:   'MMM d',
+                            week:  'MMM d',
+                            month: 'MMM',
+                            year:  'MMM',
+                        },
+                    },
+                    ticks: {
+                        color: 'rgba(38,31,14,0.45)',
+                        font: { family: 'Lora', size: 11 },
+                        maxTicksLimit: 10,
+                        maxRotation: 0,
+                    },
                     grid: { color: 'rgba(38,31,14,0.06)' },
                 },
                 y: {
                     beginAtZero: true,
                     ticks: { color: 'rgba(38,31,14,0.45)', font: { family: 'Lora', size: 11 } },
-                    grid: { color: 'rgba(38,31,14,0.06)' },
+                    grid:  { color: 'rgba(38,31,14,0.06)' },
                 },
             },
         },
     });
+
+    rptActiveYears = new Set();
+    buildRptYearSelector(rptYears);
+}
+
+// ── Year filter pills ─────────────────────────────────────────────────────────
+function buildRptYearSelector(years) {
+    const container = document.getElementById('rpt-year-selector');
+    if (!container || years.length <= 1) return;
+    container.innerHTML = '';
+
+    years.forEach(function(year, i) {
+        const btn = document.createElement('button');
+        btn.className    = 'year-pill';
+        btn.textContent  = year;
+        btn.dataset.year = year;
+        btn.style.setProperty('--yc', YEAR_COLORS[i % YEAR_COLORS.length]);
+        btn.addEventListener('click', function() { toggleRptYear(year); });
+        container.appendChild(btn);
+    });
+
+    updateRptYearPills();
+}
+
+function toggleRptYear(year) {
+    if (rptActiveYears.has(year)) {
+        rptActiveYears.delete(year);
+    } else {
+        rptActiveYears.add(year);
+    }
+    updateRptYearPills();
+    if (!rptChart) return;
+    const allActive = rptActiveYears.size === 0;
+    rptChart.data.datasets.forEach(function(ds) {
+        if (ds.label === 'Projected Demand') return;
+        ds.hidden = !(allActive || rptActiveYears.has(ds.label));
+    });
+    rptChart.update();
+}
+
+function updateRptYearPills() {
+    const allActive = rptActiveYears.size === 0;
+    document.querySelectorAll('#rpt-year-selector .year-pill[data-year]').forEach(function(btn) {
+        const selected = rptActiveYears.has(btn.dataset.year);
+        btn.classList.toggle('year-pill-active', allActive || selected);
+        btn.classList.toggle('year-pill-muted',  !allActive && !selected);
+    });
+}
+
+function toggleRptForecastOnly() {
+    rptForecastOnly = !rptForecastOnly;
+    updateRptForecastOnlyBtn();
+    if (!rptChart) return;
+    const allActive = rptActiveYears.size === 0;
+    rptChart.data.datasets.forEach(function(ds) {
+        if (ds.label === 'Projected Demand') return;
+        ds.hidden = rptForecastOnly ? true : !(allActive || rptActiveYears.has(ds.label));
+    });
+    rptChart.update();
+}
+
+function updateRptForecastOnlyBtn() {
+    const btn = document.getElementById('rpt-forecast-only-btn');
+    if (!btn) return;
+    btn.style.background  = rptForecastOnly ? '#261F0E' : 'transparent';
+    btn.style.color       = rptForecastOnly ? '#F0E8D0' : '#261F0E';
+    btn.style.borderColor = rptForecastOnly ? '#261F0E' : '#D2C8AE';
+    btn.style.opacity     = rptForecastOnly ? '1'       : '0.45';
 }
 
 // ── Weekly forecast bar chart ─────────────────────────────────────────────────
