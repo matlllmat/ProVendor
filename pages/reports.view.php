@@ -6,18 +6,15 @@ require_once __DIR__ . '/reports.logic.php';
 
 $pageTitle = 'ProVendor — Reports';
 $pageCss   = 'reports.css';
+$extraCss  = 'chart_modal.css';
 require_once __DIR__ . '/../includes/header.php';
 ?>
 <body class="bg-[#F0E8D0] min-h-screen dot-pattern-light">
 
 <?php require_once __DIR__ . '/../includes/navbar.php'; ?>
 
-<!-- ════════════════════════════════════════════
-     MAIN
-════════════════════════════════════════════ -->
 <main class="max-w-5xl mx-auto px-6 py-8">
 
-    <!-- Page heading -->
     <div class="mb-6">
         <h1 class="text-2xl font-semibold text-[#261F0E] tracking-tight">Demand Plans</h1>
         <p class="text-sm text-[#261F0E] mt-1" style="opacity:0.5">
@@ -25,7 +22,6 @@ require_once __DIR__ . '/../includes/header.php';
         </p>
     </div>
 
-    <!-- Session list -->
     <div class="session-list">
 
         <?php if (empty($sessions)): ?>
@@ -44,7 +40,6 @@ require_once __DIR__ . '/../includes/header.php';
             <?php foreach ($sessions as $s): ?>
             <div class="session-row">
 
-                <!-- Left: product name + summary stats -->
                 <div class="session-info">
                     <div class="session-product-line">
                         <span class="session-product-name">
@@ -74,12 +69,10 @@ require_once __DIR__ . '/../includes/header.php';
                     </div>
                 </div>
 
-                <!-- Centre: save timestamp -->
                 <div class="session-timestamp">
                     Saved <?php echo date('M j, Y · g:i A', strtotime($s['generated_at'])); ?>
                 </div>
 
-                <!-- Right: actions -->
                 <div class="session-actions">
                     <button class="session-view-btn"
                             data-product-id="<?php echo $s['product_id']; ?>"
@@ -117,148 +110,6 @@ require_once __DIR__ . '/../includes/header.php';
 </main>
 
 
-<!-- ════════════════════════════════════════════
-     DETAIL MODAL
-════════════════════════════════════════════ -->
-<div id="rpt-modal" class="fixed inset-0 z-[1000] flex items-center justify-center hidden"
-     role="dialog" aria-modal="true" aria-labelledby="rpt-modal-title">
-
-    <!-- Backdrop -->
-    <div class="absolute inset-0" style="background:rgba(38,31,14,0.55)" onclick="closeDetailModal()"></div>
-
-    <!-- Card -->
-    <div class="rpt-modal-card">
-
-        <!-- Header -->
-        <div class="rpt-modal-header">
-            <div style="min-width:0">
-                <p class="rpt-modal-label">Demand Plan</p>
-                <h2 id="rpt-modal-title" class="rpt-modal-title">—</h2>
-            </div>
-            <button class="rpt-modal-close" onclick="closeDetailModal()" title="Close">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-            </button>
-        </div>
-
-        <!-- Loading -->
-        <div id="rpt-loading" class="rpt-modal-loading">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                 stroke-width="2" style="animation:spin 1s linear infinite">
-                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-            </svg>
-            Loading chart…
-        </div>
-
-        <!-- Error -->
-        <div id="rpt-error" class="rpt-modal-error" style="display:none"></div>
-
-        <!-- Content (hidden until loaded) -->
-        <div id="rpt-content" style="display:none">
-
-            <!-- Chart -->
-            <div class="rpt-chart-wrap">
-                <div class="rpt-chart-controls">
-                    <div class="rpt-chart-legend">
-                        <span class="rpt-legend-item">
-                            <svg width="18" height="10" viewBox="0 0 18 10">
-                                <line x1="0" y1="5" x2="18" y2="5" stroke="#1A6933" stroke-width="2"/>
-                            </svg>
-                            Historical
-                            <span class="rpt-legend-info" data-tip="Actual units sold each day before this plan was created — the real demand pattern the model learned from.">ⓘ</span>
-                        </span>
-                        <span class="rpt-legend-item">
-                            <svg width="18" height="10" viewBox="0 0 18 10">
-                                <line x1="0" y1="5" x2="18" y2="5" stroke="#FF5722" stroke-width="2"
-                                      stroke-dasharray="5 3"/>
-                            </svg>
-                            Projected Demand
-                            <span class="rpt-legend-info" data-tip="Units the model predicts will be needed each day. This drives the recommended order quantity.">ⓘ</span>
-                        </span>
-                    </div>
-                    <div class="rpt-chart-btns">
-                        <button id="rpt-forecast-only-btn" class="rpt-events-btn" onclick="toggleRptForecastOnly()">
-                            Forecast Only
-                        </button>
-                        <button id="rpt-events-btn" class="rpt-events-btn" onclick="toggleRptEvents()">
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                                <line x1="16" y1="2" x2="16" y2="6"/>
-                                <line x1="8" y1="2" x2="8" y2="6"/>
-                                <line x1="3" y1="10" x2="21" y2="10"/>
-                            </svg>
-                            Events
-                        </button>
-                        <button class="rpt-zoom-reset-btn" onclick="if(rptChart) rptChart.resetZoom()">
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-                                <path d="M3 3v5h5"/>
-                            </svg>
-                            Reset Zoom
-                        </button>
-                    </div>
-                </div>
-                <!-- Year filter pills — built by buildRptYearSelector() after chart loads -->
-                <div id="rpt-year-selector" class="rpt-year-selector"></div>
-
-                <canvas id="rpt-chart" style="max-height:280px"></canvas>
-            </div>
-
-            <!-- Stat cards -->
-            <div class="rpt-stats-grid">
-                <div class="rpt-stat-card">
-                    <p class="rpt-stat-label">Total Forecast</p>
-                    <p id="rpt-stat-demand" class="rpt-stat-value"></p>
-                    <p class="rpt-stat-sub">units predicted</p>
-                </div>
-                <div class="rpt-stat-card">
-                    <p class="rpt-stat-label">Current Stock</p>
-                    <p id="rpt-stat-stock" class="rpt-stat-value"></p>
-                    <p class="rpt-stat-sub">units on hand</p>
-                </div>
-                <div class="rpt-stat-card">
-                    <p class="rpt-stat-label">Order Qty</p>
-                    <p id="rpt-stat-order" class="rpt-stat-value rpt-stat-accent"></p>
-                    <p class="rpt-stat-sub">units to order</p>
-                </div>
-                <div class="rpt-stat-card">
-                    <p class="rpt-stat-label">Est. Profit</p>
-                    <p id="rpt-stat-profit" class="rpt-stat-value rpt-stat-green"></p>
-                    <p class="rpt-stat-sub">at forecast demand</p>
-                </div>
-            </div>
-
-            <!-- Newsvendor explanation -->
-            <div id="rpt-nv-section" class="rpt-nv-section">
-                <button class="rpt-nv-header" onclick="toggleRptNvSection()">
-                    <span class="rpt-nv-title">Newsvendor Model — How this was calculated</span>
-                    <svg id="rpt-nv-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none"
-                         stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-                         style="transition:transform 0.2s; flex-shrink:0">
-                        <polyline points="6 9 12 15 18 9"/>
-                    </svg>
-                </button>
-                <div id="rpt-nv-body" class="rpt-nv-body">
-                    <!-- Filled by renderDetailNvExplanation() -->
-                </div>
-            </div>
-
-            <!-- Weekly forecast bar chart -->
-            <div class="rpt-weekly-wrap">
-                <p class="rpt-section-label">Weekly Demand Forecast</p>
-                <canvas id="rpt-weekly-chart" style="max-height:170px"></canvas>
-            </div>
-
-        </div><!-- /rpt-content -->
-
-    </div><!-- /rpt-modal-card -->
-</div><!-- /rpt-modal -->
-
-
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
@@ -269,452 +120,69 @@ const CHART_EVENTS = <?php echo json_encode($chartEvents); ?>;
 const EVENT_COLOR  = '#FF5722';
 </script>
 <script src="<?php echo BASE_URL; ?>/pages/js/chart.shared.js"></script>
+<script src="<?php echo BASE_URL; ?>/pages/js/chart_modal.js"></script>
 <script>
-// Spin animation for loading icons
 const spinStyle = document.createElement('style');
 spinStyle.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
 document.head.appendChild(spinStyle);
 
-let rptChart           = null;
-let rptWeeklyChart     = null;
-let rptHighlight       = false;
-let rptNvOpen          = true;
-let rptActiveYears     = new Set();
-let rptForecastOnly    = false;
-let rptForecastStart   = null; // normalised forecast-start date (2000-MM-DD)
-
 // ── Open detail modal ─────────────────────────────────────────────────────────
 function openDetailModal(btn) {
-    const productId     = btn.dataset.productId;
-    const productName   = btn.dataset.productName;
-    const generatedAt   = btn.dataset.generatedAt;
+    const productId      = btn.dataset.productId;
+    const productName    = btn.dataset.productName;
+    const generatedAt    = btn.dataset.generatedAt;
     const totalPredicted = btn.dataset.totalPredicted;
-    const restockQty    = btn.dataset.restockQty;
-    const dayCount      = btn.dataset.dayCount;
+    const restockQty     = btn.dataset.restockQty;
 
-    // Reset modal state
-    document.getElementById('rpt-modal-title').textContent    = productName;
-    document.getElementById('rpt-loading').style.display      = '';
-    document.getElementById('rpt-error').style.display        = 'none';
-    document.getElementById('rpt-content').style.display      = 'none';
-    document.getElementById('rpt-modal').classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
+    ChartModal.openLoading('Demand Plan', productName);
 
-    if (rptChart)       { rptChart.destroy();       rptChart       = null; }
-    if (rptWeeklyChart) { rptWeeklyChart.destroy();  rptWeeklyChart = null; }
-    rptHighlight     = false;
-    rptActiveYears   = new Set();
-    rptForecastOnly  = false;
-    rptForecastStart = null;
-    const rptYearSel = document.getElementById('rpt-year-selector');
-    if (rptYearSel) rptYearSel.innerHTML = '';
-    updateRptEventsBtn();
-    updateRptForecastOnlyBtn();
-
-    // Fetch chart data + session metadata
     const body = new FormData();
     body.append('product_id',   productId);
     body.append('generated_at', generatedAt);
 
     fetch('<?php echo BASE_URL; ?>/api/get_forecast_detail.php', { method: 'POST', body: body })
-        .then(function (r) { return r.json(); })
+        .then(r => r.json())
         .then(function (data) {
-            document.getElementById('rpt-loading').style.display = 'none';
             if (data.error) {
-                const errEl       = document.getElementById('rpt-error');
-                errEl.textContent = data.error;
-                errEl.style.display = '';
+                ChartModal.showResults({
+                    label: 'Demand Plan', title: productName,
+                    historical: [], forecast: [], hasBand: false, meta: null,
+                    disabledEventIds: new Set(),
+                });
                 return;
             }
 
             const meta = data.meta || {};
+            meta.total_predicted = Number(totalPredicted);
+            meta.restock_qty     = Number(restockQty);
 
-            // Stat cards
-            document.getElementById('rpt-stat-demand').textContent =
-                Number(totalPredicted).toLocaleString() + ' units';
-            document.getElementById('rpt-stat-stock').textContent =
-                (meta.current_stock !== null && meta.current_stock !== undefined)
-                    ? meta.current_stock + ' units' : '—';
-            document.getElementById('rpt-stat-order').textContent =
-                Number(restockQty).toLocaleString() + ' units';
-            document.getElementById('rpt-stat-profit').textContent =
-                (meta.est_profit !== null && meta.est_profit !== undefined)
-                    ? '₱' + meta.est_profit.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                    : '—';
-
-            document.getElementById('rpt-content').style.display = '';
-            renderDetailChart(data.historical, data.forecast);
-            renderDetailWeeklyChart(data.forecast);
-            if (meta.cost_price) {
-                meta.total_predicted = Number(totalPredicted);
-                renderDetailNvExplanation(meta);
-            }
-            else document.getElementById('rpt-nv-section').style.display = 'none';
+            ChartModal.showResults({
+                label:           'Demand Plan',
+                title:           productName,
+                historical:      data.historical,
+                forecast:        data.forecast,
+                hasBand:         false,
+                meta:            meta,
+                disabledEventIds: new Set(),
+            });
         })
         .catch(function () {
-            document.getElementById('rpt-loading').style.display = 'none';
-            const errEl       = document.getElementById('rpt-error');
-            errEl.textContent = 'Network error. Could not load chart.';
-            errEl.style.display = '';
+            ChartModal.showResults({
+                label: 'Demand Plan', title: productName,
+                historical: [], forecast: [], hasBand: false, meta: null,
+                disabledEventIds: new Set(),
+            });
         });
-}
-
-function closeDetailModal() {
-    document.getElementById('rpt-modal').classList.add('hidden');
-    document.body.style.overflow = '';
-    if (rptChart)       { rptChart.destroy();       rptChart       = null; }
-    if (rptWeeklyChart) { rptWeeklyChart.destroy();  rptWeeklyChart = null; }
-}
-
-function updateRptAnnotationsOnZoom({ chart }) {
-    if (!rptHighlight || !chart.scales.x) return;
-    const base = rptForecastStart ? { forecastStart: buildForecastStartAnnotation(rptForecastStart) } : {};
-    chart.options.plugins.annotation.annotations = Object.assign(
-        base, buildChartAnnotations(tsToDateStr(chart.scales.x.min), tsToDateStr(chart.scales.x.max), true, new Set())
-    );
-    chart.update('none');
-}
-
-// ── Events toggle ─────────────────────────────────────────────────────────────
-function toggleRptEvents() {
-    rptHighlight = !rptHighlight;
-    updateRptEventsBtn();
-    if (!rptChart || !rptChart.scales.x) return;
-    const base = rptForecastStart ? { forecastStart: buildForecastStartAnnotation(rptForecastStart) } : {};
-    rptChart.options.plugins.annotation.annotations = rptHighlight
-        ? Object.assign(base, buildRptAnnotations(
-            tsToDateStr(rptChart.scales.x.min), tsToDateStr(rptChart.scales.x.max), true, new Set()))
-        : base;
-    rptChart.update('none');
-}
-
-function updateRptEventsBtn() {
-    const btn = document.getElementById('rpt-events-btn');
-    if (!btn) return;
-    btn.style.background  = rptHighlight ? '#261F0E'  : 'transparent';
-    btn.style.color       = rptHighlight ? '#F0E8D0'  : '#261F0E';
-    btn.style.borderColor = rptHighlight ? '#261F0E'  : '#D2C8AE';
-    btn.style.opacity     = rptHighlight ? '1'        : '0.5';
-}
-
-// ── Render the detail chart ───────────────────────────────────────────────────
-function renderDetailChart(historical, forecast) {
-    if (rptChart) rptChart.destroy();
-
-    // Normalize all dates to 2000 base year so all years overlap on the same Jan–Dec axis.
-    const nd = function(d) { return d ? '2000' + d.slice(4) : null; };
-
-    // Historical: one dataset per year, dates normalized
-    const byYear    = groupByYearNorm(historical);
-    const rptYears  = Object.keys(byYear).sort();
-    const allActive = rptActiveYears.size === 0;
-
-    const histDatasets = rptYears.map(function(year, i) {
-        const color    = YEAR_COLORS[i % YEAR_COLORS.length];
-        const isActive = allActive || rptActiveYears.has(year);
-        return {
-            label:            year,
-            data:             byYear[year],
-            hidden:           !isActive,
-            borderColor:      color,
-            backgroundColor:  'transparent',
-            borderWidth:      1.5,
-            pointRadius:      0,
-            pointHoverRadius: 3,
-            fill:             false,
-            tension:          0.3,
-        };
-    });
-
-    // Forecast dataset — normalized, thicker dashed orange line
-    rptForecastStart = forecast.length ? nd(forecast[0].date) : null;
-    const fcDataset = {
-        label:            'Projected Demand',
-        data:             forecast.map(function(r) { return { x: nd(r.date), y: r.predicted }; }),
-        borderColor:      '#FF5722',
-        borderWidth:      3,
-        borderDash:       [6, 3],
-        backgroundColor:  'transparent',
-        pointRadius:      0,
-        pointHoverRadius: 4,
-        fill:             false,
-        tension:          0.3,
-    };
-    const datasets = histDatasets.concat([fcDataset]);
-
-    // Zoom limits: normalized data extent + 3-day padding
-    let minNorm = '2000-12-31', maxNorm = '2000-01-01';
-    datasets.forEach(function(ds) {
-        ds.data.forEach(function(pt) {
-            if (pt.x && pt.x < minNorm) minNorm = pt.x;
-            if (pt.x && pt.x > maxNorm) maxNorm = pt.x;
-        });
-    });
-    const PAD   = 3 * 86400000;
-    const minTs = new Date(minNorm).getTime() - PAD;
-    const maxTs = new Date(maxNorm).getTime() + PAD;
-
-    // Initial view: 6 months before normalized forecast start
-    let initialMin = minNorm;
-    if (rptForecastStart) {
-        const d = new Date(rptForecastStart);
-        d.setMonth(d.getMonth() - 6);
-        initialMin = d.toISOString().slice(0, 10);
-    }
-
-    const annotations = rptForecastStart
-        ? { forecastStart: buildForecastStartAnnotation(rptForecastStart) } : {};
-
-    rptChart = new Chart(document.getElementById('rpt-chart'), {
-        type: 'line',
-        data: { datasets: datasets },
-        options: {
-            responsive: true,
-            interaction: { mode: 'x', intersect: false },
-            plugins: {
-                legend: { display: false },
-                zoom: {
-                    zoom: {
-                        wheel:          { enabled: true },
-                        pinch:          { enabled: true },
-                        mode:           'x',
-                        onZoomComplete: updateRptAnnotationsOnZoom,
-                    },
-                    pan: {
-                        enabled:       true,
-                        mode:          'x',
-                        onPanComplete: updateRptAnnotationsOnZoom,
-                    },
-                    limits: {
-                        x: { min: minTs, max: maxTs },
-                    },
-                },
-                tooltip: {
-                    backgroundColor: '#261F0E',
-                    titleColor:      '#D2C8AE',
-                    bodyColor:       '#F0E8D0',
-                    padding:         10,
-                    callbacks: {
-                        title: function(items) {
-                            if (!items.length) return '';
-                            const d = new Date(items[0].parsed.x);
-                            return d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
-                        },
-                        label: function(ctx) {
-                            if (ctx.parsed.y === null) return null;
-                            return ' ' + ctx.dataset.label + ': ' + Math.round(ctx.parsed.y) + ' units';
-                        },
-                    },
-                },
-                annotation: { annotations: annotations },
-            },
-            scales: {
-                x: {
-                    type: 'time',
-                    min:  initialMin,
-                    max:  maxTs,
-                    time: {
-                        minUnit: 'day',
-                        tooltipFormat: 'MMM d',
-                        displayFormats: {
-                            day:   'MMM d',
-                            week:  'MMM d',
-                            month: 'MMM',
-                            year:  'MMM',
-                        },
-                    },
-                    ticks: {
-                        color: 'rgba(38,31,14,0.45)',
-                        font: { family: 'Lora', size: 11 },
-                        maxTicksLimit: 10,
-                        maxRotation: 0,
-                    },
-                    grid: { color: 'rgba(38,31,14,0.06)' },
-                },
-                y: {
-                    beginAtZero: true,
-                    ticks: { color: 'rgba(38,31,14,0.45)', font: { family: 'Lora', size: 11 } },
-                    grid:  { color: 'rgba(38,31,14,0.06)' },
-                },
-            },
-        },
-    });
-
-    rptActiveYears = new Set();
-    buildRptYearSelector(rptYears);
-}
-
-// ── Year filter pills ─────────────────────────────────────────────────────────
-function buildRptYearSelector(years) {
-    const container = document.getElementById('rpt-year-selector');
-    if (!container || years.length <= 1) return;
-    container.innerHTML = '';
-
-    years.forEach(function(year, i) {
-        const btn = document.createElement('button');
-        btn.className    = 'year-pill';
-        btn.textContent  = year;
-        btn.dataset.year = year;
-        btn.style.setProperty('--yc', YEAR_COLORS[i % YEAR_COLORS.length]);
-        btn.addEventListener('click', function() { toggleRptYear(year); });
-        container.appendChild(btn);
-    });
-
-    updateRptYearPills();
-}
-
-function toggleRptYear(year) {
-    if (rptActiveYears.has(year)) {
-        rptActiveYears.delete(year);
-    } else {
-        rptActiveYears.add(year);
-    }
-    updateRptYearPills();
-    if (!rptChart) return;
-    const allActive = rptActiveYears.size === 0;
-    rptChart.data.datasets.forEach(function(ds) {
-        if (ds.label === 'Projected Demand') return;
-        ds.hidden = !(allActive || rptActiveYears.has(ds.label));
-    });
-    rptChart.update();
-}
-
-function updateRptYearPills() {
-    const allActive = rptActiveYears.size === 0;
-    document.querySelectorAll('#rpt-year-selector .year-pill[data-year]').forEach(function(btn) {
-        const selected = rptActiveYears.has(btn.dataset.year);
-        btn.classList.toggle('year-pill-active', allActive || selected);
-        btn.classList.toggle('year-pill-muted',  !allActive && !selected);
-    });
-}
-
-function toggleRptForecastOnly() {
-    rptForecastOnly = !rptForecastOnly;
-    updateRptForecastOnlyBtn();
-    if (!rptChart) return;
-    const allActive = rptActiveYears.size === 0;
-    rptChart.data.datasets.forEach(function(ds) {
-        if (ds.label === 'Projected Demand') return;
-        ds.hidden = rptForecastOnly ? true : !(allActive || rptActiveYears.has(ds.label));
-    });
-    rptChart.update();
-}
-
-function updateRptForecastOnlyBtn() {
-    const btn = document.getElementById('rpt-forecast-only-btn');
-    if (!btn) return;
-    btn.style.background  = rptForecastOnly ? '#261F0E' : 'transparent';
-    btn.style.color       = rptForecastOnly ? '#F0E8D0' : '#261F0E';
-    btn.style.borderColor = rptForecastOnly ? '#261F0E' : '#D2C8AE';
-    btn.style.opacity     = rptForecastOnly ? '1'       : '0.45';
-}
-
-// ── Weekly forecast bar chart ─────────────────────────────────────────────────
-function renderDetailWeeklyChart(forecastRows) {
-    const weekMap = {};
-    forecastRows.forEach(function (r) {
-        const d = new Date(r.date), dow = d.getDay();
-        const mon = new Date(d);
-        mon.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1));
-        const key = mon.toISOString().slice(0, 10);
-        weekMap[key] = (weekMap[key] || 0) + r.predicted;
-    });
-    const weeks  = Object.keys(weekMap).sort();
-    const labels = weeks.map(function (w) {
-        const d = new Date(w + 'T00:00:00');
-        return d.toLocaleString('default', { month: 'short', day: 'numeric' });
-    });
-    const values = weeks.map(function (w) { return Math.round(weekMap[w]); });
-
-    if (rptWeeklyChart) rptWeeklyChart.destroy();
-    rptWeeklyChart = new Chart(document.getElementById('rpt-weekly-chart'), {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Forecast', data: values,
-                backgroundColor: 'rgba(255,87,34,0.65)', borderColor: '#FF5722',
-                borderWidth: 1, borderRadius: 4,
-            }],
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    backgroundColor: '#261F0E', titleColor: '#D2C8AE', bodyColor: '#F0E8D0', padding: 10,
-                    callbacks: {
-                        title: function (items) { return 'Week of ' + items[0].label; },
-                        label: function (ctx)   { return ' ' + ctx.parsed.y + ' units predicted'; },
-                    },
-                },
-            },
-            scales: {
-                x: { ticks: { color: 'rgba(38,31,14,0.45)', font: { family: 'Lora', size: 11 } }, grid: { display: false } },
-                y: { beginAtZero: true, ticks: { color: 'rgba(38,31,14,0.45)', font: { family: 'Lora', size: 11 } }, grid: { color: 'rgba(38,31,14,0.06)' } },
-            },
-        },
-    });
-}
-
-// ── Newsvendor explanation ────────────────────────────────────────────────────
-function renderDetailNvExplanation(meta) {
-    document.getElementById('rpt-nv-section').style.display = '';
-    const body = document.getElementById('rpt-nv-body');
-    if (!body) return;
-
-    const price  = meta.selling_price, cost  = meta.cost_price;
-    const margin = price - cost;
-    const cr     = (margin / price * 100).toFixed(1);
-    const low    = Math.max(0, Math.round(meta.total_std != null ? meta.total_predicted - 1.96 * meta.total_std : 0));
-    const high   = Math.round(meta.total_std != null ? (meta.total_predicted || 0) + 1.96 * meta.total_std : 0);
-
-    let strategy;
-    if (parseFloat(cr) >= 70)      strategy = 'High margin — over-stocking is cheaper than a lost sale. Order aggressively.';
-    else if (parseFloat(cr) >= 40) strategy = 'Balanced margin — order near expected demand.';
-    else                           strategy = 'Tight margin — cost of unsold stock is high. Order conservatively.';
-
-    const totalPredicted = meta.total_predicted || meta.optimal_total;
-
-    body.innerHTML =
-        '<div class="rpt-nv-row"><span class="rpt-nv-label">Price / Cost</span>'
-        + '<span class="rpt-nv-val">₱' + price.toFixed(2) + ' selling &nbsp;·&nbsp; ₱' + cost.toFixed(2) + ' cost &nbsp;·&nbsp; ₱' + margin.toFixed(2) + ' margin (' + cr + '%)</span></div>'
-        + '<div class="rpt-nv-row"><span class="rpt-nv-label">Critical ratio</span>'
-        + '<span class="rpt-nv-val"><strong>' + cr + '%</strong> — ' + strategy + '</span></div>'
-        + '<div class="rpt-nv-row"><span class="rpt-nv-label">Under-stock cost</span>'
-        + '<span class="rpt-nv-val">₱' + margin.toFixed(2) + ' per unit — profit lost when you run out of stock</span></div>'
-        + '<div class="rpt-nv-row"><span class="rpt-nv-label">Over-stock cost</span>'
-        + '<span class="rpt-nv-val">₱' + cost.toFixed(2) + ' per unit — money tied up in unsold inventory</span></div>'
-        + (meta.total_std != null ? '<div class="rpt-nv-row"><span class="rpt-nv-label">Demand range (95%)</span>'
-        + '<span class="rpt-nv-val">' + low + ' – ' + high + ' units &nbsp;·&nbsp; avg ' + Math.round(totalPredicted) + ' units &nbsp;·&nbsp; σ = ' + Math.round(meta.total_std) + ' units</span></div>' : '')
-        + '<div class="rpt-nv-row"><span class="rpt-nv-label">Optimal supply</span>'
-        + '<span class="rpt-nv-val">' + meta.optimal_total + ' units total &nbsp;·&nbsp; ' + meta.current_stock + ' on hand + <strong>' + meta.restock_qty + ' to order</strong></span></div>';
-
-    body.style.display = rptNvOpen ? '' : 'none';
-    const chevron = document.getElementById('rpt-nv-chevron');
-    if (chevron) chevron.style.transform = rptNvOpen ? 'rotate(0deg)' : 'rotate(-90deg)';
-}
-
-function toggleRptNvSection() {
-    rptNvOpen = !rptNvOpen;
-    const body    = document.getElementById('rpt-nv-body');
-    const chevron = document.getElementById('rpt-nv-chevron');
-    if (body)    body.style.display      = rptNvOpen ? '' : 'none';
-    if (chevron) chevron.style.transform = rptNvOpen ? 'rotate(0deg)' : 'rotate(-90deg)';
 }
 
 // ── Delete ────────────────────────────────────────────────────────────────────
 function confirmDeleteSession(btn) {
-    const productName = btn.dataset.productName;
-    const productId   = btn.dataset.productId;
-    const generatedAt = btn.dataset.generatedAt;
-
     showConfirm({
         title:        'Delete this demand plan?',
-        message:      'The demand plan for "' + productName + '" will be permanently removed.',
+        message:      'The demand plan for "' + btn.dataset.productName + '" will be permanently removed.',
         confirmText:  'Delete',
         confirmStyle: 'danger',
-        onConfirm:    function () { deleteSession(btn, productId, generatedAt); },
+        onConfirm:    function () { deleteSession(btn, btn.dataset.productId, btn.dataset.generatedAt); },
     });
 }
 
@@ -724,31 +192,21 @@ function deleteSession(btn, productId, generatedAt) {
     body.append('generated_at', generatedAt);
 
     fetch('<?php echo BASE_URL; ?>/api/delete_forecast.php', { method: 'POST', body: body })
-        .then(function (r) { return r.json(); })
+        .then(r => r.json())
         .then(function (data) {
             if (data.error) { alert(data.error); return; }
-            // Remove the row from the DOM without a full page reload
             const row = btn.closest('.session-row');
             if (row) row.remove();
-            // If no rows remain, show the empty state
             const list = document.querySelector('.session-list');
             if (list && list.querySelectorAll('.session-row').length === 0) {
-                list.innerHTML = '<div class="session-empty">'
-                    + '<p class="session-empty-title">No saved forecasts yet</p>'
-                    + '<p class="session-empty-sub">Go to the Forecast page, select a product, and run a forecast.</p>'
-                    + '</div>';
+                list.innerHTML = '<div class="session-empty">' +
+                    '<p class="session-empty-title">No saved forecasts yet</p>' +
+                    '<p class="session-empty-sub">Go to the Forecast page, select a product, and run a forecast.</p>' +
+                    '</div>';
             }
         })
         .catch(function () { alert('Network error. Could not delete.'); });
 }
-
-// Close modal on Escape
-document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') {
-        const modal = document.getElementById('rpt-modal');
-        if (modal && !modal.classList.contains('hidden')) closeDetailModal();
-    }
-});
 </script>
 
 <?php require_once __DIR__ . '/../includes/confirm_modal.php'; ?>

@@ -294,8 +294,8 @@
     display: flex;
     gap: 0.375rem;
     flex-wrap: wrap;
-    margin-bottom: 1.25rem;
-    min-height: 1.75rem;
+    margin-bottom: 0.875rem;
+    min-height: 0;
 }
 
 .year-pill {
@@ -564,17 +564,8 @@
 }
 
 /* ══════════════════════════════════════════════════════
-   FORECAST MODAL
+   FORECAST MODAL  (input form only — results use chart_modal.css)
 ══════════════════════════════════════════════════════ */
-
-/* Year filter pills row inside the forecast modal chart area */
-.fc-year-selector {
-    display: flex;
-    gap: 0.375rem;
-    flex-wrap: wrap;
-    margin-bottom: 0.75rem;
-    min-height: 1.5rem;
-}
 
 /* ── "Run Forecast" button inside the selected-product pill ── */
 .fc-run-btn {
@@ -809,121 +800,7 @@
     font-size: 0.9rem;
 }
 
-/* ── Results: chart area ── */
-.fc-chart-wrap {
-    padding: 0 1.5rem 1rem;
-}
-
-.fc-chart-legend {
-    display: flex;
-    gap: 1.25rem;
-    margin-bottom: 0.75rem;
-    flex-wrap: wrap;
-}
-
-.fc-legend-item {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.72rem;
-    color: #261F0E;
-    opacity: 0.55;
-}
-
-.fc-legend-info {
-    position: relative;
-    font-size: 0.65rem;
-    cursor: default;
-    opacity: 0.6;
-    line-height: 1;
-}
-
-.fc-legend-info::after {
-    content: attr(data-tip);
-    position: absolute;
-    bottom: calc(100% + 6px);
-    left: 50%;
-    transform: translateX(-50%);
-    width: 200px;
-    background: #261F0E;
-    color: #F0E8D0;
-    font-size: 0.68rem;
-    font-family: 'Lora', serif;
-    line-height: 1.45;
-    padding: 7px 10px;
-    border-radius: 5px;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.15s;
-    z-index: 10;
-    white-space: normal;
-    text-align: left;
-}
-
-.fc-legend-info:hover { opacity: 1; }
-.fc-legend-info:hover::after { opacity: 1; }
-
-/* ── Results: stat cards ── */
-.fc-stats-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 0.625rem;
-    padding: 0 1.5rem 1.25rem;
-}
-
-.fc-stat-card {
-    background: rgba(38,31,14,0.04);
-    border: 1px solid #D2C8AE;
-    border-radius: 0.75rem;
-    padding: 0.875rem 0.875rem;
-}
-
-.fc-stat-label {
-    font-size: 0.62rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: #261F0E;
-    opacity: 0.38;
-    margin-bottom: 0.3rem;
-}
-
-.fc-stat-value {
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: #261F0E;
-    line-height: 1.2;
-    margin-bottom: 0.25rem;
-}
-.fc-stat-accent { color: #FF5722; }
-.fc-stat-green  { color: #1A6933; }
-
-.fc-stat-sub {
-    font-size: 0.62rem;
-    color: #261F0E;
-    opacity: 0.32;
-}
-
-/* ── Results: action row ── */
-.fc-action-row {
-    display: flex;
-    gap: 0.75rem;
-    align-items: center;
-    padding: 0 1.5rem 1.5rem;
-    flex-wrap: wrap;
-}
-
-/* ── Chart controls row (legend + buttons) ── */
-.fc-chart-controls {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
-    flex-wrap: wrap;
-}
-
-/* Button group inside controls row */
+/* ── Demand analysis chart header: button group ── */
 .fc-chart-btns {
     display: flex;
     align-items: center;

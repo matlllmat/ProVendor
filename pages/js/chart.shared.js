@@ -46,10 +46,17 @@ function groupByYearNorm(historical) {
 //   normalize  — when true, maps event dates to 2000 base year (for overlay charts).
 //   disabledIds — Set of event IDs to hide; pass new Set() to show all events.
 function buildChartAnnotations(visibleFrom, visibleTo, normalize, disabledIds) {
-    const na   = normalize ? function (d) { return d ? '2000' + d.slice(4) : null; } : function (d) { return d; };
+    // Normalize date to base year 2000. Feb 29 is clamped to Feb 28 so that
+    // leap-year events and non-leap-year events of the same name don't both
+    // appear in February when years are overlaid on the shared 2000 axis.
+    const na = normalize ? function (d) {
+        if (!d) return null;
+        const n = '2000' + d.slice(4);
+        return n === '2000-02-29' ? '2000-02-28' : n;
+    } : function (d) { return d; };
     const skip = disabledIds || new Set();
 
-    const visible = CHART_EVENTS.filter(function (ev) {
+    let visible = CHART_EVENTS.filter(function (ev) {
         if (skip.has(ev.id)) return false;
         const evEnd   = na(ev.instance_end || ev.instance_start);
         const evStart = na(ev.instance_start);
@@ -57,6 +64,18 @@ function buildChartAnnotations(visibleFrom, visibleTo, normalize, disabledIds) {
         if (visibleTo   && evStart > visibleTo)   return false;
         return true;
     });
+
+    // When dates are normalized to year 2000, the same recurring event from different
+    // calendar years lands on the same axis position — deduplicate by (name + date).
+    if (normalize) {
+        const seen = new Set();
+        visible = visible.filter(function (ev) {
+            const key = ev.name + '|' + na(ev.instance_start) + '|' + na(ev.instance_end || ev.instance_start);
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+    }
     const compact = visible.length > 8;
 
     const totalDays     = (visibleFrom && visibleTo)

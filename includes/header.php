@@ -12,4 +12,7 @@
     <?php if (!empty($pageCss)): ?>
     <link rel="stylesheet" href="<?php echo BASE_URL; ?>/pages/css/<?php echo htmlspecialchars($pageCss); ?>">
     <?php endif; ?>
+    <?php if (!empty($extraCss)): ?>
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/pages/css/<?php echo htmlspecialchars($extraCss); ?>">
+    <?php endif; ?>
 </head>
