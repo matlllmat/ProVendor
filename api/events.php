@@ -4,7 +4,7 @@
 // Input  (POST): { action, ...fields }
 // Output (JSON): { success: true } or { error: "..." }
 
-session_start();
+require_once __DIR__ . '/../config/bootstrap.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['user_id'])) {

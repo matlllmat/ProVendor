@@ -29,12 +29,6 @@ function createUser(PDO $pdo, string $name, string $storeName, string $email, st
     return (int) $pdo->lastInsertId();
 }
 
-function saveUserLocation(PDO $pdo, int $userId, float $lat, float $lng): void
-{
-    $stmt = $pdo->prepare('UPDATE users SET lat = ?, lng = ? WHERE id = ?');
-    $stmt->execute([$lat, $lng, $userId]);
-}
-
 function getUserById(PDO $pdo, int $userId): array|false
 {
     $stmt = $pdo->prepare('SELECT id, name, store_name FROM users WHERE id = ? LIMIT 1');
@@ -46,17 +40,17 @@ function getUserById(PDO $pdo, int $userId): array|false
 function getUserProfile(PDO $pdo, int $userId): array|false
 {
     $stmt = $pdo->prepare(
-        'SELECT id, name, store_name, email, lat, lng FROM users WHERE id = ? LIMIT 1'
+        'SELECT id, name, store_name, email FROM users WHERE id = ? LIMIT 1'
     );
     $stmt->execute([$userId]);
     return $stmt->fetch();
 }
 
-// Updates display name, store name, and store coordinates.
-function updateUserProfile(PDO $pdo, int $userId, string $name, string $storeName, ?float $lat, ?float $lng): void
+// Updates display name and store name.
+function updateUserProfile(PDO $pdo, int $userId, string $name, string $storeName): void
 {
-    $pdo->prepare('UPDATE users SET name = ?, store_name = ?, lat = ?, lng = ? WHERE id = ?')
-        ->execute([$name, $storeName, $lat, $lng, $userId]);
+    $pdo->prepare('UPDATE users SET name = ?, store_name = ? WHERE id = ?')
+        ->execute([$name, $storeName, $userId]);
 }
 
 // Returns the stored password hash for the given user (used for change-password verification).
@@ -75,7 +69,7 @@ function updateUserPassword(PDO $pdo, int $userId, string $newHash): void
 }
 
 // Permanently deletes all imported data for a user: forecasts → sales → import sessions → products.
-// The user account and store settings (name, location, etc.) are preserved.
+// The user account and store name are preserved.
 function clearUserData(PDO $pdo, int $userId): void
 {
     // Forecasts reference products — delete first to avoid FK violation.

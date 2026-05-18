@@ -4,7 +4,7 @@
 // Input  (POST): { session_id: int }
 // Output (JSON): { success: true } or { error: "..." }
 
-session_start();
+require_once __DIR__ . '/../config/bootstrap.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['user_id'])) {
@@ -30,5 +30,7 @@ try {
         echo json_encode(['error' => 'Import session not found or access denied.']);
     }
 } catch (PDOException $e) {
-    echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
+    // Log the underlying SQL error server-side; show the client a generic message.
+    error_log('[ProVendor delete_import] ' . $e->getMessage());
+    echo json_encode(['error' => 'Database error during delete. Please try again.']);
 }

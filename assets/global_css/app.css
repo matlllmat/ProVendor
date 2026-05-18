@@ -11,6 +11,10 @@ html {
     scroll-behavior: smooth;
 }
 
+body > main {
+    min-height: calc(100vh - 4rem - 3.5rem);
+}
+
 input::placeholder {
     color: #a89f8a;
 }

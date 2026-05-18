@@ -2,7 +2,7 @@
 // api/save_forecast.php
 // AJAX: saves a forecast result (all predicted dates) to the forecasts table.
 
-session_start();
+require_once __DIR__ . '/../config/bootstrap.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['user_id'])) {

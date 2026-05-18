@@ -3,7 +3,7 @@
 // AJAX bridge: receives forecast data + cost/price inputs from the forecast modal,
 // calls Flask /optimize (Newsvendor model), and passes the JSON result back.
 
-session_start();
+require_once __DIR__ . '/../config/bootstrap.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['user_id'])) {

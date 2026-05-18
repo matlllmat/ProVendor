@@ -321,11 +321,13 @@ function expandEvents(array $rawEvents, string $fromDate, string $toDate): array
 }
 
 // Merges a raw event row with concrete instance dates.
+// `type` is set so the chart event filter can group instances as Preset vs. Custom.
 function makeEventInstance(array $event, DateTime $iStart, ?DateTime $iEnd): array
 {
     return array_merge($event, [
         'instance_start' => $iStart->format('Y-m-d'),
         'instance_end'   => $iEnd ? $iEnd->format('Y-m-d') : null,
+        'type'           => $event['is_seeded'] ? 'preset' : 'custom',
     ]);
 }
 

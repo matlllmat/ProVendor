@@ -4,8 +4,7 @@
 // Accepts POST: current_password, new_password, confirm_password
 // Returns JSON: { success: true } or { error: string }
 
-define('BASE_URL', '/ProVendor');
-session_start();
+require_once __DIR__ . '/../config/bootstrap.php';
 
 header('Content-Type: application/json');
 

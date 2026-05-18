@@ -1,6 +1,193 @@
 /* pages/css/import.css
    Styles for the Import Data page. */
 
+/* ══════════════════════════════════════════════════════════════════
+   PROPHET PIPELINE EXPLAINER
+   Three-step flow that shows the panel exactly how the imported rows
+   below get used by Meta's Prophet model.
+══════════════════════════════════════════════════════════════════ */
+.pipeline-explainer {
+    background: #F0E8D0;
+    border: 1px solid #D2C8AE;
+    border-radius: 1rem;
+    padding: 1.5rem 1.75rem 1.75rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 24px rgba(38,31,14,0.07);
+    position: relative;
+    overflow: hidden;
+}
+
+.pipeline-explainer::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #1A6933 0%, #1A6933 33%, #8B6B14 33%, #8B6B14 66%, #FF5722 66%);
+    opacity: 0.85;
+}
+
+.pipeline-header {
+    margin-bottom: 1.5rem;
+    max-width: 38rem;
+}
+
+.pipeline-eyebrow {
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #1A6933;
+    margin-bottom: 0.45rem;
+}
+
+.pipeline-title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #261F0E;
+    margin-bottom: 0.45rem;
+    line-height: 1.3;
+}
+
+.pipeline-sub {
+    font-size: 0.8rem;
+    color: #261F0E;
+    opacity: 0.6;
+    line-height: 1.55;
+}
+
+.pipeline-link {
+    color: #1A6933;
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-color: rgba(26,105,51,0.35);
+    text-underline-offset: 2px;
+    transition: text-decoration-color 0.15s;
+}
+.pipeline-link:hover { text-decoration-color: #1A6933; }
+
+.pipeline-flow {
+    display: flex;
+    align-items: stretch;
+    gap: 0.5rem;
+}
+
+.pipeline-step {
+    flex: 1;
+    min-width: 0;
+    background: rgba(38,31,14,0.025);
+    border: 1px solid #D2C8AE;
+    border-radius: 0.75rem;
+    padding: 1rem 1.1rem 1.15rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.pipeline-step-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.85rem;
+}
+
+.pipeline-step-num {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    color: #1A6933;
+    opacity: 0.5;
+}
+
+.pipeline-step-icon {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.55rem;
+    background: rgba(26,105,51,0.1);
+    border: 1px solid rgba(26,105,51,0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #1A6933;
+    flex-shrink: 0;
+}
+.pipeline-step-icon svg { width: 1rem; height: 1rem; }
+
+.pipeline-step-title {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #261F0E;
+    margin-bottom: 0.3rem;
+    line-height: 1.3;
+}
+
+.pipeline-step-desc {
+    font-size: 0.73rem;
+    color: #261F0E;
+    opacity: 0.55;
+    line-height: 1.45;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.7rem;
+    border-bottom: 1px dashed rgba(210,200,174,0.7);
+}
+
+.pipeline-step-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    flex: 1;
+}
+
+.pipeline-step-list li {
+    font-size: 0.78rem;
+    color: #261F0E;
+    opacity: 0.75;
+    line-height: 1.4;
+}
+
+.pipeline-step-list li strong {
+    font-weight: 700;
+    color: #261F0E;
+    opacity: 1;
+}
+
+.pipeline-step-muted {
+    color: #261F0E;
+    opacity: 0.45;
+}
+
+.pipeline-arrow-inline {
+    display: inline-block;
+    margin: 0 0.2rem;
+    color: #1A6933;
+    opacity: 0.55;
+    font-weight: 600;
+}
+
+.pipeline-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #D2C8AE;
+    flex-shrink: 0;
+    padding: 0 0.1rem;
+    width: 1.5rem;
+}
+
+/* Stack vertically on narrow screens */
+@media (max-width: 820px) {
+    .pipeline-flow { flex-direction: column; }
+    .pipeline-arrow {
+        width: 100%;
+        padding: 0.25rem 0;
+        transform: rotate(90deg);
+        align-self: center;
+    }
+}
+
 /* ── Summary cards ── */
 .summary-grid {
     display: grid;
@@ -762,6 +949,17 @@ tr:hover .qty-edit-btn { opacity: 0.45; }
 
 .profile-field:last-of-type { margin-bottom: 0; }
 
+/* Two-column row of fields inside a card. The inner .profile-field
+   keeps its own bottom margin, but the grid itself sits flush so the
+   trailing divider/field below has correct spacing. */
+.profile-grid-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 1.25rem;
+}
+
+.profile-grid-2col .profile-field:last-of-type { margin-bottom: 1.125rem; }
+
 .profile-label {
     display: block;
     font-size: 0.7rem;
@@ -865,56 +1063,6 @@ tr:hover .qty-edit-btn { opacity: 0.45; }
 }
 
 .profile-save-btn:not([disabled]):hover { opacity: 0.82; }
-
-/* ── Leaflet map inside profile card ── */
-.profile-map {
-    height: 260px;
-    width: 100%;
-    border-radius: 0.625rem;
-    border: 1px solid #D2C8AE;
-    overflow: hidden;
-    margin-bottom: 0.875rem;
-}
-
-/* ── Coordinates row ── */
-.profile-coord-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-    margin-bottom: 0.5rem;
-}
-
-.profile-coord-label {
-    display: block;
-    font-size: 0.68rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: #261F0E;
-    opacity: 0.45;
-    margin-bottom: 0.3rem;
-}
-
-.profile-coord-input {
-    width: 100%;
-    background: rgba(210,200,174,0.4);
-    border: 1px solid rgba(38,31,14,0.12);
-    border-radius: 0.5rem;
-    padding: 0.45rem 0.75rem;
-    font-size: 0.8rem;
-    color: #261F0E;
-    cursor: default;
-    outline: none;
-    box-sizing: border-box;
-}
-
-/* ── No-location warning ── */
-.profile-no-location {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: #FF5722;
-    margin-top: 0.375rem;
-}
 
 
 /* ════════════════════════════════════════════

@@ -3,14 +3,12 @@
 --   USE provendor;
 
 CREATE TABLE IF NOT EXISTS `users` (
-    `id`         INT           NOT NULL AUTO_INCREMENT,
-    `name`       VARCHAR(100)  NOT NULL,
-    `store_name` VARCHAR(100)  NOT NULL,
-    `email`      VARCHAR(150)  NOT NULL,
-    `password`   VARCHAR(255)  NOT NULL,
-    `lat`        DECIMAL(10,7) DEFAULT NULL,
-    `lng`        DECIMAL(10,7) DEFAULT NULL,
-    `created_at` TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `id`         INT          NOT NULL AUTO_INCREMENT,
+    `name`       VARCHAR(100) NOT NULL,
+    `store_name` VARCHAR(100) NOT NULL,
+    `email`      VARCHAR(150) NOT NULL,
+    `password`   VARCHAR(255) NOT NULL,
+    `created_at` TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `users_email_unique` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -89,7 +87,6 @@ CREATE TABLE IF NOT EXISTS `seasonal_events` (
 -- Seeded global events (user_id IS NULL, is_seeded = 1)
 INSERT IGNORE INTO `seasonal_events` (`id`, `user_id`, `name`, `event_start`, `event_end`, `recurrence`, `is_last_day`, `is_seeded`, `color`) VALUES
   (101, NULL, 'New Year\'s Day',     '2024-01-01', NULL, 'yearly',  0, 1, '#3B82F6'),
-  (102, NULL, 'Mid-month Payday',    '2024-01-15', NULL, 'monthly', 0, 1, '#10B981'),
   (103, NULL, 'End-of-month Payday', '2024-01-31', NULL, 'monthly', 1, 1, '#059669'),
   (104, NULL, 'All Souls Day',       '2024-11-02', NULL, 'yearly',  0, 1, '#8B5CF6'),
   (105, NULL, 'Christmas Eve',       '2024-12-24', NULL, 'yearly',  0, 1, '#F59E0B'),

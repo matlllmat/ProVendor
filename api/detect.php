@@ -3,7 +3,7 @@
 // Receives an uploaded CSV, saves it to uploads/, detects column types,
 // and returns suggested field mappings as JSON.
 
-session_start();
+require_once __DIR__ . '/../config/bootstrap.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['user_id'])) {

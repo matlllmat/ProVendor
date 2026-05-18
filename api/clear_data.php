@@ -1,13 +1,12 @@
 <?php
 // api/clear_data.php
 // Permanently deletes all imported sales data for the authenticated user.
-// Preserves the user account, store name, and store location.
+// Preserves the user account and store name.
 // After success the client redirects to the landing page (pre-data state).
 // Accepts POST: (no body required — identity comes from session)
 // Returns JSON: { success: true } or { error: string }
 
-define('BASE_URL', '/ProVendor');
-session_start();
+require_once __DIR__ . '/../config/bootstrap.php';
 
 header('Content-Type: application/json');
 

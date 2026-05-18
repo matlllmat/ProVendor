@@ -1,6 +1,6 @@
 <?php
 // pages/landing.view.php
-// Presentation only — renders the store setup wizard (location + CSV import).
+// Presentation only — renders the store setup wizard (CSV import).
 // All logic is handled by landing.logic.php.
 
 require_once __DIR__ . '/landing.logic.php';
@@ -10,9 +10,6 @@ $pageCss   = 'import.css';
 require_once __DIR__ . '/../includes/header.php';
 
 ?>
-<body class="bg-[#F0E8D0] min-h-screen dot-pattern-light">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <!-- ════════════════════════════════════════════
      TOP NAVBAR
@@ -34,7 +31,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <?php echo htmlspecialchars($userName); ?>
             </span>
             <button type="button"
-                onclick="showConfirm({ title: 'Log out?', message: 'You will be returned to the login page.', confirmText: 'Log out', confirmStyle: 'danger', onConfirm: function(){ window.location='<?php echo BASE_URL; ?>/pages/landing.view.php?logout=1'; } })"
+                onclick="showConfirm({ title: 'Log out?', message: 'You will be returned to the login page.', confirmText: 'Log out', confirmStyle: 'danger', onConfirm: function(){ pvLogout(); } })"
                 class="text-sm text-[#261F0E] border border-[#D2C8AE] rounded-lg px-3 py-1.5 hover:bg-[#D2C8AE] transition-colors">
                 Log out
             </button>
@@ -51,8 +48,7 @@ require_once __DIR__ . '/../includes/header.php';
     <div class="mb-10">
         <h1 class="text-3xl font-semibold text-[#261F0E] mb-2 tracking-tight">Set up your store</h1>
         <p class="text-sm text-[#261F0E] leading-relaxed" style="opacity:0.5">
-            Pin your store on the map, then upload your sales history.<br>
-            Once imported, your demand forecasts will be ready.
+            Upload your sales history to unlock your demand forecasts.
         </p>
     </div>
 
@@ -64,7 +60,7 @@ require_once __DIR__ . '/../includes/header.php';
             <div id="dot-1" class="w-7 h-7 rounded-full bg-[#261F0E] flex items-center justify-center">
                 <span class="text-[#F0E8D0] text-xs font-semibold">1</span>
             </div>
-            <span class="text-[#261F0E] text-sm font-semibold">Store Location</span>
+            <span class="text-[#261F0E] text-sm font-semibold">Upload Data</span>
         </div>
 
         <!-- Connector 1–2 -->
@@ -77,105 +73,15 @@ require_once __DIR__ . '/../includes/header.php';
             <div id="dot-2" class="w-7 h-7 rounded-full border-2 border-[#261F0E] flex items-center justify-center">
                 <span class="text-[#261F0E] text-xs font-semibold">2</span>
             </div>
-            <span class="text-[#261F0E] text-sm font-semibold">Upload Data</span>
-        </div>
-
-        <!-- Connector 2–3 -->
-        <div class="flex-1 h-px bg-[#D2C8AE] mx-4 relative overflow-hidden">
-            <div id="connector-2" class="absolute inset-0 bg-[#261F0E] reveal-line"></div>
-        </div>
-
-        <!-- Step 3 -->
-        <div id="ind-3" class="flex items-center gap-2.5" style="opacity:0.35">
-            <div id="dot-3" class="w-7 h-7 rounded-full border-2 border-[#261F0E] flex items-center justify-center">
-                <span class="text-[#261F0E] text-xs font-semibold">3</span>
-            </div>
             <span class="text-[#261F0E] text-sm font-semibold">Map Columns</span>
         </div>
 
     </div>
 
     <!-- ════════════════════════════════════════════
-         STEP 1 — Store Location
+         STEP 1 — Upload CSV
     ════════════════════════════════════════════ -->
     <div id="step-1">
-        <div class="rounded-2xl border border-[#D2C8AE] overflow-hidden" style="box-shadow:0 4px 24px rgba(38,31,14,0.08)">
-
-            <!-- Card Header -->
-            <div class="px-8 py-6 border-b border-[#D2C8AE] bg-[#F0E8D0]">
-                <h2 class="text-lg font-semibold text-[#261F0E] mb-0.5">Pin your store location</h2>
-                <p class="text-sm text-[#261F0E]" style="opacity:0.5">
-                    Your coordinates are used to pull local weather data, which improves forecast accuracy.
-                </p>
-            </div>
-
-            <!-- Google Map -->
-            <div id="map" style="height:380px; width:100%;"></div>
-
-            <!-- Below map: address + coordinates -->
-            <div class="px-8 py-7 bg-[#F0E8D0]">
-                <div class="flex flex-col gap-5">
-
-                    <!-- Address search -->
-                    <div>
-                        <label class="block text-[10px] font-semibold text-[#261F0E] uppercase tracking-widest mb-1.5" style="opacity:0.5">
-                            Search Address
-                        </label>
-                        <div class="relative">
-                            <input type="text" id="address-search"
-                                placeholder="e.g. 123 Rizal Street, Quezon City"
-                                class="w-full border bg-[#F0E8D0] rounded-lg pl-4 pr-10 py-2.5 text-[#261F0E] text-sm focus:outline-none transition-all"
-                                style="border-color:rgba(38,31,14,0.18)"
-                                onfocus="this.style.borderColor='rgba(38,31,14,0.5)'"
-                                onblur="this.style.borderColor='rgba(38,31,14,0.18)'"
-                                onkeydown="if(event.key==='Enter'){searchAddress();}">
-                            <button type="button" onclick="searchAddress()"
-                                class="absolute right-3 top-1/2 -translate-y-1/2 hover:opacity-70 transition-opacity">
-                                <svg class="w-4 h-4 text-[#261F0E]" style="opacity:0.45" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Lat / Lng -->
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-[10px] font-semibold text-[#261F0E] uppercase tracking-widest mb-1.5" style="opacity:0.5">Latitude</label>
-                            <input type="text" id="lat" name="lat" placeholder="14.5995" readonly
-                                class="w-full border rounded-lg px-4 py-2.5 text-[#261F0E] text-sm cursor-default focus:outline-none"
-                                style="border-color:rgba(38,31,14,0.12); background:rgba(210,200,174,0.4)">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-semibold text-[#261F0E] uppercase tracking-widest mb-1.5" style="opacity:0.5">Longitude</label>
-                            <input type="text" id="lng" name="lng" placeholder="120.9842" readonly
-                                class="w-full border rounded-lg px-4 py-2.5 text-[#261F0E] text-sm cursor-default focus:outline-none"
-                                style="border-color:rgba(38,31,14,0.12); background:rgba(210,200,174,0.4)">
-                        </div>
-                    </div>
-
-                    <!-- Action -->
-                    <div class="flex justify-end pt-1">
-                        <button onclick="goToStep(2)"
-                            class="bg-[#261F0E] text-[#F0E8D0] rounded-xl px-6 py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2">
-                            Save Location &amp; Continue
-                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="9 18 15 12 9 6"/>
-                            </svg>
-                        </button>
-                    </div>
-
-                </div>
-            </div>
-
-        </div>
-    </div><!-- /step-1 -->
-
-
-    <!-- ════════════════════════════════════════════
-         STEP 2 — Upload CSV
-    ════════════════════════════════════════════ -->
-    <div id="step-2" class="hidden">
         <div class="rounded-2xl border border-[#D2C8AE] overflow-hidden" style="box-shadow:0 4px 24px rgba(38,31,14,0.08)">
 
             <!-- Card Header -->
@@ -186,14 +92,6 @@ require_once __DIR__ . '/../includes/header.php';
                         Export your transaction records as a CSV and upload below.
                     </p>
                 </div>
-                <button onclick="goToStep(1)"
-                    class="text-sm text-[#261F0E] flex items-center gap-1.5 transition-opacity hover:opacity-70 mt-1"
-                    style="opacity:0.45">
-                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="15 18 9 12 15 6"/>
-                    </svg>
-                    Back
-                </button>
             </div>
 
             <!-- Card Body -->
@@ -300,9 +198,9 @@ require_once __DIR__ . '/../includes/header.php';
 
 
     <!-- ════════════════════════════════════════════
-         STEP 3 — Column Mapping
+         STEP 2 — Column Mapping
     ════════════════════════════════════════════ -->
-    <div id="step-3" class="hidden">
+    <div id="step-2" class="hidden">
         <div class="rounded-2xl border border-[#D2C8AE] overflow-hidden" style="box-shadow:0 4px 24px rgba(38,31,14,0.08)">
 
             <!-- Card Header -->
@@ -313,7 +211,7 @@ require_once __DIR__ . '/../includes/header.php';
                         ProVendor auto-detected your CSV columns. Adjust any mismatches before importing.
                     </p>
                 </div>
-                <button onclick="goToStep(2)"
+                <button onclick="goToStep(1)"
                     class="text-sm text-[#261F0E] flex items-center gap-1.5 transition-opacity hover:opacity-70 mt-1"
                     style="opacity:0.45">
                     <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -364,7 +262,7 @@ require_once __DIR__ . '/../includes/header.php';
 
                 <!-- Actions -->
                 <div class="flex items-center justify-between pt-5 border-t border-[#D2C8AE]">
-                    <button onclick="goToStep(2)"
+                    <button onclick="goToStep(1)"
                         class="text-sm text-[#261F0E] flex items-center gap-1.5 transition-opacity hover:opacity-70"
                         style="opacity:0.45">
                         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -399,7 +297,6 @@ let currentStep = 1;
 function goToStep(n) {
     document.getElementById('step-1').classList.add('hidden');
     document.getElementById('step-2').classList.add('hidden');
-    document.getElementById('step-3').classList.add('hidden');
     document.getElementById('step-' + n).classList.remove('hidden');
     currentStep = n;
     updateIndicators(n);
@@ -407,7 +304,7 @@ function goToStep(n) {
 }
 
 function updateIndicators(active) {
-    for (let i = 1; i <= 3; i++) {
+    for (let i = 1; i <= 2; i++) {
         const ind  = document.getElementById('ind-' + i);
         const dot  = document.getElementById('dot-' + i);
         const label = ind.querySelector('span');
@@ -435,16 +332,11 @@ function updateIndicators(active) {
         }
     }
 
-    // Connectors
+    // Connector
     if (active > 1) {
         document.getElementById('connector-1').classList.add('visible');
     } else {
         document.getElementById('connector-1').classList.remove('visible');
-    }
-    if (active > 2) {
-        document.getElementById('connector-2').classList.add('visible');
-    } else {
-        document.getElementById('connector-2').classList.remove('visible');
     }
 }
 
@@ -510,7 +402,7 @@ async function detectColumns() {
         }
 
         populateMappingUI(data);
-        goToStep(3);
+        goToStep(2);
 
     } catch (e) {
         alert('Network error. Please try again.');
@@ -794,15 +686,10 @@ async function doImport(mapping, replace) {
     btn.textContent = 'Importing…';
     btn.disabled    = true;
 
-    var lat = document.getElementById('lat').value;
-    var lng = document.getElementById('lng').value;
-
     var formData = new FormData();
     formData.append('mapping',  JSON.stringify(mapping));
     formData.append('csv_rows', colRowCount);
     formData.append('replace',  replace ? '1' : '0');
-    formData.append('lat',      lat);
-    formData.append('lng',      lng);
 
     try {
         var res  = await fetch('<?php echo BASE_URL; ?>/api/import.php', { method: 'POST', body: formData });
@@ -829,74 +716,12 @@ function showMappingError(msg) {
     setTimeout(function() { el.classList.add('hidden'); }, 6000);
 }
 
-// ── Scroll-reveal (connectors animate in naturally via CSS) ──────────────────
+// ── Scroll-reveal (connector animates in naturally via CSS) ──────────────────
 // Initial state is handled by CSS .reveal-line
-
-// ── Leaflet + OpenStreetMap ───────────────────────────────────────────────────
-let map, marker;
-
-// Initialize map once the DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
-    map = L.map('map', { zoomControl: true }).setView([12.8797, 122.7740], 6);
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',
-        maxZoom: 19,
-    }).addTo(map);
-
-    // Click anywhere on the map to drop/move the pin
-    map.on('click', function(e) {
-        placeMarker(e.latlng);
-    });
-});
-
-function placeMarker(latlng) {
-    if (marker) {
-        marker.setLatLng(latlng);
-    } else {
-        marker = L.marker(latlng, { draggable: true }).addTo(map);
-
-        // Allow fine-tuning by dragging the pin
-        marker.on('dragend', function() {
-            updateCoords(marker.getLatLng());
-        });
-    }
-    updateCoords(latlng);
-    map.panTo(latlng);
-}
-
-function updateCoords(latlng) {
-    document.getElementById('lat').value = latlng.lat.toFixed(6);
-    document.getElementById('lng').value = latlng.lng.toFixed(6);
-}
-
-// Address search via Nominatim (OpenStreetMap's free geocoder)
-function searchAddress() {
-    const query = document.getElementById('address-search').value.trim();
-    if (!query) return;
-
-    const url = 'https://nominatim.openstreetmap.org/search?'
-        + 'q=' + encodeURIComponent(query)
-        + '&countrycodes=ph&format=json&limit=1&accept-language=en';
-
-    fetch(url)
-        .then(function(r) { return r.json(); })
-        .then(function(results) {
-            if (!results.length) {
-                alert('Address not found. Try a more specific search.');
-                return;
-            }
-            const latlng = L.latLng(parseFloat(results[0].lat), parseFloat(results[0].lon));
-            map.setView(latlng, 16);
-            placeMarker(latlng);
-        })
-        .catch(function() {
-            alert('Search failed. Please check your connection and try again.');
-        });
-}
 </script>
 
 
 <?php require_once __DIR__ . '/../includes/confirm_modal.php'; ?>
+<?php require_once __DIR__ . '/../includes/footer.php'; ?>
 </body>
 </html>

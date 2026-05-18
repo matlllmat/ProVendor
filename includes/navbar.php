@@ -32,8 +32,6 @@ $_navClass = function(string $keyword) use ($_navFile): string {
         <div class="flex items-center gap-6">
 
             <nav class="flex items-center gap-6">
-                <a href="<?php echo BASE_URL; ?>/pages/dashboard.view.php"
-                   class="<?php echo $_navClass('dashboard'); ?>">Dashboard</a>
                 <a href="<?php echo BASE_URL; ?>/pages/forecast.view.php"
                    class="<?php echo $_navClass('forecast'); ?>">Forecast</a>
                 <a href="<?php echo BASE_URL; ?>/pages/events.view.php"
@@ -42,8 +40,6 @@ $_navClass = function(string $keyword) use ($_navFile): string {
                    class="<?php echo $_navClass('reports'); ?>">Reports</a>
                 <a href="<?php echo BASE_URL; ?>/pages/import.view.php"
                    class="<?php echo $_navClass('import'); ?>">My Store</a>
-                <a href="<?php echo BASE_URL; ?>/pages/about.view.php"
-                   class="<?php echo $_navClass('about'); ?>">About</a>
             </nav>
 
             <!-- Divider -->
@@ -60,7 +56,7 @@ $_navClass = function(string $keyword) use ($_navFile): string {
                             message:      'You will be returned to the login page.',
                             confirmText:  'Log out',
                             confirmStyle: 'danger',
-                            onConfirm:    function(){ window.location='<?php echo BASE_URL; ?>/pages/landing.view.php?logout=1'; }
+                            onConfirm:    function(){ pvLogout(); }
                         })"
                         class="text-sm text-[#261F0E] border border-[#D2C8AE] rounded-lg px-3 py-1.5 hover:bg-[#D2C8AE] transition-colors"
                         style="white-space:nowrap; opacity:0.75">

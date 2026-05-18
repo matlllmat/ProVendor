@@ -3,7 +3,7 @@
 // AJAX: returns historical sales + saved forecast rows for one session.
 // Used by the Reports page detail modal to render the chart.
 
-session_start();
+require_once __DIR__ . '/../config/bootstrap.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['user_id'])) {

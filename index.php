@@ -1,8 +1,7 @@
 <?php
 // index.php
 // Entry point — redirects based on auth state and whether the user has imported data.
-define('BASE_URL', '/ProVendor');
-session_start();
+require_once __DIR__ . '/config/bootstrap.php';
 
 // if not logged in then redirect the user to login
 if (!isset($_SESSION['user_id'])) {
@@ -29,8 +28,8 @@ if (file_exists(__DIR__ . '/config/db.php')) {
 }
 
 if ($hasSales) {
-    header('Location: ' . BASE_URL . '/pages/dashboard.php');
+    header('Location: ' . BASE_URL . '/pages/forecast.view.php');
 } else {
-    header('Location: ' . BASE_URL . '/pages/landing.php');
+    header('Location: ' . BASE_URL . '/pages/landing.view.php');
 }
 exit;

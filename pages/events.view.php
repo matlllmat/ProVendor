@@ -8,7 +8,6 @@ $pageTitle = 'ProVendor — Events';
 $pageCss   = 'events.css';
 require_once __DIR__ . '/../includes/header.php';
 ?>
-<body class="bg-[#F0E8D0] min-h-screen dot-pattern-light">
 
 <?php require_once __DIR__ . '/../includes/navbar.php'; ?>
 
@@ -155,7 +154,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <?php if ($ev['is_seeded']): ?>
                 <span class="event-seeded-badge">Preset</span>
                 <button class="event-action-btn delete"
-                        onclick="confirmHidePresetEvent(<?php echo $ev['id']; ?>, '<?php echo htmlspecialchars(addslashes($ev['name'])); ?>')"
+                        onclick="confirmHidePresetEvent(<?php echo $ev['id']; ?>, <?php echo htmlspecialchars(json_encode($ev['name']), ENT_QUOTES); ?>)"
                         title="Hide this preset">
                     <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -174,7 +173,7 @@ require_once __DIR__ . '/../includes/header.php';
                     </svg>
                 </button>
                 <button class="event-action-btn delete"
-                        onclick="confirmDeleteEvent(<?php echo $ev['id']; ?>, '<?php echo htmlspecialchars(addslashes($ev['name'])); ?>')"
+                        onclick="confirmDeleteEvent(<?php echo $ev['id']; ?>, <?php echo htmlspecialchars(json_encode($ev['name']), ENT_QUOTES); ?>)"
                         title="Delete">
                     <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1040,5 +1039,6 @@ async function doHideEvent(id) {
 </div>
 
 <?php require_once __DIR__ . '/../includes/confirm_modal.php'; ?>
+<?php require_once __DIR__ . '/../includes/footer.php'; ?>
 </body>
 </html>

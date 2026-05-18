@@ -2,7 +2,7 @@
 // api/delete_forecast.php
 // AJAX: deletes all rows of a saved forecast session.
 
-session_start();
+require_once __DIR__ . '/../config/bootstrap.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['user_id'])) {

@@ -4,7 +4,7 @@
 // Reads the temp CSV, inserts products + sales into the DB, saves the import session.
 // Returns JSON { success: true } or { error: "..." }.
 
-session_start();
+require_once __DIR__ . '/../config/bootstrap.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['user_id'])) {
@@ -21,8 +21,6 @@ if (empty($_SESSION['temp_csv']) || !file_exists($_SESSION['temp_csv'])) {
 $mapping  = json_decode($_POST['mapping'] ?? '{}', true);
 $csvRows  = (int) ($_POST['csv_rows'] ?? 0);
 $replace  = ($_POST['replace'] ?? '0') === '1'; // replace overlapping records instead of skipping
-$lat      = isset($_POST['lat']) && $_POST['lat'] !== '' ? (float) $_POST['lat'] : null;
-$lng      = isset($_POST['lng']) && $_POST['lng'] !== '' ? (float) $_POST['lng'] : null;
 
 // Validate required fields are mapped
 if (empty($mapping['date']) || empty($mapping['product']) || empty($mapping['quantity'])) {
@@ -84,11 +82,6 @@ require_once __DIR__ . '/../queries/user.query.php';
 try {
     $pdo->beginTransaction();
 
-    // Save store location if provided
-    if ($lat !== null && $lng !== null) {
-        saveUserLocation($pdo, $_SESSION['user_id'], $lat, $lng);
-    }
-
     // Save import session first so we have its id for sales rows
     $sessionId = saveImportSession(
         $pdo,
@@ -104,6 +97,35 @@ try {
     $existingPairs        = $replace
         ? array_fill_keys(array_keys($existingPairsWithIds), true)
         : getExistingSalesPairs($pdo, $_SESSION['user_id']);
+
+    // Pre-pass: figure out the most recent cost and most recent selling price per
+    // product based on sale_date, so the canonical price stored on `products` is
+    // the latest one seen — not just whatever row happened to come first.
+    // Cost and price are tracked independently in case rows have one but not the other.
+    $latestByProduct = []; // name => ['cost'=>?float, 'cost_date'=>string, 'price'=>?float, 'price_date'=>string]
+    foreach ($dataRows as $row) {
+        $pn = trim($row[$colProduct] ?? '');
+        $dr = trim($row[$colDate]    ?? '');
+        if ($pn === '' || $dr === '') continue;
+        $d  = normalizeDate($dr);
+        if ($d === null) continue;
+
+        $rc = $colCost  ? (is_numeric($row[$colCost]  ?? '') ? (float) $row[$colCost]  : null) : null;
+        $rp = $colPrice ? (is_numeric($row[$colPrice] ?? '') ? (float) $row[$colPrice] : null) : null;
+        if ($rc === null && $rp === null) continue;
+
+        if (!isset($latestByProduct[$pn])) {
+            $latestByProduct[$pn] = ['cost' => null, 'cost_date' => '', 'price' => null, 'price_date' => ''];
+        }
+        if ($rc !== null && $d > $latestByProduct[$pn]['cost_date']) {
+            $latestByProduct[$pn]['cost']      = $rc;
+            $latestByProduct[$pn]['cost_date'] = $d;
+        }
+        if ($rp !== null && $d > $latestByProduct[$pn]['price_date']) {
+            $latestByProduct[$pn]['price']      = $rp;
+            $latestByProduct[$pn]['price_date'] = $d;
+        }
+    }
 
     // Process rows — upsert products, aggregate quantities by (product, date)
     $productCache   = []; // name → id, avoids re-querying the same product
@@ -126,14 +148,18 @@ try {
         $qty  = (int) $qtyRaw;
         if ($date === null || $qty <= 0) continue;
 
-        $sku         = $colSku         ? trim($row[$colSku]         ?? '') ?: null : null;
-        $category    = $colCategory    ? trim($row[$colCategory]    ?? '') ?: null : null;
-        $subcategory = $colSubcategory ? trim($row[$colSubcategory] ?? '') ?: null : null;
+        $sku         = $colSku         ? (trim($row[$colSku]         ?? '') ?: null) : null;
+        $category    = $colCategory    ? (trim($row[$colCategory]    ?? '') ?: null) : null;
+        $subcategory = $colSubcategory ? (trim($row[$colSubcategory] ?? '') ?: null) : null;
         $cost        = $colCost        ? (is_numeric($row[$colCost]  ?? '') ? (float) $row[$colCost]  : null) : null;
         $price       = $colPrice       ? (is_numeric($row[$colPrice] ?? '') ? (float) $row[$colPrice] : null) : null;
 
-        // Get or create product — cache by name to avoid duplicate DB lookups
+        // Get or create product — cache by name to avoid duplicate DB lookups.
+        // Cost and selling price come from the pre-pass (most recent sale_date),
+        // not this individual row, so older rows can never overwrite a newer price.
         if (!isset($productCache[$productName])) {
+            $latestCost  = $latestByProduct[$productName]['cost']  ?? null;
+            $latestPrice = $latestByProduct[$productName]['price'] ?? null;
             $productCache[$productName] = upsertProduct(
                 $pdo,
                 $_SESSION['user_id'],
@@ -141,8 +167,8 @@ try {
                 $sku,
                 $category,
                 $subcategory,
-                $cost,
-                $price
+                $latestCost,
+                $latestPrice
             );
         }
 
@@ -196,11 +222,8 @@ try {
         insertSalesBatch($pdo, $salesBatch);
     }
 
-    // Apply replace-mode updates
-    foreach ($updateBatch as $upd) {
-        $pdo->prepare('UPDATE sales SET quantity_sold = ?, import_session_id = ? WHERE id = ?')
-            ->execute([$upd['qty'], $upd['session_id'], $upd['sale_id']]);
-    }
+    // Apply replace-mode updates in chunked CASE-WHEN batches instead of per-row UPDATEs.
+    bulkUpdateSalesByPair($pdo, $updateBatch);
 
     $pdo->commit();
 
@@ -220,7 +243,9 @@ try {
 
 } catch (PDOException $e) {
     $pdo->rollBack();
-    echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
+    // Log the underlying SQL error server-side; show the client a generic message.
+    error_log('[ProVendor import] ' . $e->getMessage());
+    echo json_encode(['error' => 'Database error during import. Please try again.']);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -4,6 +4,167 @@
 
 const YEAR_COLORS = ['#1A6933', '#3B6EA5', '#8B6B14', '#1A5F7A', '#7B3F8C', '#B94040'];
 
+// Normalize a real date string to the 2000 base year used by overlay charts.
+function normYear(d) {
+    if (!d) return null;
+    var n = '2000' + d.slice(4);
+    return n === '2000-02-29' ? '2000-02-28' : n;
+}
+
+// Returns CHART_EVENTS that overlap a given normalized date (year 2000 format),
+// deduplicated by name. Excludes IDs in disabledIds.
+function getEventsOnNormDate(normDate, disabledIds) {
+    var skip = disabledIds || new Set();
+    var seen = new Set();
+    var result = [];
+    (CHART_EVENTS || []).forEach(function (ev) {
+        if (skip.has(ev.id)) return;
+        var start = normYear(ev.instance_start);
+        var end   = normYear(ev.instance_end || ev.instance_start);
+        if (start && normDate >= start && normDate <= end && !seen.has(ev.name)) {
+            seen.add(ev.name);
+            result.push(ev);
+        }
+    });
+    return result;
+}
+
+// Groups CHART_EVENTS by type, deduplicating instances by name.
+function _buildEventGroups() {
+    var typeMap = {};
+    (CHART_EVENTS || []).forEach(function (ev) {
+        var type = ev.type || 'custom';
+        if (!typeMap[type]) typeMap[type] = { type: type, events: {} };
+        if (!typeMap[type].events[ev.name]) {
+            typeMap[type].events[ev.name] = { name: ev.name, color: ev.color || EVENT_COLOR, ids: [] };
+        }
+        typeMap[type].events[ev.name].ids.push(ev.id);
+    });
+    return Object.values(typeMap).map(function (g) {
+        g.events = Object.values(g.events);
+        return g;
+    });
+}
+
+// Opens (or closes) a floating event-filter checklist anchored below anchorEl.
+// disabledIds — Set mutated in place as checkboxes toggle.
+// onApply     — called after every change so the chart can refresh annotations.
+// Returns true if the panel was opened, false if it was closed.
+function toggleEventsChecklist(anchorEl, disabledIds, onApply) {
+    var PANEL_ID = 'pv-ev-checklist';
+    var existing = document.getElementById(PANEL_ID);
+    if (existing) { existing.remove(); return false; }
+
+    var groups = _buildEventGroups();
+
+    var panel = document.createElement('div');
+    panel.id        = PANEL_ID;
+    panel.className = 'event-filter-panel';
+    panel.style.cssText = 'position:fixed;z-index:9999;left:auto';
+
+    if (!groups.length) {
+        panel.innerHTML = '<p class="event-filter-empty">No events to filter.</p>';
+    } else {
+        var allOn = (CHART_EVENTS || []).every(function (ev) { return !disabledIds.has(ev.id); });
+        var html  = '<p class="event-filter-title">Show Events</p>';
+        html += '<label class="event-filter-row" style="padding-bottom:0.4rem;border-bottom:1px solid rgba(210,200,174,0.55);margin-bottom:0.1rem">' +
+                    '<input type="checkbox" id="pv-ev-all"' + (allOn ? ' checked' : '') + '>' +
+                    '<strong style="font-size:0.72rem">All events</strong>' +
+                '</label>';
+        html += '<div class="event-filter-inner">';
+        groups.forEach(function (g) {
+            var label      = g.type.charAt(0).toUpperCase() + g.type.slice(1).replace(/_/g, ' ');
+            var groupAllOn = g.events.every(function (ev) {
+                return ev.ids.every(function (id) { return !disabledIds.has(id); });
+            });
+            html += '<div class="event-filter-group-header">' +
+                        '<span class="event-filter-group-label">' + label + '</span>' +
+                        '<button type="button" class="event-filter-group-toggle" data-gtype="' + g.type + '">' +
+                            (groupAllOn ? 'Hide all' : 'Show all') +
+                        '</button>' +
+                    '</div>';
+            g.events.forEach(function (ev) {
+                var evOn    = ev.ids.every(function (id) { return !disabledIds.has(id); });
+                var idsAttr = ev.ids.join(',');
+                html += '<label class="event-filter-row-child">' +
+                            '<input type="checkbox" data-ev-ids="' + idsAttr + '"' + (evOn ? ' checked' : '') + '>' +
+                            '<span class="event-filter-dot" style="background:' + ev.color + '"></span>' +
+                            '<span>' + ev.name + '</span>' +
+                        '</label>';
+            });
+        });
+        html += '</div>';
+        panel.innerHTML = html;
+    }
+
+    var rect = anchorEl.getBoundingClientRect();
+    panel.style.top   = (rect.bottom + 6) + 'px';
+    panel.style.right = Math.max(8, window.innerWidth - rect.right) + 'px';
+    document.body.appendChild(panel);
+
+    var allCb = panel.querySelector('#pv-ev-all');
+
+    function syncAllCb() {
+        if (allCb) allCb.checked = (CHART_EVENTS || []).every(function (ev) { return !disabledIds.has(ev.id); });
+    }
+
+    panel.querySelectorAll('input[data-ev-ids]').forEach(function (cb) {
+        cb.addEventListener('change', function () {
+            var checked = this.checked;
+            this.dataset.evIds.split(',').map(Number).forEach(function (id) {
+                if (checked) disabledIds.delete(id); else disabledIds.add(id);
+            });
+            syncAllCb();
+            onApply();
+        });
+    });
+
+    if (allCb) {
+        allCb.addEventListener('change', function () {
+            var checked = this.checked;
+            (CHART_EVENTS || []).forEach(function (ev) {
+                if (checked) disabledIds.delete(ev.id); else disabledIds.add(ev.id);
+            });
+            panel.querySelectorAll('input[data-ev-ids]').forEach(function (c) { c.checked = checked; });
+            panel.querySelectorAll('.event-filter-group-toggle').forEach(function (b) {
+                b.textContent = checked ? 'Hide all' : 'Show all';
+            });
+            onApply();
+        });
+    }
+
+    panel.querySelectorAll('.event-filter-group-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var gtype = this.dataset.gtype;
+            var group = groups.find(function (g) { return g.type === gtype; });
+            if (!group) return;
+            var wasAllOn = group.events.every(function (ev) {
+                return ev.ids.every(function (id) { return !disabledIds.has(id); });
+            });
+            group.events.forEach(function (ev) {
+                ev.ids.forEach(function (id) { if (wasAllOn) disabledIds.add(id); else disabledIds.delete(id); });
+            });
+            this.textContent = wasAllOn ? 'Show all' : 'Hide all';
+            group.events.forEach(function (ev) {
+                var cb = panel.querySelector('input[data-ev-ids="' + ev.ids.join(',') + '"]');
+                if (cb) cb.checked = !wasAllOn;
+            });
+            syncAllCb();
+            onApply();
+        });
+    });
+
+    function onOutside(e) {
+        if (!panel.contains(e.target) && e.target !== anchorEl) {
+            panel.remove();
+            document.removeEventListener('click', onOutside, true);
+        }
+    }
+    setTimeout(function () { document.addEventListener('click', onOutside, true); }, 0);
+
+    return true;
+}
+
 function hexToRgba(hex, alpha) {
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);

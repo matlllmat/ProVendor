@@ -5,7 +5,7 @@
 // (b) overlap count — how many existing records fall in the CSV's date range.
 // Does NOT write anything to the database.
 
-session_start();
+require_once __DIR__ . '/../config/bootstrap.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['user_id'])) {

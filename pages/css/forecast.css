@@ -289,6 +289,64 @@
     font-size: 0.875rem;
 }
 
+/* ── Filters row: categories on the left, view switcher on the right ── */
+.chart-filters-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+    margin-bottom: 1.25rem;
+}
+.chart-filters-row .category-tabs { margin-bottom: 0; }
+.chart-filters-row .view-tabs     { margin-bottom: 0; }
+
+/* ── View tabs (Daily / Weekly / Monthly / Yearly) ── */
+.view-tabs {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    background: rgba(38,31,14,0.05);
+    border: 1px solid #D2C8AE;
+    border-radius: 999px;
+    margin-bottom: 1rem;
+    width: fit-content;
+    flex-shrink: 0;
+}
+
+.view-tab {
+    padding: 0.3rem 0.95rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    border-radius: 999px;
+    border: none;
+    background: transparent;
+    color: #261F0E;
+    opacity: 0.55;
+    cursor: pointer;
+    font-family: 'Lora', serif;
+    transition: background 0.15s, color 0.15s, opacity 0.15s;
+}
+.view-tab:hover  { opacity: 0.85; }
+.view-tab.active {
+    background: #261F0E;
+    color: #F0E8D0;
+    opacity: 1;
+}
+
+/* ── Year pills + selected-product row (balanced layout) ── */
+.year-product-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.875rem;
+}
+.year-product-row .year-selector          { margin-bottom: 0; }
+.year-product-row .chart-selected-product { margin-bottom: 0; margin-left: auto; }
+
 /* ── Year overlay selector ── */
 .year-selector {
     display: flex;
@@ -680,6 +738,281 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1rem;
+}
+
+/* ── Product insights panel (sits below the chart when a product is selected) ── */
+.product-insights {
+    margin-top: 1.25rem;
+    padding: 1.3rem 1.4rem 1.35rem;
+    background: linear-gradient(135deg, rgba(26,105,51,0.05) 0%, rgba(38,31,14,0.02) 70%);
+    border: 1px solid #D2C8AE;
+    border-radius: 0.85rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.product-insights::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #1A6933 0%, #3B6EA5 50%, #8B6B14 100%);
+    opacity: 0.75;
+}
+
+.insights-header {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    margin-bottom: 1.1rem;
+}
+
+.insights-icon {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.55rem;
+    background: rgba(26,105,51,0.13);
+    border: 1px solid rgba(26,105,51,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #1A6933;
+    flex-shrink: 0;
+}
+
+.insights-header-text { flex: 1; min-width: 0; }
+
+.insights-eyebrow {
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #1A6933;
+    margin-bottom: 0.18rem;
+}
+
+.insights-subtitle {
+    font-size: 0.74rem;
+    color: #261F0E;
+    opacity: 0.55;
+    line-height: 1.4;
+}
+
+/* Stat tiles ─────────────────────────────────────────────────────────── */
+.insights-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.65rem;
+    margin-bottom: 1rem;
+}
+@media (max-width: 720px) {
+    .insights-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.insight-stat {
+    position: relative;
+    padding: 0.65rem 0.8rem 0.7rem;
+    background: rgba(240,232,208,0.65);
+    border: 1px solid #D2C8AE;
+    border-radius: 0.6rem;
+    min-width: 0;
+    overflow: hidden;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.insight-stat:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(38,31,14,0.07);
+}
+.insight-stat::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 2px;
+    background: #1A6933;
+    opacity: 0.55;
+}
+.insight-stat[data-tone="brown"]::before  { background: #8B6B14; }
+.insight-stat[data-tone="blue"]::before   { background: #3B6EA5; }
+.insight-stat[data-tone="green"]::before  { background: #1A6933; }
+.insight-stat[data-tone="orange"]::before { background: #FF5722; }
+
+.insight-stat-icon {
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 0.35rem;
+    background: rgba(38,31,14,0.07);
+    color: #261F0E;
+    opacity: 0.55;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.4rem;
+}
+.insight-stat[data-tone="brown"]  .insight-stat-icon { color: #8B6B14; background: rgba(139,107,20,0.12); opacity: 1; }
+.insight-stat[data-tone="blue"]   .insight-stat-icon { color: #3B6EA5; background: rgba(59,110,165,0.13); opacity: 1; }
+.insight-stat[data-tone="green"]  .insight-stat-icon { color: #1A6933; background: rgba(26,105,51,0.13); opacity: 1; }
+.insight-stat[data-tone="orange"] .insight-stat-icon { color: #FF5722; background: rgba(255,87,34,0.13); opacity: 1; }
+
+.insight-stat-value {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #261F0E;
+    line-height: 1.2;
+    margin-bottom: 0.22rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.insight-stat-label {
+    font-size: 0.58rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #261F0E;
+    opacity: 0.5;
+}
+
+/* Observations list ───────────────────────────────────────────────────── */
+.insights-list {
+    list-style: none;
+    margin: 0 0 0.8rem 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.insights-list li {
+    font-size: 0.78rem;
+    color: #261F0E;
+    opacity: 0.92;
+    line-height: 1.5;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.55rem 0.75rem;
+    background: rgba(240,232,208,0.55);
+    border: 1px solid rgba(210,200,174,0.65);
+    border-radius: 0.55rem;
+}
+
+.insights-list li strong {
+    font-weight: 700;
+    color: #261F0E;
+    opacity: 1;
+}
+
+.insight-bullet {
+    flex-shrink: 0;
+    width: 1.55rem;
+    height: 1.55rem;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    line-height: 1;
+    border: 1px solid transparent;
+}
+.insight-bullet-good  { background: rgba(26,105,51,0.13);  border-color: rgba(26,105,51,0.25); }
+.insight-bullet-bad   { background: rgba(255,87,34,0.15);  border-color: rgba(255,87,34,0.3); }
+.insight-bullet-blue  { background: rgba(59,110,165,0.13); border-color: rgba(59,110,165,0.28); }
+.insight-bullet-flat  { background: rgba(38,31,14,0.07);   border-color: rgba(38,31,14,0.12); }
+
+.insights-empty {
+    opacity: 0.5 !important;
+    font-style: italic;
+    background: transparent !important;
+    border: 1px dashed rgba(210,200,174,0.7) !important;
+}
+
+/* Data-quality footnote ──────────────────────────────────────────────── */
+.insights-quality {
+    margin: 0;
+    padding: 0.55rem 0.75rem 0.55rem 0.85rem;
+    font-size: 0.72rem;
+    line-height: 1.5;
+    border-radius: 0.5rem;
+    border-left: 3px solid;
+    color: #261F0E;
+}
+.insights-quality-good {
+    background: rgba(26,105,51,0.07);
+    border-color: rgba(26,105,51,0.55);
+    color: #1A6933;
+    font-weight: 600;
+}
+.insights-quality-warn {
+    background: rgba(139,107,20,0.07);
+    border-color: rgba(139,107,20,0.55);
+    color: #8B6B14;
+    font-weight: 600;
+}
+
+/* ── "Compute from" toggle (Today vs. Last sale date) above the presets ── */
+.fc-ref-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.7rem;
+    flex-wrap: wrap;
+}
+.fc-ref-toggle .fc-preset-pills { margin-bottom: 0; }
+
+.fc-ref-label {
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #261F0E;
+    opacity: 0.45;
+}
+
+/* ── Forecast range preset pills (Next Week / Next Month / etc.) ── */
+.fc-preset-pills {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.7rem;
+}
+
+.fc-preset-pill {
+    padding: 0.28rem 0.8rem;
+    border-radius: 999px;
+    border: 1px solid #D2C8AE;
+    background: transparent;
+    color: #261F0E;
+    font-size: 0.72rem;
+    font-weight: 600;
+    font-family: 'Lora', serif;
+    cursor: pointer;
+    opacity: 0.55;
+    transition: opacity 0.15s, background 0.15s, color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+}
+.fc-preset-pill:hover { opacity: 0.85; }
+.fc-preset-pill.fc-preset-pill-on {
+    background: #261F0E;
+    color: #F0E8D0;
+    border-color: #261F0E;
+    opacity: 1;
+}
+
+/* ── Help text shown above the date range form ── */
+.fc-form-helptext {
+    font-size: 0.78rem;
+    color: #261F0E;
+    opacity: 0.55;
+    line-height: 1.55;
+    padding: 0.65rem 0.85rem;
+    background: rgba(26,105,51,0.05);
+    border: 1px solid rgba(26,105,51,0.15);
+    border-radius: 0.5rem;
 }
 
 /* ── Date range warning (shown when window > 12 months past last sale) ── */

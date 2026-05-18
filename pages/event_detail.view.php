@@ -4,7 +4,7 @@
 
 require_once __DIR__ . '/event_detail.logic.php';
 
-$pageTitle = 'ProVendor — ' . htmlspecialchars($event['name']);
+$pageTitle = 'ProVendor — ' . $event['name'];
 $pageCss   = 'event_detail.css';
 require_once __DIR__ . '/../includes/header.php';
 
@@ -42,7 +42,6 @@ if ($hasProphet) {
     }
 }
 ?>
-<body class="bg-[#F0E8D0] min-h-screen dot-pattern-light">
 
 <?php require_once __DIR__ . '/../includes/navbar.php'; ?>
 
@@ -207,5 +206,6 @@ if ($hasProphet) {
 </main>
 
 <?php require_once __DIR__ . '/../includes/confirm_modal.php'; ?>
+<?php require_once __DIR__ . '/../includes/footer.php'; ?>
 </body>
 </html>

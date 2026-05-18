@@ -2,19 +2,10 @@
 // pages/landing.logic.php
 // Auth guard, logout, and page-level data for the landing (setup) page.
 
-define('BASE_URL', '/ProVendor');
-
-session_start();
+require_once __DIR__ . '/../config/bootstrap.php';
 
 // Must be logged in
 if (!isset($_SESSION['user_id'])) {
-    header('Location: ' . BASE_URL . '/pages/login.view.php');
-    exit;
-}
-
-// Handle logout
-if (isset($_GET['logout'])) {
-    session_destroy();
     header('Location: ' . BASE_URL . '/pages/login.view.php');
     exit;
 }

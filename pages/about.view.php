@@ -1,93 +1,42 @@
 <?php
 // pages/about.view.php
-session_start();
-
-define('BASE_URL', '/ProVendor');
-
-$isLoggedIn = isset($_SESSION['user_id']);
-$userName   = 'Account';
-
-if ($isLoggedIn) {
-    require_once __DIR__ . '/../config/db.php';
-    require_once __DIR__ . '/../queries/user.query.php';
-    $_aboutUser = getUserById($pdo, (int) $_SESSION['user_id']);
-    $userName   = $_aboutUser ? $_aboutUser['name'] : 'Account';
-}
+require_once __DIR__ . '/../config/bootstrap.php';
 
 $pageTitle = 'ProVendor — About Us';
+$bodyClass = 'bg-[#261F0E]';
 require_once __DIR__ . '/../includes/header.php';
-
-// Active link helper for dark navbar
-$_navFile  = basename($_SERVER['PHP_SELF']);
-$_darkNav  = function(string $keyword) use ($_navFile): string {
-    return str_contains($_navFile, $keyword)
-        ? 'color:#F0E8D0; font-weight:600; border-bottom:2px solid rgba(240,232,208,0.6); padding-bottom:2px; text-decoration:none; font-size:0.875rem;'
-        : 'color:rgba(210,200,174,0.45); text-decoration:none; font-size:0.875rem; transition:color 0.15s;';
-};
 ?>
-<body class="bg-[#261F0E]">
 
     <!-- ════════════════════════════════════════════
-         TOP NAV (context-aware)
+         BACK BUTTON BAR
     ════════════════════════════════════════════ -->
-    <nav class="sticky top-0 z-50 border-b border-[#F0E8D0]/10" style="background:rgba(38,31,14,0.92); backdrop-filter:blur(12px)">
-        <div class="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-
-            <!-- Logo -->
-            <a href="<?php echo BASE_URL; ?>/<?php echo $isLoggedIn ? 'pages/import.view.php' : 'pages/login.view.php'; ?>" class="flex items-center gap-2.5" style="text-decoration:none">
-                <div class="w-7 h-7 rounded-lg flex items-center justify-center" style="background:rgba(240,232,208,0.10); border:1px solid rgba(240,232,208,0.20)">
-                    <span class="text-[#F0E8D0] text-[9px] font-semibold tracking-widest">PV</span>
-                </div>
-                <span class="text-[#F0E8D0] font-semibold text-sm">ProVendor</span>
+    <div class="sticky top-0 z-50 border-b border-[#F0E8D0]/10" style="background:rgba(38,31,14,0.92); backdrop-filter:blur(12px)">
+        <div class="max-w-5xl mx-auto px-6 h-12 flex items-center">
+            <a id="about-back"
+               href="<?php echo BASE_URL; ?>/pages/login.view.php"
+               onclick="if(history.length>1){history.back();return false;}"
+               style="display:flex;align-items:center;gap:0.375rem;color:rgba(210,200,174,0.55);font-size:0.72rem;text-decoration:none;text-transform:uppercase;letter-spacing:0.1em;transition:color 0.15s;"
+               onmouseover="this.style.color='rgba(210,200,174,0.9)'" onmouseout="this.style.color='rgba(210,200,174,0.55)'">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                <span id="about-back-label">Back</span>
             </a>
-
-            <?php if ($isLoggedIn): ?>
-            <!-- Full nav when logged in -->
-            <div class="flex items-center gap-6">
-
-                <nav class="flex items-center gap-6">
-                    <a href="<?php echo BASE_URL; ?>/pages/dashboard.view.php" style="<?php echo $_darkNav('dashboard'); ?>">Dashboard</a>
-                    <a href="<?php echo BASE_URL; ?>/pages/forecast.view.php"  style="<?php echo $_darkNav('forecast'); ?>">Forecast</a>
-                    <a href="<?php echo BASE_URL; ?>/pages/events.view.php"    style="<?php echo $_darkNav('event'); ?>">Events</a>
-                    <a href="<?php echo BASE_URL; ?>/pages/import.view.php"    style="<?php echo $_darkNav('import'); ?>">My Store</a>
-                    <a href="<?php echo BASE_URL; ?>/pages/reports.view.php"   style="<?php echo $_darkNav('reports'); ?>">Reports</a>
-                    <a href="<?php echo BASE_URL; ?>/pages/about.view.php"     style="<?php echo $_darkNav('about'); ?>">About</a>
-                </nav>
-
-                <!-- Divider -->
-                <div style="width:1px; height:1rem; background:rgba(210,200,174,0.25); flex-shrink:0"></div>
-
-                <!-- User + Logout -->
-                <div class="flex items-center gap-3">
-                    <span style="font-size:0.875rem; color:rgba(210,200,174,0.45); white-space:nowrap">
-                        <?php echo htmlspecialchars($userName); ?>
-                    </span>
-                    <button type="button"
-                            onclick="showConfirm({
-                                title:        'Log out?',
-                                message:      'You will be returned to the login page.',
-                                confirmText:  'Log out',
-                                confirmStyle: 'danger',
-                                onConfirm:    function(){ window.location='<?php echo BASE_URL; ?>/pages/landing.view.php?logout=1'; }
-                            })"
-                            style="font-size:0.875rem; color:rgba(210,200,174,0.65); border:1px solid rgba(210,200,174,0.25); border-radius:0.5rem; padding:0.25rem 0.75rem; background:transparent; cursor:pointer; white-space:nowrap; transition:background 0.15s;">
-                        Log out
-                    </button>
-                </div>
-
-            </div>
-
-            <?php else: ?>
-            <!-- Guest: just a back link -->
-            <a href="<?php echo BASE_URL; ?>/pages/login.view.php"
-               style="display:flex; align-items:center; gap:0.375rem; color:rgba(210,200,174,0.60); font-size:0.75rem; text-decoration:none; text-transform:uppercase; letter-spacing:0.1em; transition:color 0.15s;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-                Back to Login
-            </a>
-            <?php endif; ?>
-
         </div>
-    </nav>
+    </div>
+    <script>
+    (function () {
+        var ref = document.referrer;
+        var label = 'Back';
+        if (ref) {
+            if      (ref.includes('login'))    label = 'Back to Login';
+            else if (ref.includes('forecast')) label = 'Back to Forecast';
+            else if (ref.includes('reports'))  label = 'Back to Reports';
+            else if (ref.includes('events'))   label = 'Back to Events';
+            else if (ref.includes('import'))   label = 'Back to My Store';
+        }
+        var el = document.getElementById('about-back-label');
+        if (el) el.textContent = label;
+    })();
+    </script>
 
 
     <!-- ════════════════════════════════════════════
@@ -128,7 +77,7 @@ $_darkNav  = function(string $keyword) use ($_navFile): string {
                         </div>
                         <div>
                             <p class="text-[#F0E8D0] font-semibold text-sm mb-1">Demand Forecasting via Prophet</p>
-                            <p class="text-[#D2C8AE]/70 text-sm leading-relaxed">Analyzes historical sales CSV data using Meta's Prophet model to detect trends, weekly cycles, and seasonal spikes. Integrates Philippine public holiday data and local weather as additional regressors.</p>
+                            <p class="text-[#D2C8AE]/70 text-sm leading-relaxed">Analyzes historical sales CSV data using Meta's Prophet model to detect trends, weekly cycles, and seasonal spikes. Integrates Philippine public holiday data as an additional regressor.</p>
                         </div>
                     </div>
                     <div class="flex items-start gap-4">
@@ -146,7 +95,7 @@ $_darkNav  = function(string $keyword) use ($_navFile): string {
                         </div>
                         <div>
                             <p class="text-[#F0E8D0] font-semibold text-sm mb-1">Built for Philippine SMEs</p>
-                            <p class="text-[#D2C8AE]/70 text-sm leading-relaxed">Evaluated with a real partner store, factoring in local context — payday cycles, Philippine holidays, and regional weather patterns that affect small-store demand.</p>
+                            <p class="text-[#D2C8AE]/70 text-sm leading-relaxed">Evaluated with a real partner store, factoring in local context — payday cycles and Philippine holidays that affect small-store demand.</p>
                         </div>
                     </div>
                 </div>
@@ -295,9 +244,6 @@ $_darkNav  = function(string $keyword) use ($_navFile): string {
         </div>
     </footer>
 
-<?php if ($isLoggedIn): ?>
-<?php require_once __DIR__ . '/../includes/confirm_modal.php'; ?>
-<?php endif; ?>
 
 </body>
 </html>

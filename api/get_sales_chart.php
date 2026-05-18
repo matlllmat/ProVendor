@@ -3,7 +3,7 @@
 // AJAX: returns aggregated historical sales for the chart (no Flask needed).
 // POST params: product_id (optional) OR category (optional, empty = all products).
 
-session_start();
+require_once __DIR__ . '/../config/bootstrap.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['user_id'])) {

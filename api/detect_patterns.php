@@ -3,7 +3,7 @@
 // Bridge: sends this user's existing events to Flask /detect_patterns
 // and returns pattern suggestions + weekly insights.
 
-session_start();
+require_once __DIR__ . '/../config/bootstrap.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['user_id'])) {

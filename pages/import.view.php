@@ -8,11 +8,6 @@ $pageTitle = 'ProVendor — My Store';
 $pageCss   = 'import.css';
 require_once __DIR__ . '/../includes/header.php';
 ?>
-<body class="bg-[#F0E8D0] min-h-screen dot-pattern-light">
-
-<!-- Leaflet (needed for the profile map) -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <?php require_once __DIR__ . '/../includes/navbar.php'; ?>
 
@@ -72,6 +67,113 @@ require_once __DIR__ . '/../includes/header.php';
             <?php endif; ?>
         </div>
         <?php endif; ?>
+
+        <!-- ── Prophet Pipeline Explainer ──────────────────────────────────
+             Shows the academic panel exactly how the system uses the rows
+             below: data → Prophet decomposition → forecast.
+        ─────────────────────────────────────────────────────────────────── -->
+        <div class="pipeline-explainer">
+
+            <div class="pipeline-header">
+                <p class="pipeline-eyebrow">Forecasting Pipeline</p>
+                <h2 class="pipeline-title">How ProVendor learns from your data</h2>
+                <p class="pipeline-sub">
+                    There is no separate &ldquo;training&rdquo; step. Every forecast refits
+                    <a href="https://facebook.github.io/prophet/" target="_blank" rel="noopener" class="pipeline-link">Meta&rsquo;s Prophet model</a>
+                    on the sales history below &mdash; per product, per request.
+                </p>
+            </div>
+
+            <div class="pipeline-flow">
+
+                <!-- Step 1: Your data ─────────────────────────────────── -->
+                <div class="pipeline-step">
+                    <div class="pipeline-step-head">
+                        <span class="pipeline-step-num">01</span>
+                        <div class="pipeline-step-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                                <path d="M3 5v6c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                                <path d="M3 11v6c0 1.66 4 3 9 3s9-1.34 9-3v-6"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <h3 class="pipeline-step-title">Your Sales History</h3>
+                    <p class="pipeline-step-desc">The raw daily rows below are what Prophet trains on.</p>
+                    <ul class="pipeline-step-list">
+                        <li><strong><?php echo number_format($summary['total_sales']); ?></strong> daily records</li>
+                        <li><strong><?php echo number_format($summary['total_products']); ?></strong> products</li>
+                        <?php if ($summary['date_from'] && $summary['date_to']): ?>
+                        <li>
+                            <strong><?php echo date('M Y', strtotime($summary['date_from'])); ?></strong>
+                            <span class="pipeline-arrow-inline">&rarr;</span>
+                            <strong><?php echo date('M Y', strtotime($summary['date_to'])); ?></strong>
+                        </li>
+                        <?php else: ?>
+                        <li class="pipeline-step-muted">Upload a CSV to start</li>
+                        <?php endif; ?>
+                    </ul>
+                </div>
+
+                <div class="pipeline-arrow" aria-hidden="true">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                        <polyline points="13 6 19 12 13 18"/>
+                    </svg>
+                </div>
+
+                <!-- Step 2: Prophet decomposes ────────────────────────── -->
+                <div class="pipeline-step">
+                    <div class="pipeline-step-head">
+                        <span class="pipeline-step-num">02</span>
+                        <div class="pipeline-step-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 8c2-2.5 4-2.5 6 0s4 2.5 6 0 4-2.5 6 0"/>
+                                <path d="M3 14c2-1.5 4-1.5 6 0s4 1.5 6 0 4-1.5 6 0"/>
+                                <line x1="3" y1="20" x2="21" y2="20"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <h3 class="pipeline-step-title">Prophet Decomposes</h3>
+                    <p class="pipeline-step-desc">The model splits demand into independent signals.</p>
+                    <ul class="pipeline-step-list">
+                        <li>Long-term <strong>trend</strong></li>
+                        <li>Weekly cycle <span class="pipeline-step-muted">(Mon&ndash;Sun)</span></li>
+                        <li>Yearly <strong>seasonality</strong></li>
+                        <li><strong><?php echo (int) $summary['total_events']; ?></strong> custom event <?php echo $summary['total_events'] == 1 ? 'regressor' : 'regressors'; ?></li>
+                    </ul>
+                </div>
+
+                <div class="pipeline-arrow" aria-hidden="true">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                        <polyline points="13 6 19 12 13 18"/>
+                    </svg>
+                </div>
+
+                <!-- Step 3: Forecast output ────────────────────────────── -->
+                <div class="pipeline-step">
+                    <div class="pipeline-step-head">
+                        <span class="pipeline-step-num">03</span>
+                        <div class="pipeline-step-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="3 16 8 11 12 14 21 6"/>
+                                <polyline points="15 6 21 6 21 12"/>
+                                <path d="M3 20h18" opacity="0.4"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <h3 class="pipeline-step-title">Forecast &amp; Uncertainty</h3>
+                    <p class="pipeline-step-desc">Prophet sums the signals to project future demand.</p>
+                    <ul class="pipeline-step-list">
+                        <li>Daily <strong>predicted units</strong></li>
+                        <li>+ <strong>95%</strong> confidence band</li>
+                        <li>Feeds the <strong>Newsvendor</strong> restock model</li>
+                    </ul>
+                </div>
+
+            </div>
+        </div>
 
         <!-- ── Summary Cards ── -->
         <div class="summary-grid">
@@ -316,7 +418,7 @@ require_once __DIR__ . '/../includes/header.php';
                         </button>
 
                         <button class="session-delete-btn"
-                                onclick="confirmDeleteSession(<?php echo $s['id']; ?>, '<?php echo htmlspecialchars(addslashes($s['filename'])); ?>')"
+                                onclick="confirmDeleteSession(<?php echo $s['id']; ?>, <?php echo htmlspecialchars(json_encode($s['filename']), ENT_QUOTES); ?>)"
                                 title="Delete this import">
                             <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <polyline points="3 6 5 6 21 6"/>
@@ -343,130 +445,78 @@ require_once __DIR__ . '/../includes/header.php';
     ════════════════════════════════════════════ -->
     <div id="tab-content-profile">
 
-        <!-- 2-column grid: Account + Password (left) | Store (right) -->
-        <div class="grid grid-cols-2 gap-6 items-start mb-6">
+        <!-- ── Account Card (Name + Email + Store Name) ── -->
+        <div class="profile-card mb-6">
+            <p class="profile-card-title">Account</p>
 
-            <!-- LEFT COLUMN -->
-            <div class="flex flex-col gap-6">
-
-                <!-- Account Card -->
-                <div class="profile-card">
-                    <p class="profile-card-title">Account</p>
-
-                    <div class="profile-field">
-                        <label class="profile-label" for="profile-name">Name</label>
-                        <input type="text" id="profile-name" class="profile-input"
-                               value="<?php echo htmlspecialchars($profile['name'] ?? ''); ?>"
-                               maxlength="100" oninput="updateSaveBtn()">
-                    </div>
-
-                    <div class="profile-field">
-                        <label class="profile-label">Email</label>
-                        <input type="text" class="profile-input-readonly"
-                               value="<?php echo htmlspecialchars($profile['email'] ?? ''); ?>"
-                               readonly>
-                        <p class="profile-field-hint">Email address cannot be changed.</p>
-                    </div>
-                </div>
-
-                <!-- Change Password Card -->
-                <div class="profile-card">
-                    <p class="profile-card-title">Change Password</p>
-
-                    <div class="profile-field">
-                        <label class="profile-label" for="profile-current-pwd">Current Password</label>
-                        <input type="password" id="profile-current-pwd" class="profile-input" placeholder="••••••••">
-                    </div>
-
-                    <div class="profile-field">
-                        <label class="profile-label" for="profile-new-pwd">New Password</label>
-                        <input type="password" id="profile-new-pwd" class="profile-input" placeholder="Min. 8 characters">
-                    </div>
-
-                    <div class="profile-field">
-                        <label class="profile-label" for="profile-confirm-pwd">Confirm New Password</label>
-                        <input type="password" id="profile-confirm-pwd" class="profile-input" placeholder="••••••••">
-                    </div>
-
-                    <div id="profile-pwd-feedback" class="profile-feedback hidden"></div>
-
-                    <div class="flex justify-end mt-5">
-                        <button id="profile-pwd-btn" onclick="changePassword()" class="profile-action-btn">
-                            Update Password
-                        </button>
-                    </div>
-                </div>
-
-            </div><!-- /left column -->
-
-            <!-- RIGHT COLUMN: Store Card -->
-            <div class="profile-card">
-                <p class="profile-card-title">Store</p>
-
+            <div class="profile-grid-2col">
                 <div class="profile-field">
-                    <label class="profile-label" for="profile-store-name">Store Name</label>
-                    <input type="text" id="profile-store-name" class="profile-input"
-                           value="<?php echo htmlspecialchars($profile['store_name'] ?? ''); ?>"
+                    <label class="profile-label" for="profile-name">Name</label>
+                    <input type="text" id="profile-name" class="profile-input"
+                           value="<?php echo htmlspecialchars($profile['name'] ?? ''); ?>"
                            maxlength="100" oninput="updateSaveBtn()">
                 </div>
 
-                <hr class="profile-divider">
+                <div class="profile-field">
+                    <label class="profile-label">Email</label>
+                    <input type="text" class="profile-input-readonly"
+                           value="<?php echo htmlspecialchars($profile['email'] ?? ''); ?>"
+                           readonly>
+                    <p class="profile-field-hint">Email address cannot be changed.</p>
+                </div>
+            </div>
+
+            <hr class="profile-divider">
+
+            <div class="profile-field">
+                <label class="profile-label" for="profile-store-name">Store Name</label>
+                <input type="text" id="profile-store-name" class="profile-input"
+                       value="<?php echo htmlspecialchars($profile['store_name'] ?? ''); ?>"
+                       maxlength="100" oninput="updateSaveBtn()">
+                <p class="profile-field-hint">This is how your store appears across ProVendor.</p>
+            </div>
+
+            <!-- Save feedback + button live inside the card so they're tied to the fields above -->
+            <div id="profile-save-feedback" class="profile-feedback hidden" style="margin-top:1rem;"></div>
+            <div class="flex justify-end mt-5">
+                <button id="profile-save-btn" onclick="saveProfile()" disabled
+                        class="profile-save-btn" style="opacity:0.3; cursor:not-allowed;">
+                    Save Profile Changes
+                    <svg class="w-4 h-4 inline-block ml-1.5 -mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- ── Change Password Card ── -->
+        <div class="profile-card mb-8">
+            <p class="profile-card-title">Change Password</p>
+
+            <div class="profile-field">
+                <label class="profile-label" for="profile-current-pwd">Current Password</label>
+                <input type="password" id="profile-current-pwd" class="profile-input" placeholder="••••••••">
+            </div>
+
+            <div class="profile-grid-2col">
+                <div class="profile-field">
+                    <label class="profile-label" for="profile-new-pwd">New Password</label>
+                    <input type="password" id="profile-new-pwd" class="profile-input" placeholder="Min. 8 characters">
+                </div>
 
                 <div class="profile-field">
-                    <label class="profile-label">Store Location</label>
-                    <p class="profile-field-hint" style="margin-bottom:0.75rem;">
-                        Click the map or search an address to move your store's pin.
-                    </p>
-
-                    <!-- Address search -->
-                    <div class="relative mb-3">
-                        <input type="text" id="profile-address-search" class="profile-input"
-                               placeholder="e.g. 123 Rizal Street, Quezon City"
-                               onkeydown="if(event.key==='Enter'){ event.preventDefault(); profileSearchAddress(); }">
-                        <button type="button" onclick="profileSearchAddress()"
-                                class="absolute right-3 top-1/2 -translate-y-1/2 hover:opacity-70 transition-opacity"
-                                style="background:none; border:none; cursor:pointer; padding:0;">
-                            <svg class="w-4 h-4 text-[#261F0E]" style="opacity:0.45" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                            </svg>
-                        </button>
-                    </div>
-
-                    <!-- Leaflet map -->
-                    <div id="profile-map" class="profile-map"></div>
-
-                    <!-- Coordinates display -->
-                    <div class="profile-coord-row">
-                        <div>
-                            <span class="profile-coord-label">Latitude</span>
-                            <input type="text" id="profile-lat" class="profile-coord-input"
-                                   value="<?php echo $profileLat ?? ''; ?>" readonly>
-                        </div>
-                        <div>
-                            <span class="profile-coord-label">Longitude</span>
-                            <input type="text" id="profile-lng" class="profile-coord-input"
-                                   value="<?php echo $profileLng ?? ''; ?>" readonly>
-                        </div>
-                    </div>
-
-                    <?php if (!$profileLat): ?>
-                    <p class="profile-no-location">No location set — click the map to pin your store.</p>
-                    <?php endif; ?>
+                    <label class="profile-label" for="profile-confirm-pwd">Confirm New Password</label>
+                    <input type="password" id="profile-confirm-pwd" class="profile-input" placeholder="••••••••">
                 </div>
-            </div><!-- /right column -->
+            </div>
 
-        </div><!-- /grid -->
+            <div id="profile-pwd-feedback" class="profile-feedback hidden"></div>
 
-        <!-- Save Profile feedback + button -->
-        <div id="profile-save-feedback" class="profile-feedback hidden" style="margin-bottom:1rem;"></div>
-        <div class="flex justify-end mb-8">
-            <button id="profile-save-btn" onclick="saveProfile()" disabled
-                    class="profile-save-btn" style="opacity:0.3; cursor:not-allowed;">
-                Save Profile Changes
-                <svg class="w-4 h-4 inline-block ml-1.5 -mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="20 6 9 17 4 12"/>
-                </svg>
-            </button>
+            <div class="flex justify-end mt-5">
+                <button id="profile-pwd-btn" onclick="changePassword()" class="profile-action-btn">
+                    Update Password
+                </button>
+            </div>
         </div>
 
         <!-- Danger Zone -->
@@ -476,7 +526,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <p class="danger-zone-title">Danger Zone</p>
                     <p class="danger-zone-desc">
                         Delete all imported sales data — products, sales records, and import sessions will be
-                        permanently erased. Your account, store name, and location will remain intact.
+                        permanently erased. Your account and store name will remain intact.
                         You will be redirected to the setup page to re-import data.
                     </p>
                 </div>
@@ -504,10 +554,6 @@ function switchTab(name) {
     document.getElementById('tab-content-profile').classList.toggle('hidden', name !== 'profile');
 
     window.location.hash = name;
-
-    if (name === 'profile') {
-        initProfileMap();
-    }
 }
 
 // Restore the active tab on load.
@@ -520,9 +566,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (fromImport || hashImport) {
         switchTab('import');
-    } else {
-        // Profile is already the visible default — just init the map.
-        initProfileMap();
     }
     wRestoreState();
 });
@@ -536,25 +579,15 @@ document.addEventListener('DOMContentLoaded', function() {
 var profileOriginal = {
     name:      <?php echo json_encode($profile['name']       ?? ''); ?>,
     storeName: <?php echo json_encode($profile['store_name'] ?? ''); ?>,
-    lat:       <?php echo $profileLat !== null ? json_encode($profileLat) : 'null'; ?>,
-    lng:       <?php echo $profileLng !== null ? json_encode($profileLng) : 'null'; ?>,
 };
 
 // ── Change detection ──────────────────────────────────────────────────────────
 function profileHasChanges() {
     var name      = document.getElementById('profile-name').value.trim();
     var storeName = document.getElementById('profile-store-name').value.trim();
-    var lat       = document.getElementById('profile-lat').value;
-    var lng       = document.getElementById('profile-lng').value;
-
-    // Empty input matches a null original (no location was set — still no change).
-    var latMatch = (lat === '' && profileOriginal.lat === null) || (lat === profileOriginal.lat);
-    var lngMatch = (lng === '' && profileOriginal.lng === null) || (lng === profileOriginal.lng);
 
     return name !== profileOriginal.name
-        || storeName !== profileOriginal.storeName
-        || !latMatch
-        || !lngMatch;
+        || storeName !== profileOriginal.storeName;
 }
 
 function updateSaveBtn() {
@@ -570,13 +603,13 @@ function updateSaveBtn() {
     }
 }
 
-// ── Save profile (name + store name + location) ───────────────────────────────
+// ── Save profile (name + store name) ──────────────────────────────────────────
 function saveProfile() {
     if (!profileHasChanges()) return;
 
     showConfirm({
         title:        'Save Profile Changes?',
-        message:      'Your name, store name, and location will be updated.',
+        message:      'Your name and store name will be updated.',
         confirmText:  'Save Changes',
         confirmStyle: 'primary',
         onConfirm:    doSaveProfile,
@@ -592,8 +625,6 @@ async function doSaveProfile() {
     var formData = new FormData();
     formData.append('name',       document.getElementById('profile-name').value.trim());
     formData.append('store_name', document.getElementById('profile-store-name').value.trim());
-    formData.append('lat',        document.getElementById('profile-lat').value);
-    formData.append('lng',        document.getElementById('profile-lng').value);
 
     try {
         var res  = await fetch('<?php echo BASE_URL; ?>/api/update_profile.php', { method: 'POST', body: formData });
@@ -603,8 +634,6 @@ async function doSaveProfile() {
             // Update the stored originals so the button re-disables correctly.
             profileOriginal.name      = document.getElementById('profile-name').value.trim();
             profileOriginal.storeName = document.getElementById('profile-store-name').value.trim();
-            profileOriginal.lat       = document.getElementById('profile-lat').value  || null;
-            profileOriginal.lng       = document.getElementById('profile-lng').value  || null;
 
             showProfileFeedback('profile-save-feedback', 'success', 'Profile saved successfully.');
         } else {
@@ -701,87 +730,6 @@ async function doClearData() {
     } catch (e) {
         alert('Network error. Please try again.');
     }
-}
-
-
-// ══════════════════════════════════════════════════════════════════════════════
-// PROFILE MAP (Leaflet — lazy init on first tab switch)
-// ══════════════════════════════════════════════════════════════════════════════
-var profileMap            = null;
-var profileMarker         = null;
-var profileMapInitialized = false;
-
-function initProfileMap() {
-    if (profileMapInitialized) return;
-    profileMapInitialized = true;
-
-    var lat = <?php echo $profileLat !== null ? (float) $profileLat : 'null'; ?>;
-    var lng = <?php echo $profileLng !== null ? (float) $profileLng : 'null'; ?>;
-
-    var center = (lat !== null && lng !== null) ? [lat, lng] : [12.8797, 122.7740];
-    var zoom   = (lat !== null && lng !== null) ? 15 : 6;
-
-    profileMap = L.map('profile-map', { zoomControl: true }).setView(center, zoom);
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',
-        maxZoom: 19,
-    }).addTo(profileMap);
-
-    // Place existing pin if coordinates are already saved.
-    if (lat !== null && lng !== null) {
-        profileMarker = L.marker([lat, lng], { draggable: true }).addTo(profileMap);
-        profileMarker.on('dragend', function() {
-            updateProfileCoords(profileMarker.getLatLng());
-        });
-    }
-
-    profileMap.on('click', function(e) { placeProfileMarker(e.latlng); });
-
-    // Leaflet renders incorrectly inside a hidden element — invalidate size after reveal.
-    setTimeout(function() { profileMap.invalidateSize(); }, 60);
-}
-
-function placeProfileMarker(latlng) {
-    if (profileMarker) {
-        profileMarker.setLatLng(latlng);
-    } else {
-        profileMarker = L.marker(latlng, { draggable: true }).addTo(profileMap);
-        profileMarker.on('dragend', function() {
-            updateProfileCoords(profileMarker.getLatLng());
-        });
-    }
-    updateProfileCoords(latlng);
-    profileMap.panTo(latlng);
-}
-
-function updateProfileCoords(latlng) {
-    document.getElementById('profile-lat').value = latlng.lat.toFixed(6);
-    document.getElementById('profile-lng').value = latlng.lng.toFixed(6);
-    updateSaveBtn();
-}
-
-// Address search via Nominatim (OpenStreetMap's free geocoder).
-function profileSearchAddress() {
-    var query = document.getElementById('profile-address-search').value.trim();
-    if (!query) return;
-
-    var url = 'https://nominatim.openstreetmap.org/search?'
-        + 'q=' + encodeURIComponent(query)
-        + '&countrycodes=ph&format=json&limit=1&accept-language=en';
-
-    fetch(url)
-        .then(function(r) { return r.json(); })
-        .then(function(results) {
-            if (!results.length) {
-                alert('Address not found. Try a more specific search.');
-                return;
-            }
-            var latlng = L.latLng(parseFloat(results[0].lat), parseFloat(results[0].lon));
-            placeProfileMarker(latlng);
-            profileMap.setView(latlng, 16);
-        })
-        .catch(function() { alert('Address search failed. Please try again.'); });
 }
 
 
@@ -1479,5 +1427,6 @@ async function deleteSession(sessionId) {
 </script>
 
 <?php require_once __DIR__ . '/../includes/confirm_modal.php'; ?>
+<?php require_once __DIR__ . '/../includes/footer.php'; ?>
 </body>
 </html>

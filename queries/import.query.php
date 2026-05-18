@@ -25,15 +25,18 @@ function upsertProduct(PDO $pdo, int $userId, string $name, ?string $sku, ?strin
     $existing = $stmt->fetch();
 
     if ($existing) {
-        // Build an UPDATE for any column that was NULL and now has a value
+        // Identity attributes (sku, category, subcategory): keep the first value we
+        // ever saw — these don't change frequently and the user can edit them in My Store.
+        // Money attributes (cost_price, selling_price): last-write-wins, since prices
+        // change over time and the canonical value is whatever the most recent import says.
         $updates = [];
         $params  = [];
 
-        if ($existing['sku']           === null && $sku         !== null) { $updates[] = 'sku = ?';           $params[] = $sku; }
-        if ($existing['category']      === null && $category    !== null) { $updates[] = 'category = ?';      $params[] = $category; }
-        if ($existing['subcategory']   === null && $subcategory !== null) { $updates[] = 'subcategory = ?';   $params[] = $subcategory; }
-        if ($existing['cost_price']    === null && $cost        !== null) { $updates[] = 'cost_price = ?';    $params[] = $cost; }
-        if ($existing['selling_price'] === null && $price       !== null) { $updates[] = 'selling_price = ?'; $params[] = $price; }
+        if ($existing['sku']         === null && $sku         !== null) { $updates[] = 'sku = ?';         $params[] = $sku; }
+        if ($existing['category']    === null && $category    !== null) { $updates[] = 'category = ?';    $params[] = $category; }
+        if ($existing['subcategory'] === null && $subcategory !== null) { $updates[] = 'subcategory = ?'; $params[] = $subcategory; }
+        if ($cost  !== null) { $updates[] = 'cost_price = ?';    $params[] = $cost;  }
+        if ($price !== null) { $updates[] = 'selling_price = ?'; $params[] = $price; }
 
         if (!empty($updates)) {
             $params[] = (int) $existing['id'];
@@ -118,6 +121,43 @@ function updateSaleQty(PDO $pdo, int $saleId, int $userId, int $qty): bool
     return true;
 }
 
+// Bulk-updates quantity_sold + import_session_id for many sales rows in one query
+// per chunk, using a CASE WHEN id construct instead of N individual UPDATEs.
+// $rows is the same shape produced by api/import.php replace-mode:
+//   [['sale_id' => int, 'qty' => int, 'session_id' => int], ...]
+// 5 placeholders per row (qty WHEN-THEN pair, session WHEN-THEN pair, IN list entry).
+// Chunk size 500 → 2,500 placeholders per query, well under MySQL's 65,535 limit.
+function bulkUpdateSalesByPair(PDO $pdo, array $rows): void
+{
+    if (empty($rows)) return;
+
+    $chunkSize = 500;
+    foreach (array_chunk($rows, $chunkSize) as $chunk) {
+        $qtyWhen   = '';
+        $sessWhen  = '';
+        $idPlaces  = [];
+        $qtyArgs   = [];
+        $sessArgs  = [];
+        $idArgs    = [];
+
+        foreach ($chunk as $r) {
+            $qtyWhen   .= ' WHEN ? THEN ?';
+            $sessWhen  .= ' WHEN ? THEN ?';
+            $idPlaces[] = '?';
+            $qtyArgs[]  = $r['sale_id']; $qtyArgs[]  = $r['qty'];
+            $sessArgs[] = $r['sale_id']; $sessArgs[] = $r['session_id'];
+            $idArgs[]   = $r['sale_id'];
+        }
+
+        $sql = "UPDATE sales SET
+                    quantity_sold     = CASE id $qtyWhen END,
+                    import_session_id = CASE id $sessWhen END
+                WHERE id IN (" . implode(',', $idPlaces) . ")";
+
+        $pdo->prepare($sql)->execute(array_merge($qtyArgs, $sessArgs, $idArgs));
+    }
+}
+
 // Batch-inserts sales rows in chunks to stay under MySQL's 65,535 placeholder limit.
 // 4 placeholders per row → max 500 rows per chunk (2,000 placeholders, well within limit).
 function insertSalesBatch(PDO $pdo, array $rows): void
@@ -160,15 +200,22 @@ function getImportSessions(PDO $pdo, int $userId): array
 }
 
 // Returns total product and sales counts for this user.
+// Also returns date span and visible-event count so the Prophet pipeline
+// explainer can show live numbers without a second query.
 function getImportSummary(PDO $pdo, int $userId): array
 {
     $stmt = $pdo->prepare(
         'SELECT
-            (SELECT COUNT(*) FROM products WHERE user_id = ?)                                            AS total_products,
-            (SELECT COUNT(s.id) FROM sales s JOIN products p ON p.id = s.product_id WHERE p.user_id = ?) AS total_sales,
-            (SELECT COUNT(*) FROM import_sessions WHERE user_id = ?)                                     AS total_sessions'
+            (SELECT COUNT(*) FROM products WHERE user_id = ?)                                                        AS total_products,
+            (SELECT COUNT(s.id) FROM sales s JOIN products p ON p.id = s.product_id WHERE p.user_id = ?)             AS total_sales,
+            (SELECT COUNT(*) FROM import_sessions WHERE user_id = ?)                                                 AS total_sessions,
+            (SELECT MIN(s.sale_date) FROM sales s JOIN products p ON p.id = s.product_id WHERE p.user_id = ?)        AS date_from,
+            (SELECT MAX(s.sale_date) FROM sales s JOIN products p ON p.id = s.product_id WHERE p.user_id = ?)        AS date_to,
+            (SELECT COUNT(*) FROM seasonal_events
+              WHERE (user_id IS NULL OR user_id = ?)
+                AND id NOT IN (SELECT event_id FROM user_hidden_events WHERE user_id = ?))                           AS total_events'
     );
-    $stmt->execute([$userId, $userId, $userId]);
+    $stmt->execute([$userId, $userId, $userId, $userId, $userId, $userId, $userId]);
     return $stmt->fetch();
 }
 

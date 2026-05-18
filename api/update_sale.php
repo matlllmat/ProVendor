@@ -3,7 +3,7 @@
 // Updates the quantity_sold of a single sale record (inline edit from Import History).
 // Only the owning user can edit their own sales records.
 
-session_start();
+require_once __DIR__ . '/../config/bootstrap.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['user_id'])) {

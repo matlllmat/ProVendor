@@ -9,7 +9,6 @@ $pageCss   = 'reports.css';
 $extraCss  = 'chart_modal.css';
 require_once __DIR__ . '/../includes/header.php';
 ?>
-<body class="bg-[#F0E8D0] min-h-screen dot-pattern-light">
 
 <?php require_once __DIR__ . '/../includes/navbar.php'; ?>
 
@@ -210,5 +209,6 @@ function deleteSession(btn, productId, generatedAt) {
 </script>
 
 <?php require_once __DIR__ . '/../includes/confirm_modal.php'; ?>
+<?php require_once __DIR__ . '/../includes/footer.php'; ?>
 </body>
 </html>

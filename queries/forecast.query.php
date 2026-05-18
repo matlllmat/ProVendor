@@ -18,7 +18,7 @@ function getCategories(PDO $pdo, int $userId): array
 // Returns all products for this user, with optional name search and category filter.
 function getProducts(PDO $pdo, int $userId, string $search = '', string $category = ''): array
 {
-    $sql    = 'SELECT id, name, sku, category, subcategory FROM products WHERE user_id = ?';
+    $sql    = 'SELECT id, name, sku, category, subcategory, cost_price, selling_price FROM products WHERE user_id = ?';
     $params = [$userId];
 
     if ($search !== '') {

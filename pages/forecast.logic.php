@@ -2,9 +2,7 @@
 // pages/forecast.logic.php
 // Auth guard and data loading for the forecast page.
 
-define('BASE_URL', '/ProVendor');
-
-session_start();
+require_once __DIR__ . '/../config/bootstrap.php';
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: ' . BASE_URL . '/pages/login.view.php');

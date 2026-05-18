@@ -9,7 +9,6 @@ $pageCss   = 'forecast.css';
 $extraCss  = 'chart_modal.css';
 require_once __DIR__ . '/../includes/header.php';
 ?>
-<body class="bg-[#F0E8D0] min-h-screen dot-pattern-light">
 
 <?php require_once __DIR__ . '/../includes/navbar.php'; ?>
 
@@ -34,34 +33,45 @@ require_once __DIR__ . '/../includes/header.php';
             <div id="demand-chart-btns" class="fc-chart-btns"></div>
         </div>
 
-        <!-- Category tabs -->
-        <div class="category-tabs" style="margin-top:1rem">
-            <button class="category-tab active" data-category="">All</button>
-            <?php foreach ($categories as $cat): ?>
-            <button class="category-tab" data-category="<?php echo htmlspecialchars($cat); ?>">
-                <?php echo htmlspecialchars($cat); ?>
-            </button>
-            <?php endforeach; ?>
+        <!-- Filters row: categories left, view switcher right -->
+        <div class="chart-filters-row">
+            <div class="category-tabs">
+                <button class="category-tab active" data-category="">All</button>
+                <?php foreach ($categories as $cat): ?>
+                <button class="category-tab" data-category="<?php echo htmlspecialchars($cat); ?>">
+                    <?php echo htmlspecialchars($cat); ?>
+                </button>
+                <?php endforeach; ?>
+            </div>
+            <div class="view-tabs">
+                <button type="button" class="view-tab active" data-view="daily">Daily</button>
+                <button type="button" class="view-tab"        data-view="weekly">Weekly</button>
+                <button type="button" class="view-tab"        data-view="monthly">Monthly</button>
+                <button type="button" class="view-tab"        data-view="yearly">Yearly</button>
+            </div>
         </div>
 
-        <!-- Year overlay selector -->
-        <div class="year-selector" id="year-selector"></div>
+        <!-- Year pills (left) + Selected product / Run Forecast (right) -->
+        <div class="year-product-row">
 
-        <!-- Selected product indicator -->
-        <div id="chart-selected-product" class="chart-selected-product" style="display:none">
-            <span class="chart-selected-dot"></span>
-            <span id="chart-selected-name" class="chart-selected-name"></span>
-            <button class="chart-deselect-btn" onclick="deselectProduct()">
-                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-                Deselect
-            </button>
-            <button class="fc-run-btn" onclick="openForecastModal()">
-                Run Forecast →
-            </button>
+            <div class="year-selector" id="year-selector"></div>
+
+            <div id="chart-selected-product" class="chart-selected-product" style="display:none">
+                <span class="chart-selected-dot"></span>
+                <span id="chart-selected-name" class="chart-selected-name"></span>
+                <button class="chart-deselect-btn" onclick="deselectProduct()">
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                    Deselect
+                </button>
+                <button class="fc-run-btn" onclick="openForecastModal()">
+                    Run Forecast →
+                </button>
+            </div>
+
         </div>
 
         <!-- Chart canvas -->
@@ -74,6 +84,58 @@ require_once __DIR__ . '/../includes/header.php';
         </div>
         <div id="chart-error" class="chart-error" style="display:none"></div>
         <canvas id="demand-chart" style="display:none; max-height:300px;"></canvas>
+
+        <!-- ── Product Insights ─────────────────────────────────────────
+             Shown only when a single product is selected. Surfaces what
+             Prophet will pick up on so the user can sanity-check the
+             forecast against the data's behavior.
+        ────────────────────────────────────────────────────────────── -->
+        <div id="product-insights" class="product-insights" style="display:none">
+            <div class="insights-header">
+                <div class="insights-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.21 15.89A10 10 0 1 1 8 2.83"/>
+                        <path d="M22 12A10 10 0 0 0 12 2v10z"/>
+                    </svg>
+                </div>
+                <div class="insights-header-text">
+                    <p class="insights-eyebrow">Product Insights</p>
+                    <p class="insights-subtitle">What Prophet picks up from this product&rsquo;s history</p>
+                </div>
+            </div>
+            <div class="insights-stats">
+                <div class="insight-stat" data-tone="brown">
+                    <div class="insight-stat-icon">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v6c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 11v6c0 1.66 4 3 9 3s9-1.34 9-3v-6"/></svg>
+                    </div>
+                    <p class="insight-stat-value" id="ins-records">—</p>
+                    <p class="insight-stat-label">sales records</p>
+                </div>
+                <div class="insight-stat" data-tone="blue">
+                    <div class="insight-stat-icon">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    </div>
+                    <p class="insight-stat-value" id="ins-range">—</p>
+                    <p class="insight-stat-label">date span</p>
+                </div>
+                <div class="insight-stat" data-tone="green">
+                    <div class="insight-stat-icon">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                    </div>
+                    <p class="insight-stat-value" id="ins-units">—</p>
+                    <p class="insight-stat-label">total units</p>
+                </div>
+                <div class="insight-stat" data-tone="orange">
+                    <div class="insight-stat-icon">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    </div>
+                    <p class="insight-stat-value" id="ins-avg">—</p>
+                    <p class="insight-stat-label">avg per day</p>
+                </div>
+            </div>
+            <ul class="insights-list" id="ins-observations"></ul>
+            <p class="insights-quality" id="ins-quality"></p>
+        </div>
 
     </div>
 
@@ -101,7 +163,10 @@ require_once __DIR__ . '/../includes/header.php';
                 <button class="product-row"
                         data-product-id="<?php echo $product['id']; ?>"
                         data-product-name="<?php echo htmlspecialchars($product['name']); ?>"
-                        data-category="<?php echo htmlspecialchars($product['category'] ?? ''); ?>">
+                        data-product-sku="<?php echo htmlspecialchars($product['sku'] ?? ''); ?>"
+                        data-category="<?php echo htmlspecialchars($product['category'] ?? ''); ?>"
+                        data-cost-price="<?php echo $product['cost_price']    !== null ? htmlspecialchars((string) $product['cost_price'])    : ''; ?>"
+                        data-selling-price="<?php echo $product['selling_price'] !== null ? htmlspecialchars((string) $product['selling_price']) : ''; ?>">
 
                     <div class="product-row-info">
                         <span class="product-row-name"><?php echo htmlspecialchars($product['name']); ?></span>
@@ -160,10 +225,14 @@ document.head.appendChild(spinStyle);
 let demandChart       = null;
 let demandHighlight   = false;
 let activeCategory    = '';
-let activeProductId   = null;
-let activeProductName = '';
-let fullHistorical    = [];
-let activeYears       = new Set();
+let activeProductId    = null;
+let activeProductName  = '';
+let activeProductSku   = '';    // descriptive name from products.sku, if available
+let activeProductCost  = null;  // from products.cost_price (null = not set in DB)
+let activeProductPrice = null;  // from products.selling_price
+let fullHistorical     = [];
+let activeYears        = new Set();
+let currentView        = 'daily'; // 'daily' | 'weekly' | 'monthly' | 'yearly'
 
 let fcForecastRows   = [];
 let fcOptimizeResult = null;
@@ -183,16 +252,26 @@ function saveDisabledEvents() {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
+    function rowProductArgs(row) {
+        return [
+            parseInt(row.dataset.productId, 10),
+            row.dataset.productName,
+            row.dataset.productSku || '',
+            row.dataset.costPrice    ? parseFloat(row.dataset.costPrice)    : null,
+            row.dataset.sellingPrice ? parseFloat(row.dataset.sellingPrice) : null,
+        ];
+    }
+
     document.querySelectorAll('.product-row[data-product-id]').forEach(function(row) {
         row.addEventListener('click', function() {
-            selectProduct(parseInt(this.dataset.productId, 10), this.dataset.productName);
+            selectProduct.apply(null, rowProductArgs(row));
         });
     });
 
     if (INITIAL_PRODUCT_ID !== null) {
         const row = document.querySelector('.product-row[data-product-id="' + INITIAL_PRODUCT_ID + '"]');
         if (row) {
-            selectProduct(INITIAL_PRODUCT_ID, row.dataset.productName);
+            selectProduct.apply(null, rowProductArgs(row));
             row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         } else {
             loadSalesChart('', null);
@@ -218,6 +297,32 @@ document.querySelectorAll('.category-tab').forEach(function(btn) {
     });
 });
 
+// ── View tabs (Daily / Weekly / Monthly / Yearly) ─────────────────────────────
+document.querySelectorAll('.view-tab').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        const view = btn.dataset.view;
+        if (view === currentView) return;
+        document.querySelectorAll('.view-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentView = view;
+        applyViewVisibility();
+        if (fullHistorical.length) renderChart(fullHistorical);
+    });
+});
+
+function applyViewVisibility() {
+    // Year pills only make sense when datasets are split by year
+    const yearSel = document.getElementById('year-selector');
+    if (yearSel) yearSel.style.display = currentView === 'yearly' ? 'none' : '';
+
+    // Events overlay & zoom only apply to the daily time-series view
+    const eventsGroup = document.querySelector('.event-btn-group');
+    if (eventsGroup) eventsGroup.style.display = currentView === 'daily' ? '' : 'none';
+
+    const zoomBtn = document.querySelector('.fc-zoom-reset-btn');
+    if (zoomBtn) zoomBtn.style.display = currentView === 'daily' ? '' : 'none';
+}
+
 function filterProductList(category) {
     let visibleCount = 0;
     document.querySelectorAll('.product-row[data-product-id]').forEach(function(row) {
@@ -230,23 +335,186 @@ function filterProductList(category) {
 }
 
 // ── Product selection ─────────────────────────────────────────────────────────
-function selectProduct(productId, productName) {
+function selectProduct(productId, productName, productSku, costPrice, sellingPrice) {
     if (activeProductId === productId) { deselectProduct(); return; }
-    activeProductId   = productId;
-    activeProductName = productName;
-    activeYears       = new Set();
+    activeProductId    = productId;
+    activeProductName  = productName;
+    activeProductSku   = productSku || '';
+    activeProductCost  = (costPrice    != null && !isNaN(costPrice)    && costPrice    > 0) ? costPrice    : null;
+    activeProductPrice = (sellingPrice != null && !isNaN(sellingPrice) && sellingPrice > 0) ? sellingPrice : null;
+    activeYears        = new Set();
     loadSalesChart(activeCategory, productId);
     updateProductRows();
     updateChartContext();
 }
 
 function deselectProduct() {
-    activeProductId   = null;
-    activeProductName = '';
-    activeYears       = new Set();
+    activeProductId    = null;
+    activeProductName  = '';
+    activeProductSku   = '';
+    activeProductCost  = null;
+    activeProductPrice = null;
+    activeYears        = new Set();
     loadSalesChart(activeCategory, null);
     updateProductRows();
     updateChartContext();
+}
+
+// Combines name + sku for headers — falls back to just name when sku is missing.
+function productDisplayLabel() {
+    if (activeProductSku && activeProductSku !== activeProductName) {
+        return activeProductName + ' · ' + activeProductSku;
+    }
+    return activeProductName;
+}
+
+// ── Product insights ─────────────────────────────────────────────────────────
+// Derives quick stats + behavioral observations from fullHistorical so the user
+// can sanity-check the data Prophet will train on. Computed purely client-side
+// from the rows already fetched — no extra API call.
+function computeProductInsights(rows) {
+    if (!rows || !rows.length) return null;
+
+    const total      = rows.length;
+    const totalUnits = rows.reduce(function (s, r) { return s + r.actual; }, 0);
+    const avg        = total > 0 ? totalUnits / total : 0;
+
+    // Day-of-week averages (Sun=0..Sat=6)
+    const dowSum = new Array(7).fill(0);
+    const dowCnt = new Array(7).fill(0);
+    rows.forEach(function (r) {
+        const dow = new Date(r.date + 'T00:00:00').getDay();
+        dowSum[dow] += r.actual;
+        dowCnt[dow]++;
+    });
+    const dowAvg = dowSum.map(function (s, i) { return dowCnt[i] > 0 ? s / dowCnt[i] : null; });
+
+    let bestDow = -1, bestDowAvg = -Infinity;
+    let worstDow = -1, worstDowAvg = Infinity;
+    dowAvg.forEach(function (a, i) {
+        if (a == null) return;
+        if (a > bestDowAvg)  { bestDowAvg  = a; bestDow  = i; }
+        if (a < worstDowAvg) { worstDowAvg = a; worstDow = i; }
+    });
+    const DOW_NAMES = ['Sundays','Mondays','Tuesdays','Wednesdays','Thursdays','Fridays','Saturdays'];
+
+    // Month-of-year averages (Jan=0..Dec=11) — only meaningful if data covers a few months
+    const moSum = new Array(12).fill(0);
+    const moCnt = new Array(12).fill(0);
+    rows.forEach(function (r) {
+        const m = parseInt(r.date.slice(5, 7), 10) - 1;
+        moSum[m] += r.actual;
+        moCnt[m]++;
+    });
+    const activeMonths = moCnt.filter(function (c) { return c > 0; }).length;
+    let bestMonth = null, peakMonthPct = null, worstMonth = null, slowMonthPct = null;
+    if (activeMonths >= 3) {
+        const moAvg = moSum.map(function (s, i) { return moCnt[i] > 0 ? s / moCnt[i] : null; });
+        let bm = -1, bv = -Infinity, wm = -1, wv = Infinity;
+        moAvg.forEach(function (a, i) {
+            if (a == null) return;
+            if (a > bv) { bv = a; bm = i; }
+            if (a < wv) { wv = a; wm = i; }
+        });
+        const MO = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        bestMonth     = MO[bm];
+        peakMonthPct  = avg > 0 ? Math.round(((bv - avg) / avg) * 100) : 0;
+        worstMonth    = MO[wm];
+        slowMonthPct  = avg > 0 ? Math.round(((wv - avg) / avg) * 100) : 0;
+    }
+
+    // Trend: compare recent half vs earlier half — only with enough data
+    let trendPct = null;
+    if (total >= 60) {
+        const mid = Math.floor(total / 2);
+        const firstAvg  = rows.slice(0, mid).reduce(function (s, r) { return s + r.actual; }, 0) / mid;
+        const secondAvg = rows.slice(mid).reduce(function (s, r) { return s + r.actual; }, 0) / (total - mid);
+        if (firstAvg > 0) trendPct = Math.round(((secondAvg - firstAvg) / firstAvg) * 100);
+    }
+
+    return {
+        totalRecords: total,
+        dateFrom:     rows[0].date,
+        dateTo:       rows[rows.length - 1].date,
+        totalUnits:   Math.round(totalUnits),
+        avgDaily:     avg,
+        bestDow:      bestDow >= 0 ? DOW_NAMES[bestDow] : null,
+        bestDowPct:   bestDow >= 0 && avg > 0 ? Math.round(((bestDowAvg - avg) / avg) * 100) : 0,
+        worstDow:     worstDow >= 0 ? DOW_NAMES[worstDow] : null,
+        worstDowPct:  worstDow >= 0 && avg > 0 ? Math.round(((worstDowAvg - avg) / avg) * 100) : 0,
+        bestMonth: bestMonth, peakMonthPct: peakMonthPct,
+        worstMonth: worstMonth, slowMonthPct: slowMonthPct,
+        trendPct: trendPct,
+    };
+}
+
+function updateProductInsights() {
+    const panel = document.getElementById('product-insights');
+    if (!panel) return;
+    if (!activeProductId || !fullHistorical.length) {
+        panel.style.display = 'none';
+        return;
+    }
+
+    const s = computeProductInsights(fullHistorical);
+    if (!s) { panel.style.display = 'none'; return; }
+
+    function shortDate(d) {
+        return new Date(d + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', year: 'numeric' });
+    }
+    function fmtPct(p) { return (p > 0 ? '+' : '') + p + '%'; }
+
+    document.getElementById('ins-records').textContent = s.totalRecords.toLocaleString();
+    document.getElementById('ins-range').textContent   = shortDate(s.dateFrom) + ' → ' + shortDate(s.dateTo);
+    document.getElementById('ins-units').textContent   = s.totalUnits.toLocaleString();
+    document.getElementById('ins-avg').textContent     = s.avgDaily.toFixed(1) + ' / day';
+
+    function bullet(tone, emoji) {
+        return '<span class="insight-bullet insight-bullet-' + tone + '">' + emoji + '</span>';
+    }
+
+    const obs = document.getElementById('ins-observations');
+    let html  = '';
+
+    if (s.bestDow && Math.abs(s.bestDowPct) >= 5) {
+        html += '<li>' + bullet('good', '📅') + '<span>Strongest day: <strong>' + s.bestDow + '</strong> &mdash; ' + fmtPct(s.bestDowPct) + ' vs average</span></li>';
+    }
+    if (s.worstDow && s.worstDow !== s.bestDow && Math.abs(s.worstDowPct) >= 5) {
+        html += '<li>' + bullet('flat', '😴') + '<span>Slowest day: <strong>' + s.worstDow + '</strong> &mdash; ' + fmtPct(s.worstDowPct) + ' vs average</span></li>';
+    }
+    if (s.bestMonth) {
+        html += '<li>' + bullet('good', '📈') + '<span>Peak month: <strong>' + s.bestMonth + '</strong> &mdash; ' + fmtPct(s.peakMonthPct) + ' vs average</span></li>';
+    }
+    if (s.worstMonth && s.worstMonth !== s.bestMonth) {
+        html += '<li>' + bullet('flat', '📉') + '<span>Slow month: <strong>' + s.worstMonth + '</strong> &mdash; ' + fmtPct(s.slowMonthPct) + ' vs average</span></li>';
+    }
+    if (s.trendPct !== null) {
+        if (s.trendPct >= 5) {
+            html += '<li>' + bullet('good', '⚡') + '<span>Sales <strong>growing ' + s.trendPct + '%</strong> &mdash; recent half vs earlier half</span></li>';
+        } else if (s.trendPct <= -5) {
+            html += '<li>' + bullet('bad', '⚡') + '<span>Sales <strong>declining ' + Math.abs(s.trendPct) + '%</strong> &mdash; recent half vs earlier half</span></li>';
+        } else {
+            html += '<li>' + bullet('blue', '📊') + '<span>Sales are <strong>steady</strong> &mdash; no significant trend</span></li>';
+        }
+    }
+
+    if (!html) html = '<li class="insights-empty">Not enough data yet to spot a pattern.</li>';
+    obs.innerHTML = html;
+
+    // Data-quality footnote so the user sees what Prophet can / can't capture yet.
+    const q = document.getElementById('ins-quality');
+    if (s.totalRecords < 60) {
+        q.textContent = 'Limited history (' + s.totalRecords + ' days). Prophet works best with at least 2 months of data — early forecasts will be rough.';
+        q.className   = 'insights-quality insights-quality-warn';
+    } else if (s.totalRecords < 365) {
+        q.textContent = 'Less than 1 year of data — yearly seasonality patterns are not fully captured yet.';
+        q.className   = 'insights-quality insights-quality-warn';
+    } else {
+        q.textContent = 'Strong dataset — full weekly + yearly patterns are captured.';
+        q.className   = 'insights-quality insights-quality-good';
+    }
+
+    panel.style.display = '';
 }
 
 function updateProductRows() {
@@ -260,7 +528,7 @@ function updateChartContext() {
     const nameEl    = document.getElementById('chart-selected-name');
     if (!indicator || !nameEl) return;
     if (activeProductId) {
-        nameEl.textContent      = activeProductName;
+        nameEl.textContent      = productDisplayLabel();
         indicator.style.display = 'flex';
     } else {
         indicator.style.display = 'none';
@@ -279,7 +547,8 @@ function loadSalesChart(category, productId) {
             if (data.error) { showChartState('error', data.error); return; }
             fullHistorical = data.historical;
             buildYearSelector(fullHistorical);
-            renderYearOverlay(fullHistorical);
+            renderChart(fullHistorical);
+            updateProductInsights();
         })
         .catch(() => showChartState('error', 'Network error. Please refresh.'));
 }
@@ -316,12 +585,38 @@ function buildYearSelector(historical) {
     }
 
     if (btnsRow) {
+        // Split button: left = toggle events on/off, right = open filter checklist
+        const evtGroup = document.createElement('div');
+        evtGroup.className = 'event-btn-group';
+
         const eventsBtn = document.createElement('button');
         eventsBtn.id        = 'demand-events-btn';
         eventsBtn.className = 'fc-events-btn';
+        eventsBtn.style.cssText = 'border-radius:999px 0 0 999px;border-right:none';
         eventsBtn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Events';
         eventsBtn.addEventListener('click', toggleDemandEvents);
-        btnsRow.appendChild(eventsBtn);
+
+        const filterTrigger = document.createElement('button');
+        filterTrigger.className = 'event-filter-trigger';
+        filterTrigger.title     = 'Filter events';
+        filterTrigger.innerHTML = '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+        filterTrigger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const opened = toggleEventsChecklist(filterTrigger, disabledEventIds, function() {
+                saveDisabledEvents();
+                if (demandChart && demandChart.scales.x) {
+                    demandChart.options.plugins.annotation.annotations = demandHighlight
+                        ? buildChartAnnotations(tsToDateStr(demandChart.scales.x.min), tsToDateStr(demandChart.scales.x.max), true, disabledEventIds)
+                        : {};
+                    demandChart.update('none');
+                }
+            });
+            if (opened && !demandHighlight) toggleDemandEvents();
+        });
+
+        evtGroup.appendChild(eventsBtn);
+        evtGroup.appendChild(filterTrigger);
+        btnsRow.appendChild(evtGroup);
         updateDemandEventsBtn();
 
         const resetBtn = document.createElement('button');
@@ -379,11 +674,27 @@ function updateYearPills() {
     });
 }
 
-// ── Year overlay: render ──────────────────────────────────────────────────────
-function renderYearOverlay(historical) {
+// ── Chart rendering: dispatcher + per-view renderers ──────────────────────────
+const AXIS_COLOR = 'rgba(38,31,14,0.45)';
+const GRID_COLOR = 'rgba(38,31,14,0.06)';
+const AXIS_FONT  = { family: 'Lora', size: 11 };
+const TOOLTIP_BG = { backgroundColor: '#261F0E', titleColor: '#D2C8AE', bodyColor: '#F0E8D0', padding: 10 };
+
+function renderChart(historical) {
     if (!historical.length) { showChartState('error', 'No sales data for this selection.'); return; }
     showChartState('chart');
+    if (demandChart) { demandChart.destroy(); demandChart = null; }
+    applyViewVisibility();
+    switch (currentView) {
+        case 'weekly':  renderWeeklyView(historical);  break;
+        case 'monthly': renderMonthlyView(historical); break;
+        case 'yearly':  renderYearlyView(historical);  break;
+        default:        renderDailyView(historical);   break;
+    }
+}
 
+// ── Daily view: line chart with year overlay (normalized to base year 2000) ───
+function renderDailyView(historical) {
     const byYear    = groupByYearNorm(historical);
     const years     = Object.keys(byYear).sort();
     const allActive = activeYears.size === 0;
@@ -409,14 +720,12 @@ function renderYearOverlay(historical) {
     const minTs = new Date(minNorm).getTime() - PAD;
     const maxTs = new Date(maxNorm).getTime() + PAD;
 
-    if (demandChart) demandChart.destroy();
-
     demandChart = new Chart(document.getElementById('demand-chart'), {
         type: 'line',
         data: { datasets: datasets },
         options: {
             responsive: true,
-            interaction: { mode: 'x', intersect: false },
+            interaction: { mode: 'nearest', axis: 'x', intersect: false },
             plugins: {
                 legend: { display: false },
                 zoom: {
@@ -435,22 +744,171 @@ function renderYearOverlay(historical) {
                             if (ctx.parsed.y === null) return null;
                             return ' ' + ctx.dataset.label + ': ' + Math.round(ctx.parsed.y) + ' units';
                         },
+                        afterBody: function(items) {
+                            if (!items.length) return null;
+                            var evts = getEventsOnNormDate(tsToDateStr(items[0].parsed.x), disabledEventIds);
+                            if (!evts.length) return null;
+                            return [' ', '📅 ' + evts.map(function(e) { return e.name; }).join(', ')];
+                        },
                     },
                 },
-                annotation: { annotations: {} },
+                annotation: { annotations: demandHighlight ? buildChartAnnotations(minNorm, maxNorm, true, disabledEventIds) : {} },
             },
             scales: {
                 x: {
                     type: 'time', min: minTs, max: maxTs,
                     time: { minUnit: 'day', tooltipFormat: 'MMM d', displayFormats: { day: 'MMM d', week: 'MMM d', month: 'MMM', year: 'MMM' } },
-                    ticks: { color: 'rgba(38,31,14,0.45)', font: { family: 'Lora', size: 11 }, maxTicksLimit: 10, maxRotation: 0 },
-                    grid: { color: 'rgba(38,31,14,0.06)' },
+                    ticks: { color: AXIS_COLOR, font: AXIS_FONT, maxTicksLimit: 10, maxRotation: 0 },
+                    grid: { color: GRID_COLOR },
                 },
-                y: {
-                    beginAtZero: true,
-                    ticks: { color: 'rgba(38,31,14,0.45)', font: { family: 'Lora', size: 11 } },
-                    grid:  { color: 'rgba(38,31,14,0.06)' },
-                },
+                y: { beginAtZero: true, ticks: { color: AXIS_COLOR, font: AXIS_FONT }, grid: { color: GRID_COLOR } },
+            },
+        },
+    });
+}
+
+// ── Weekly view: bar chart, ISO weeks grouped by year ─────────────────────────
+function renderWeeklyView(historical) {
+    function weekOfYear(dateStr) {
+        const d = new Date(dateStr + 'T00:00:00');
+        const target = new Date(d.valueOf());
+        const dayNr = (d.getDay() + 6) % 7;
+        target.setDate(target.getDate() - dayNr + 3);
+        const firstThu = target.valueOf();
+        target.setMonth(0, 1);
+        if (target.getDay() !== 4) target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+        return 1 + Math.ceil((firstThu - target) / 604800000);
+    }
+
+    const byYear = {};
+    let maxWeek  = 52;
+    historical.forEach(function(r) {
+        const year = r.date.slice(0, 4);
+        const wk   = weekOfYear(r.date);
+        if (wk > maxWeek) maxWeek = wk;
+        if (!byYear[year]) byYear[year] = {};
+        byYear[year][wk] = (byYear[year][wk] || 0) + r.actual;
+    });
+
+    const labels    = Array.from({ length: maxWeek }, (_, i) => 'W' + (i + 1));
+    const years     = Object.keys(byYear).sort();
+    const allActive = activeYears.size === 0;
+
+    const datasets = years.map(function(year, i) {
+        const color = YEAR_COLORS[i % YEAR_COLORS.length];
+        const data  = Array.from({ length: maxWeek }, (_, w) => byYear[year][w + 1] || 0);
+        return {
+            label: year, data: data, hidden: !(allActive || activeYears.has(year)),
+            backgroundColor: hexToRgba(color, 0.75), borderColor: color, borderWidth: 1,
+            borderRadius: 2, categoryPercentage: 0.85, barPercentage: 0.92,
+        };
+    });
+
+    demandChart = new Chart(document.getElementById('demand-chart'), {
+        type: 'bar',
+        data: { labels: labels, datasets: datasets },
+        options: {
+            responsive: true,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { display: false },
+                tooltip: Object.assign({}, TOOLTIP_BG, {
+                    callbacks: {
+                        title: function(items) { return items.length ? 'Week ' + (items[0].dataIndex + 1) : ''; },
+                        label: function(ctx) { return ' ' + ctx.dataset.label + ': ' + Math.round(ctx.parsed.y) + ' units'; },
+                    },
+                }),
+            },
+            scales: {
+                x: { ticks: { color: AXIS_COLOR, font: AXIS_FONT, autoSkip: true, maxTicksLimit: 13, maxRotation: 0 }, grid: { display: false } },
+                y: { beginAtZero: true, ticks: { color: AXIS_COLOR, font: AXIS_FONT }, grid: { color: GRID_COLOR } },
+            },
+        },
+    });
+}
+
+// ── Monthly view: bar chart, Jan–Dec grouped by year ──────────────────────────
+function renderMonthlyView(historical) {
+    const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const byYear = {};
+    historical.forEach(function(r) {
+        const year = r.date.slice(0, 4);
+        const m    = parseInt(r.date.slice(5, 7), 10) - 1;
+        if (!byYear[year]) byYear[year] = new Array(12).fill(0);
+        byYear[year][m] += r.actual;
+    });
+
+    const years     = Object.keys(byYear).sort();
+    const allActive = activeYears.size === 0;
+
+    const datasets = years.map(function(year, i) {
+        const color = YEAR_COLORS[i % YEAR_COLORS.length];
+        return {
+            label: year, data: byYear[year], hidden: !(allActive || activeYears.has(year)),
+            backgroundColor: hexToRgba(color, 0.75), borderColor: color, borderWidth: 1,
+            borderRadius: 4, categoryPercentage: 0.8, barPercentage: 0.9,
+        };
+    });
+
+    demandChart = new Chart(document.getElementById('demand-chart'), {
+        type: 'bar',
+        data: { labels: MONTH_LABELS, datasets: datasets },
+        options: {
+            responsive: true,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { display: false },
+                tooltip: Object.assign({}, TOOLTIP_BG, {
+                    callbacks: {
+                        label: function(ctx) { return ' ' + ctx.dataset.label + ': ' + Math.round(ctx.parsed.y).toLocaleString() + ' units'; },
+                    },
+                }),
+            },
+            scales: {
+                x: { ticks: { color: AXIS_COLOR, font: AXIS_FONT }, grid: { display: false } },
+                y: { beginAtZero: true, ticks: { color: AXIS_COLOR, font: AXIS_FONT }, grid: { color: GRID_COLOR } },
+            },
+        },
+    });
+}
+
+// ── Yearly view: single-series bar chart, one bar per year ────────────────────
+function renderYearlyView(historical) {
+    const totals = {};
+    historical.forEach(function(r) {
+        const year = r.date.slice(0, 4);
+        totals[year] = (totals[year] || 0) + r.actual;
+    });
+    const years  = Object.keys(totals).sort();
+    const colors = years.map((_, i) => YEAR_COLORS[i % YEAR_COLORS.length]);
+
+    demandChart = new Chart(document.getElementById('demand-chart'), {
+        type: 'bar',
+        data: {
+            labels: years,
+            datasets: [{
+                label: 'Total Units',
+                data: years.map(y => totals[y]),
+                backgroundColor: colors.map(c => hexToRgba(c, 0.75)),
+                borderColor: colors, borderWidth: 1, borderRadius: 6,
+                categoryPercentage: 0.7, barPercentage: 0.85,
+            }],
+        },
+        options: {
+            responsive: true,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { display: false },
+                tooltip: Object.assign({}, TOOLTIP_BG, {
+                    callbacks: {
+                        title: function(items) { return items.length ? items[0].label : ''; },
+                        label: function(ctx) { return ' Total: ' + Math.round(ctx.parsed.y).toLocaleString() + ' units'; },
+                    },
+                }),
+            },
+            scales: {
+                x: { ticks: { color: AXIS_COLOR, font: { family: 'Lora', size: 12, weight: '600' } }, grid: { display: false } },
+                y: { beginAtZero: true, ticks: { color: AXIS_COLOR, font: AXIS_FONT }, grid: { color: GRID_COLOR } },
             },
         },
     });
@@ -483,21 +941,17 @@ function updateFcRangeWarning() {
 
 function openForecastModal() {
     if (!activeProductId) return;
-    document.getElementById('fc-modal-title').textContent = activeProductName;
+    document.getElementById('fc-modal-title').textContent = productDisplayLabel();
 
-    const lastDate = fullHistorical.length ? fullHistorical[fullHistorical.length - 1].date : null;
-    if (lastDate) {
-        const fromDt = new Date(lastDate + 'T00:00:00');
-        fromDt.setDate(fromDt.getDate() + 1);
-        const toDt   = new Date(fromDt);
-        toDt.setDate(toDt.getDate() + 30);
-        const fromStr = fromDt.toISOString().slice(0, 10);
-        const toStr   = toDt.toISOString().slice(0, 10);
-        const fromEl  = document.getElementById('fc-from-date');
-        const toEl    = document.getElementById('fc-to-date');
-        if (fromEl) { fromEl.min = fromStr; fromEl.value = fromStr; }
-        if (toEl)   { toEl.min   = fromStr; toEl.value   = toStr;   }
-    }
+    // Reset the reference toggle to "today" on every open.
+    forecastReferenceDate = 'today';
+    document.querySelectorAll('#fc-ref-pills .fc-preset-pill').forEach(function(b) {
+        b.classList.toggle('fc-preset-pill-on', b.dataset.ref === 'today');
+    });
+
+    // Default to "Next Month" — the preset both fills the dates and toggles the pill.
+    applyForecastPreset('month');
+
     document.getElementById('fc-range-warning').style.display = 'none';
     document.getElementById('fc-input-error').style.display   = 'none';
 
@@ -507,6 +961,122 @@ function openForecastModal() {
     document.getElementById('fc-modal').classList.remove('hidden');
     document.body.style.overflow = 'hidden';
 }
+
+// ── Forecast range presets ───────────────────────────────────────────────────
+// Computes From/To dates relative to a chosen reference date (today by default,
+// or the last sale date if the user toggles it), sets the inputs, and
+// highlights the active pill. Manual date edits clear the pill state (see init).
+let forecastReferenceDate = 'today'; // 'today' | 'last'
+
+function applyForecastPreset(preset) {
+    const lastDate = fullHistorical.length ? fullHistorical[fullHistorical.length - 1].date : null;
+    if (!lastDate) return;
+
+    // Format using LOCAL components — toISOString() converts to UTC, which in
+    // +UTC timezones rolls "Feb 1 00:00 local" back to "Jan 31 16:00 UTC" and
+    // strips the day. This bit us as a 1-day-off default before.
+    function toYMD(d) {
+        return d.getFullYear() + '-'
+            + String(d.getMonth() + 1).padStart(2, '0') + '-'
+            + String(d.getDate()).padStart(2, '0');
+    }
+
+    const lastDt  = new Date(lastDate + 'T00:00:00');
+    const todayDt = new Date();
+    todayDt.setHours(0, 0, 0, 0);
+
+    // The pivot all preset math is computed against
+    const refDt = (forecastReferenceDate === 'today') ? todayDt : lastDt;
+
+    let fromDt, toDt;
+
+    // Every preset snaps to a calendar boundary — never a rolling window.
+    if (preset === 'week') {
+        // Next calendar week: Monday → Sunday
+        fromDt = new Date(refDt);
+        const dow = fromDt.getDay();                 // 0=Sun, 1=Mon, ..., 6=Sat
+        const daysToNextMon = (8 - dow) % 7 || 7;    // always advance to the NEXT Monday
+        fromDt.setDate(fromDt.getDate() + daysToNextMon);
+        toDt = new Date(fromDt); toDt.setDate(toDt.getDate() + 6);
+    }
+    else if (preset === 'month') {
+        // 1st → last day of next calendar month
+        fromDt = new Date(refDt.getFullYear(), refDt.getMonth() + 1, 1);
+        toDt   = new Date(fromDt.getFullYear(), fromDt.getMonth() + 1, 0);
+    }
+    else if (preset === '3months') {
+        // Next calendar quarter (Q1 = Jan–Mar, Q2 = Apr–Jun, Q3 = Jul–Sep, Q4 = Oct–Dec)
+        const q                = Math.floor(refDt.getMonth() / 3);  // current quarter index (0..3)
+        const nextQStartMonth  = (q + 1) * 3;                       // 3, 6, 9, or 12 (auto-wraps to next Jan)
+        fromDt = new Date(refDt.getFullYear(), nextQStartMonth, 1);
+        toDt   = new Date(fromDt.getFullYear(), fromDt.getMonth() + 3, 0);
+    }
+    else if (preset === '6months') {
+        // Next calendar half-year (H1 = Jan–Jun, H2 = Jul–Dec)
+        const nextHStartMonth = refDt.getMonth() < 6 ? 6 : 12;      // Jul of same year, or Jan of next year
+        fromDt = new Date(refDt.getFullYear(), nextHStartMonth, 1);
+        toDt   = new Date(fromDt.getFullYear(), fromDt.getMonth() + 6, 0);
+    }
+    else if (preset === 'year') {
+        // The literal next calendar year: Jan 1 → Dec 31
+        fromDt = new Date(refDt.getFullYear() + 1, 0, 1);
+        toDt   = new Date(refDt.getFullYear() + 1, 11, 31);
+    }
+
+    // Date inputs can never start before the day after the last sale —
+    // Prophet only projects forward from historical data. If the reference
+    // is "today" but today is earlier than (or on) the last sale date,
+    // we clamp From so the user can't accidentally pick an invalid window.
+    const minDt = new Date(lastDt); minDt.setDate(minDt.getDate() + 1);
+    if (fromDt < minDt) fromDt = new Date(minDt);
+    if (toDt   < fromDt) toDt  = new Date(fromDt);
+
+    const minStr  = toYMD(minDt);
+    const fromStr = toYMD(fromDt);
+    const toStr   = toYMD(toDt);
+
+    const fromEl = document.getElementById('fc-from-date');
+    const toEl   = document.getElementById('fc-to-date');
+    if (fromEl) { fromEl.min = minStr; fromEl.value = fromStr; }
+    if (toEl)   { toEl.min   = minStr; toEl.value   = toStr;   }
+
+    document.querySelectorAll('#fc-preset-pills .fc-preset-pill').forEach(function(b) {
+        b.classList.toggle('fc-preset-pill-on', b.dataset.preset === preset);
+    });
+
+    updateFcRangeWarning();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('#fc-preset-pills .fc-preset-pill').forEach(function(btn) {
+        btn.addEventListener('click', function() { applyForecastPreset(btn.dataset.preset); });
+    });
+
+    // Reference-date toggle: switch the pivot between today and last-sale, then
+    // re-apply whichever preset is currently active so the dates refresh.
+    document.querySelectorAll('#fc-ref-pills .fc-preset-pill').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            forecastReferenceDate = btn.dataset.ref;
+            document.querySelectorAll('#fc-ref-pills .fc-preset-pill').forEach(function(b) {
+                b.classList.toggle('fc-preset-pill-on', b.dataset.ref === forecastReferenceDate);
+            });
+            var activePreset = document.querySelector('#fc-preset-pills .fc-preset-pill.fc-preset-pill-on');
+            if (activePreset) applyForecastPreset(activePreset.dataset.preset);
+        });
+    });
+
+    // Manual date edits exit preset mode (no pill highlighted).
+    ['fc-from-date', 'fc-to-date'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', function() {
+                document.querySelectorAll('#fc-preset-pills .fc-preset-pill').forEach(function(b) {
+                    b.classList.remove('fc-preset-pill-on');
+                });
+            });
+        }
+    });
+});
 
 function closeForecastModal() {
     document.getElementById('fc-modal').classList.add('hidden');
@@ -518,27 +1088,18 @@ function setFcPanel(panel) {
     document.getElementById('fc-loading-panel').style.display = panel === 'loading' ? '' : 'none';
 }
 
-// ── Run forecast ──────────────────────────────────────────────────────────────
+// ── Run forecast (Prophet only — Newsvendor is opt-in from the result modal) ──
 function runForecast() {
-    const cost     = parseFloat(document.getElementById('fc-cost').value)  || 0;
-    const price    = parseFloat(document.getElementById('fc-price').value) || 0;
-    const stock    = parseInt(document.getElementById('fc-stock').value)   || 0;
     const fromDate = document.getElementById('fc-from-date').value;
     const toDate   = document.getElementById('fc-to-date').value;
     const errEl    = document.getElementById('fc-input-error');
 
-    if (cost <= 0 || price <= 0)   { errEl.textContent = 'Please enter both cost price and selling price.'; errEl.style.display = ''; return; }
-    if (price <= cost)             { errEl.textContent = 'Selling price must be greater than cost price.';  errEl.style.display = ''; return; }
-    if (!fromDate || !toDate)      { errEl.textContent = 'Please select both a start and end date.';        errEl.style.display = ''; return; }
-    if (fromDate >= toDate)        { errEl.textContent = 'End date must be after start date.';              errEl.style.display = ''; return; }
+    if (!fromDate || !toDate) { errEl.textContent = 'Please select both a start and end date.'; errEl.style.display = ''; return; }
+    if (fromDate >= toDate)   { errEl.textContent = 'End date must be after start date.';       errEl.style.display = ''; return; }
     const lastDate = fullHistorical.length ? fullHistorical[fullHistorical.length - 1].date : null;
     if (lastDate && fromDate <= lastDate) { errEl.textContent = 'Start date must be after your last sale date (' + lastDate + ').'; errEl.style.display = ''; return; }
 
     errEl.style.display = 'none';
-    fcCurrentStock  = stock;
-    fcCostPrice     = cost;
-    fcSellingPrice  = price;
-
     setFcPanel('loading');
 
     const forecastBody = new FormData();
@@ -552,44 +1113,56 @@ function runForecast() {
             if (data.error) { showFcInputError(data.error); return; }
             fcForecastRows = data.forecast;
 
-            const optBody = new FormData();
-            optBody.append('forecast',      JSON.stringify(data.forecast));
-            optBody.append('cost_price',    cost);
-            optBody.append('selling_price', price);
-            optBody.append('current_stock', stock);
+            // Close input modal, open ChartModal with forecast only.
+            // Newsvendor / restock insight is opt-in from inside the result modal.
+            closeForecastModal();
+            ChartModal.open({
+                label:               'Demand Forecast',
+                title:               productDisplayLabel(),
+                historical:          data.historical,
+                forecast:            data.forecast,
+                hasBand:             true,
+                productCostPrice:    activeProductCost,    // null if not in DB
+                productSellingPrice: activeProductPrice,   // null if not in DB
+                disabledEventIds:    disabledEventIds,
+                onRunAgain: function () {
+                    ChartModal.close();
+                    openForecastModal();
+                },
+                onGenerateRestock: function (inputs, done) {
+                    // Called by chart_modal.js when user submits the restock form.
+                    // inputs = { cost_price, selling_price, current_stock }
+                    // done   = callback(opt | { error })
+                    fcCurrentStock = inputs.current_stock;
+                    fcCostPrice    = inputs.cost_price;
+                    fcSellingPrice = inputs.selling_price;
 
-            return fetch('<?php echo BASE_URL; ?>/api/run_optimize.php', { method: 'POST', body: optBody })
-                .then(r => r.json())
-                .then(function (opt) {
-                    if (opt.error) { showFcInputError(opt.error); return; }
-                    fcOptimizeResult = opt;
+                    const optBody = new FormData();
+                    optBody.append('forecast',      JSON.stringify(data.forecast));
+                    optBody.append('cost_price',    inputs.cost_price);
+                    optBody.append('selling_price', inputs.selling_price);
+                    optBody.append('current_stock', inputs.current_stock);
 
-                    // Close input modal, open ChartModal with results
-                    closeForecastModal();
-                    ChartModal.open({
-                        label:            'Demand Forecast',
-                        title:            activeProductName,
-                        historical:       data.historical,
-                        forecast:         data.forecast,
-                        hasBand:          true,
-                        meta: {
-                            total_predicted: opt.total_predicted,
-                            restock_qty:     opt.restock_qty,
-                            current_stock:   fcCurrentStock,
-                            cost_price:      fcCostPrice,
-                            selling_price:   fcSellingPrice,
-                            total_std:       opt.total_std,
-                            optimal_total:   opt.optimal_total,
-                            est_profit:      opt.est_profit,
-                        },
-                        disabledEventIds: disabledEventIds,
-                        onRunAgain: function () {
-                            ChartModal.close();
-                            openForecastModal();
-                        },
-                        onSave: saveForecast,
-                    });
-                });
+                    fetch('<?php echo BASE_URL; ?>/api/run_optimize.php', { method: 'POST', body: optBody })
+                        .then(r => r.json())
+                        .then(function (opt) {
+                            if (opt.error) { done(opt); return; }
+                            fcOptimizeResult = opt;
+                            done({
+                                total_predicted: opt.total_predicted,
+                                restock_qty:     opt.restock_qty,
+                                current_stock:   inputs.current_stock,
+                                cost_price:      inputs.cost_price,
+                                selling_price:   inputs.selling_price,
+                                total_std:       opt.total_std,
+                                optimal_total:   opt.optimal_total,
+                                est_profit:      opt.est_profit,
+                            });
+                        })
+                        .catch(function () { done({ error: 'Network error. Please try again.' }); });
+                },
+                onSave: saveForecast,
+            });
         })
         .catch(function () { showFcInputError('Network error. Please try again.'); });
 }
@@ -664,12 +1237,39 @@ function saveForecast() {
             </button>
         </div>
 
-        <!-- Input panel -->
+        <!-- Input panel — Prophet only needs a date range.
+             Cost / selling price / stock are collected later in the result
+             modal when the user generates a Newsvendor restock insight. -->
         <div id="fc-input-panel">
             <div class="fc-form">
 
+                <p class="fc-form-helptext">
+                    Prophet will fit a model to this product&rsquo;s sales history and project demand
+                    for every day in the window below. You can request a restock recommendation after
+                    you see the forecast.
+                </p>
+
                 <div class="fc-form-group">
                     <label class="fc-form-label">Forecast Date Range</label>
+
+                    <!-- Reference date: presets are computed relative to this pivot. -->
+                    <div class="fc-ref-toggle">
+                        <span class="fc-ref-label">Compute from</span>
+                        <div class="fc-preset-pills" id="fc-ref-pills">
+                            <button type="button" class="fc-preset-pill fc-preset-pill-on" data-ref="today">Today&rsquo;s date</button>
+                            <button type="button" class="fc-preset-pill"                   data-ref="last">Last sale date</button>
+                        </div>
+                    </div>
+
+                    <!-- Quick presets: click to auto-fill From/To. Manual edits clear the active pill. -->
+                    <div class="fc-preset-pills" id="fc-preset-pills">
+                        <button type="button" class="fc-preset-pill"                          data-preset="week">Next Week</button>
+                        <button type="button" class="fc-preset-pill fc-preset-pill-on"        data-preset="month">Next Month</button>
+                        <button type="button" class="fc-preset-pill"                          data-preset="3months">Next 3 Months</button>
+                        <button type="button" class="fc-preset-pill"                          data-preset="6months">Next 6 Months</button>
+                        <button type="button" class="fc-preset-pill"                          data-preset="year">Next Year</button>
+                    </div>
+
                     <div class="fc-form-row">
                         <div class="fc-form-group">
                             <label class="fc-form-label" for="fc-from-date">From</label>
@@ -687,31 +1287,6 @@ function saveForecast() {
                     <div id="fc-range-warning" class="fc-range-warning" style="display:none">
                         Forecasting this far beyond your last sale date — seasonal patterns will be captured
                         but exact unit numbers are less reliable. Use as directional guidance only.
-                    </div>
-                </div>
-
-                <div class="fc-form-row">
-                    <div class="fc-form-group">
-                        <label class="fc-form-label" for="fc-cost">Cost Price</label>
-                        <div class="fc-input-wrap">
-                            <span class="fc-input-affix">₱</span>
-                            <input type="number" id="fc-cost" class="fc-input" min="0" step="0.01" placeholder="0.00">
-                        </div>
-                    </div>
-                    <div class="fc-form-group">
-                        <label class="fc-form-label" for="fc-price">Selling Price</label>
-                        <div class="fc-input-wrap">
-                            <span class="fc-input-affix">₱</span>
-                            <input type="number" id="fc-price" class="fc-input" min="0" step="0.01" placeholder="0.00">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="fc-form-group">
-                    <label class="fc-form-label" for="fc-stock">Current Stock on Hand</label>
-                    <div class="fc-input-wrap" style="max-width:180px">
-                        <input type="number" id="fc-stock" class="fc-input" min="0" step="1" placeholder="0" value="0">
-                        <span class="fc-input-affix fc-input-affix-right">units</span>
                     </div>
                 </div>
 
@@ -739,5 +1314,6 @@ function saveForecast() {
 </div>
 
 <?php require_once __DIR__ . '/../includes/confirm_modal.php'; ?>
+<?php require_once __DIR__ . '/../includes/footer.php'; ?>
 </body>
 </html>
