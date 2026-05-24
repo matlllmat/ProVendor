@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 // pages/forecast.view.php
 // Presentation only — demand chart + product list.
 
@@ -140,7 +140,7 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
 
     <!-- ── Product List ───────────────────────────────────────────────────── -->
-    <div>
+    <div id="product-section">
 
         <form method="GET" action="<?php echo BASE_URL; ?>/pages/forecast.view.php">
             <div class="search-bar">
@@ -202,6 +202,17 @@ require_once __DIR__ . '/../includes/header.php';
 
 </main>
 
+<!-- Floating shortcut: jump down to the product list. Visibility is toggled
+     by an IntersectionObserver on #product-section so the pill only shows
+     when the list is below the viewport. -->
+<button type="button" id="fc-jump-list" class="fc-jump-list-btn" onclick="scrollToProductList()" title="Jump to product list" aria-label="Jump to product list">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"/>
+        <polyline points="19 12 12 19 5 12"/>
+    </svg>
+    <span>Products</span>
+</button>
+
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
@@ -251,7 +262,25 @@ function saveDisabledEvents() {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
+// Scroll to the product list section (search bar + list).
+function scrollToProductList() {
+    const section = document.getElementById('product-section');
+    if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    // Show the floating "Products" pill only while the product list isn't on screen.
+    const jumpBtn = document.getElementById('fc-jump-list');
+    const section = document.getElementById('product-section');
+    if (jumpBtn && section && 'IntersectionObserver' in window) {
+        const io = new IntersectionObserver(function(entries) {
+            entries.forEach(function(e) {
+                jumpBtn.classList.toggle('visible', !e.isIntersecting);
+            });
+        }, { rootMargin: '0px 0px -20% 0px' }); // hide pill a bit before list fully reaches viewport
+        io.observe(section);
+    }
+
     function rowProductArgs(row) {
         return [
             parseInt(row.dataset.productId, 10),
@@ -264,7 +293,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.querySelectorAll('.product-row[data-product-id]').forEach(function(row) {
         row.addEventListener('click', function() {
+            const willSelect = parseInt(row.dataset.productId, 10) !== activeProductId;
             selectProduct.apply(null, rowProductArgs(row));
+            // Bring the chart into view so the user doesn't have to scroll back up.
+            // Only on a fresh selection — clicking an already-selected row is "deselect"
+            // and a sudden scroll-up there would feel unrelated to the user's intent.
+            if (willSelect) {
+                const chartCard = document.querySelector('.chart-card');
+                if (chartCard) chartCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
         });
     });
 
@@ -315,12 +352,13 @@ function applyViewVisibility() {
     const yearSel = document.getElementById('year-selector');
     if (yearSel) yearSel.style.display = currentView === 'yearly' ? 'none' : '';
 
-    // Events overlay & zoom only apply to the daily time-series view
+    // Events overlay only applies to the daily time-series view
     const eventsGroup = document.querySelector('.event-btn-group');
     if (eventsGroup) eventsGroup.style.display = currentView === 'daily' ? '' : 'none';
 
+    // Reset Zoom is useful in every view — bar charts support zoom now too.
     const zoomBtn = document.querySelector('.fc-zoom-reset-btn');
-    if (zoomBtn) zoomBtn.style.display = currentView === 'daily' ? '' : 'none';
+    if (zoomBtn) zoomBtn.style.display = '';
 }
 
 function filterProductList(category) {
@@ -734,23 +772,8 @@ function renderDailyView(historical) {
                     limits: { x: { min: minTs, max: maxTs } },
                 },
                 tooltip: {
-                    backgroundColor: '#261F0E', titleColor: '#D2C8AE', bodyColor: '#F0E8D0', padding: 10,
-                    callbacks: {
-                        title: function(items) {
-                            if (!items.length) return '';
-                            return new Date(items[0].parsed.x).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
-                        },
-                        label: function(ctx) {
-                            if (ctx.parsed.y === null) return null;
-                            return ' ' + ctx.dataset.label + ': ' + Math.round(ctx.parsed.y) + ' units';
-                        },
-                        afterBody: function(items) {
-                            if (!items.length) return null;
-                            var evts = getEventsOnNormDate(tsToDateStr(items[0].parsed.x), disabledEventIds);
-                            if (!evts.length) return null;
-                            return [' ', '📅 ' + evts.map(function(e) { return e.name; }).join(', ')];
-                        },
-                    },
+                    enabled: false,
+                    external: function(ctx) { return externalChartTooltip(ctx, { disabledIds: disabledEventIds }); },
                 },
                 annotation: { annotations: demandHighlight ? buildChartAnnotations(minNorm, maxNorm, true, disabledEventIds) : {} },
             },
@@ -794,9 +817,13 @@ function renderWeeklyView(historical) {
     const years     = Object.keys(byYear).sort();
     const allActive = activeYears.size === 0;
 
+    // Use null for weeks a year never reported in — no bar, no tooltip line.
     const datasets = years.map(function(year, i) {
         const color = YEAR_COLORS[i % YEAR_COLORS.length];
-        const data  = Array.from({ length: maxWeek }, (_, w) => byYear[year][w + 1] || 0);
+        const data  = Array.from({ length: maxWeek }, function(_, w) {
+            const v = byYear[year][w + 1];
+            return v !== undefined ? v : null;
+        });
         return {
             label: year, data: data, hidden: !(allActive || activeYears.has(year)),
             backgroundColor: hexToRgba(color, 0.75), borderColor: color, borderWidth: 1,
@@ -812,12 +839,14 @@ function renderWeeklyView(historical) {
             interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { display: false },
-                tooltip: Object.assign({}, TOOLTIP_BG, {
-                    callbacks: {
-                        title: function(items) { return items.length ? 'Week ' + (items[0].dataIndex + 1) : ''; },
-                        label: function(ctx) { return ' ' + ctx.dataset.label + ': ' + Math.round(ctx.parsed.y) + ' units'; },
-                    },
-                }),
+                zoom: {
+                    zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' },
+                    pan:  { enabled: true, mode: 'x' },
+                },
+                tooltip: {
+                    enabled: false,
+                    external: function(ctx) { return externalChartTooltip(ctx, {}); },
+                },
             },
             scales: {
                 x: { ticks: { color: AXIS_COLOR, font: AXIS_FONT, autoSkip: true, maxTicksLimit: 13, maxRotation: 0 }, grid: { display: false } },
@@ -830,12 +859,13 @@ function renderWeeklyView(historical) {
 // ── Monthly view: bar chart, Jan–Dec grouped by year ──────────────────────────
 function renderMonthlyView(historical) {
     const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    // null-fill so months a year never reported in don't render a bar or appear on hover.
     const byYear = {};
     historical.forEach(function(r) {
         const year = r.date.slice(0, 4);
         const m    = parseInt(r.date.slice(5, 7), 10) - 1;
-        if (!byYear[year]) byYear[year] = new Array(12).fill(0);
-        byYear[year][m] += r.actual;
+        if (!byYear[year]) byYear[year] = new Array(12).fill(null);
+        byYear[year][m] = (byYear[year][m] || 0) + r.actual;
     });
 
     const years     = Object.keys(byYear).sort();
@@ -858,11 +888,14 @@ function renderMonthlyView(historical) {
             interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { display: false },
-                tooltip: Object.assign({}, TOOLTIP_BG, {
-                    callbacks: {
-                        label: function(ctx) { return ' ' + ctx.dataset.label + ': ' + Math.round(ctx.parsed.y).toLocaleString() + ' units'; },
-                    },
-                }),
+                zoom: {
+                    zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' },
+                    pan:  { enabled: true, mode: 'x' },
+                },
+                tooltip: {
+                    enabled: false,
+                    external: function(ctx) { return externalChartTooltip(ctx, {}); },
+                },
             },
             scales: {
                 x: { ticks: { color: AXIS_COLOR, font: AXIS_FONT }, grid: { display: false } },
@@ -899,12 +932,14 @@ function renderYearlyView(historical) {
             interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { display: false },
-                tooltip: Object.assign({}, TOOLTIP_BG, {
-                    callbacks: {
-                        title: function(items) { return items.length ? items[0].label : ''; },
-                        label: function(ctx) { return ' Total: ' + Math.round(ctx.parsed.y).toLocaleString() + ' units'; },
-                    },
-                }),
+                zoom: {
+                    zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' },
+                    pan:  { enabled: true, mode: 'x' },
+                },
+                tooltip: {
+                    enabled: false,
+                    external: function(ctx) { return externalChartTooltip(ctx, {}); },
+                },
             },
             scales: {
                 x: { ticks: { color: AXIS_COLOR, font: { family: 'Lora', size: 12, weight: '600' } }, grid: { display: false } },
@@ -939,6 +974,26 @@ function updateFcRangeWarning() {
     warnEl.style.display = daysOut > 365 ? '' : 'none';
 }
 
+// ── Per-product input persistence (session-scoped) ───────────────────────────
+// Survives modal close and page navigation within a login session.
+// Cleared on logout by pvLogout() in csrf.js.
+const PI_KEY = 'provendor_pi_v1';
+function piGet(pid) {
+    if (!pid) return {};
+    try {
+        const all = JSON.parse(sessionStorage.getItem(PI_KEY) || '{}');
+        return all[pid] || {};
+    } catch (e) { return {}; }
+}
+function piSet(pid, partial) {
+    if (!pid) return;
+    try {
+        const all = JSON.parse(sessionStorage.getItem(PI_KEY) || '{}');
+        all[pid] = Object.assign(all[pid] || {}, partial);
+        sessionStorage.setItem(PI_KEY, JSON.stringify(all));
+    } catch (e) {}
+}
+
 function openForecastModal() {
     if (!activeProductId) return;
     document.getElementById('fc-modal-title').textContent = productDisplayLabel();
@@ -949,8 +1004,30 @@ function openForecastModal() {
         b.classList.toggle('fc-preset-pill-on', b.dataset.ref === 'today');
     });
 
-    // Default to "Next Month" — the preset both fills the dates and toggles the pill.
+    // Capture any saved dates BEFORE applying the preset — applyForecastPreset
+    // writes its own values to storage, which would otherwise clobber the
+    // user's previously typed dates.
+    const saved = piGet(activeProductId);
+
+    // Default to "Next Month" — fills the inputs and sets `min` correctly.
     applyForecastPreset('month');
+
+    // If the user had previously typed dates for this product, override the
+    // preset defaults and re-persist (the preset call just overwrote storage).
+    if (saved.fromDate || saved.toDate) {
+        const fromEl = document.getElementById('fc-from-date');
+        const toEl   = document.getElementById('fc-to-date');
+        if (saved.fromDate && fromEl) fromEl.value = saved.fromDate;
+        if (saved.toDate   && toEl)   toEl.value   = saved.toDate;
+        piSet(activeProductId, {
+            fromDate: saved.fromDate || (fromEl ? fromEl.value : ''),
+            toDate:   saved.toDate   || (toEl   ? toEl.value   : ''),
+        });
+        // Clear preset pill — values are user-chosen, not preset-derived.
+        document.querySelectorAll('#fc-preset-pills .fc-preset-pill').forEach(function(b) {
+            b.classList.remove('fc-preset-pill-on');
+        });
+    }
 
     document.getElementById('fc-range-warning').style.display = 'none';
     document.getElementById('fc-input-error').style.display   = 'none';
@@ -960,6 +1037,7 @@ function openForecastModal() {
     setFcPanel('input');
     document.getElementById('fc-modal').classList.remove('hidden');
     document.body.style.overflow = 'hidden';
+    updateFcRangeWarning();
 }
 
 // ── Forecast range presets ───────────────────────────────────────────────────
@@ -1044,6 +1122,9 @@ function applyForecastPreset(preset) {
         b.classList.toggle('fc-preset-pill-on', b.dataset.preset === preset);
     });
 
+    // Programmatic value changes don't fire the input event, so persist explicitly.
+    piSet(activeProductId, { fromDate: fromStr, toDate: toStr });
+
     updateFcRangeWarning();
 }
 
@@ -1065,7 +1146,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Manual date edits exit preset mode (no pill highlighted).
+    // Manual date edits exit preset mode (no pill highlighted) and persist.
     ['fc-from-date', 'fc-to-date'].forEach(function(id) {
         var el = document.getElementById(id);
         if (el) {
@@ -1073,6 +1154,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.querySelectorAll('#fc-preset-pills .fc-preset-pill').forEach(function(b) {
                     b.classList.remove('fc-preset-pill-on');
                 });
+                piSet(activeProductId, id === 'fc-from-date' ? { fromDate: el.value } : { toDate: el.value });
             });
         }
     });
@@ -1119,6 +1201,8 @@ function runForecast() {
             ChartModal.open({
                 label:               'Demand Forecast',
                 title:               productDisplayLabel(),
+                productId:           activeProductId,      // keys per-product input persistence
+                accuracyBase:        '<?php echo BASE_URL; ?>', // for /api/run_product_accuracy.php
                 historical:          data.historical,
                 forecast:            data.forecast,
                 hasBand:             true,
@@ -1142,6 +1226,9 @@ function runForecast() {
                     optBody.append('cost_price',    inputs.cost_price);
                     optBody.append('selling_price', inputs.selling_price);
                     optBody.append('current_stock', inputs.current_stock);
+                    // Passes product_id so run_optimize.php can look up the
+                    // cached residual_rho and apply the AR(1) σ correction.
+                    optBody.append('product_id',    activeProductId);
 
                     fetch('<?php echo BASE_URL; ?>/api/run_optimize.php', { method: 'POST', body: optBody })
                         .then(r => r.json())
@@ -1149,14 +1236,16 @@ function runForecast() {
                             if (opt.error) { done(opt); return; }
                             fcOptimizeResult = opt;
                             done({
-                                total_predicted: opt.total_predicted,
-                                restock_qty:     opt.restock_qty,
-                                current_stock:   inputs.current_stock,
-                                cost_price:      inputs.cost_price,
-                                selling_price:   inputs.selling_price,
-                                total_std:       opt.total_std,
-                                optimal_total:   opt.optimal_total,
-                                est_profit:      opt.est_profit,
+                                total_predicted:      opt.total_predicted,
+                                restock_qty:          opt.restock_qty,
+                                current_stock:        inputs.current_stock,
+                                cost_price:           inputs.cost_price,
+                                selling_price:        inputs.selling_price,
+                                total_std:            opt.total_std,
+                                optimal_total:        opt.optimal_total,
+                                est_profit:           opt.est_profit,
+                                rho_used:             opt.rho_used,
+                                std_inflation_factor: opt.std_inflation_factor,
                             });
                         })
                         .catch(function () { done({ error: 'Network error. Please try again.' }); });
@@ -1192,6 +1281,10 @@ function saveForecast() {
     body.append('total_std',     fcOptimizeResult.total_std);
     body.append('optimal_total', fcOptimizeResult.optimal_total);
     body.append('est_profit',    fcOptimizeResult.est_profit);
+    // AR(1) bookkeeping so the saved Newsvendor disclosure reproduces correctly
+    // when this forecast is reopened from the Reports page.
+    if (fcOptimizeResult.rho_used             != null) body.append('rho_used',             fcOptimizeResult.rho_used);
+    if (fcOptimizeResult.std_inflation_factor != null) body.append('std_inflation_factor', fcOptimizeResult.std_inflation_factor);
 
     fetch('<?php echo BASE_URL; ?>/api/save_forecast.php', { method: 'POST', body: body })
         .then(r => r.json())
@@ -1317,3 +1410,4 @@ function saveForecast() {
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 </body>
 </html>
+

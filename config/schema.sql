@@ -14,18 +14,39 @@ CREATE TABLE IF NOT EXISTS `users` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `products` (
-    `id`            INT           NOT NULL AUTO_INCREMENT,
-    `user_id`       INT           NOT NULL,
-    `name`          VARCHAR(100)  NOT NULL,
-    `sku`           VARCHAR(100)  DEFAULT NULL,
-    `category`      VARCHAR(50)   DEFAULT NULL,
-    `subcategory`   VARCHAR(50)   DEFAULT NULL,
-    `cost_price`    DECIMAL(10,2) DEFAULT NULL,
-    `selling_price` DECIMAL(10,2) DEFAULT NULL,
-    `created_at`    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `id`                     INT           NOT NULL AUTO_INCREMENT,
+    `user_id`                INT           NOT NULL,
+    `name`                   VARCHAR(100)  NOT NULL,
+    `sku`                    VARCHAR(100)  DEFAULT NULL,
+    `category`               VARCHAR(50)   DEFAULT NULL,
+    `subcategory`            VARCHAR(50)   DEFAULT NULL,
+    `cost_price`             DECIMAL(10,2) DEFAULT NULL,
+    `selling_price`          DECIMAL(10,2) DEFAULT NULL,
+    -- Forecast accuracy cache, populated by /forecast/product/evaluate.
+    -- accuracy_pct = 100 - MAPE on a held-out window. residual_rho is the
+    -- lag-1 autocorrelation of backtest residuals, fed back into /optimize
+    -- to widen σ for products whose demand actually clusters day-to-day.
+    `accuracy_pct`           DECIMAL(5,2)  DEFAULT NULL,
+    `accuracy_mape`          DECIMAL(8,2)  DEFAULT NULL,
+    `accuracy_mae`           DECIMAL(8,2)  DEFAULT NULL,
+    `accuracy_rmse`          DECIMAL(8,2)  DEFAULT NULL,
+    `accuracy_horizon_days`  INT           DEFAULT NULL,
+    `accuracy_residual_rho`  DECIMAL(6,4)  DEFAULT NULL,
+    `accuracy_computed_at`   TIMESTAMP     NULL DEFAULT NULL,
+    `created_at`             TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     CONSTRAINT `fk_products_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- For existing databases, add the accuracy cache columns:
+--   ALTER TABLE `products`
+--     ADD COLUMN `accuracy_pct`          DECIMAL(5,2) DEFAULT NULL,
+--     ADD COLUMN `accuracy_mape`         DECIMAL(8,2) DEFAULT NULL,
+--     ADD COLUMN `accuracy_mae`          DECIMAL(8,2) DEFAULT NULL,
+--     ADD COLUMN `accuracy_rmse`         DECIMAL(8,2) DEFAULT NULL,
+--     ADD COLUMN `accuracy_horizon_days` INT          DEFAULT NULL,
+--     ADD COLUMN `accuracy_residual_rho` DECIMAL(6,4) DEFAULT NULL,
+--     ADD COLUMN `accuracy_computed_at`  TIMESTAMP    NULL DEFAULT NULL;
 
 -- import_sessions defined before sales so the FK reference is valid
 CREATE TABLE IF NOT EXISTS `import_sessions` (
@@ -47,26 +68,46 @@ CREATE TABLE IF NOT EXISTS `sales` (
     `sale_date`         DATE      NOT NULL,
     `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
+    -- Daily aggregation invariant: one row per (product, day). The importer
+    -- already enforces this in PHP, but a UNIQUE key makes it true at the DB
+    -- level too — so a concurrent import or a stray INSERT can't sneak past it.
+    UNIQUE KEY `sales_product_date_unique` (`product_id`, `sale_date`),
     CONSTRAINT `fk_sales_product` FOREIGN KEY (`product_id`)        REFERENCES `products` (`id`)        ON DELETE CASCADE,
     CONSTRAINT `fk_sales_import`  FOREIGN KEY (`import_session_id`) REFERENCES `import_sessions` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- For existing databases, add the uniqueness guard (run after de-duping any
+-- pre-existing (product_id, sale_date) collisions, else the ALTER will fail):
+--   ALTER TABLE `sales`
+--     ADD UNIQUE KEY `sales_product_date_unique` (`product_id`, `sale_date`);
+
 CREATE TABLE IF NOT EXISTS `forecasts` (
-    `id`               INT           NOT NULL AUTO_INCREMENT,
-    `product_id`       INT           NOT NULL,
-    `forecast_date`    DATE          NOT NULL,
-    `predicted_demand` DECIMAL(10,2) NOT NULL,
-    `restock_qty`      INT           DEFAULT NULL,
-    `cost_price`       DECIMAL(10,2) DEFAULT NULL,
-    `selling_price`    DECIMAL(10,2) DEFAULT NULL,
-    `current_stock`    INT           DEFAULT NULL,
-    `total_std`        DECIMAL(10,2) DEFAULT NULL,
-    `optimal_total`    INT           DEFAULT NULL,
-    `est_profit`       DECIMAL(12,2) DEFAULT NULL,
-    `generated_at`     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `id`                    INT           NOT NULL AUTO_INCREMENT,
+    `product_id`            INT           NOT NULL,
+    `forecast_date`         DATE          NOT NULL,
+    `predicted_demand`      DECIMAL(10,2) NOT NULL,
+    `restock_qty`           INT           DEFAULT NULL,
+    `cost_price`            DECIMAL(10,2) DEFAULT NULL,
+    `selling_price`         DECIMAL(10,2) DEFAULT NULL,
+    `current_stock`         INT           DEFAULT NULL,
+    `total_std`             DECIMAL(10,2) DEFAULT NULL,
+    `optimal_total`         INT           DEFAULT NULL,
+    `est_profit`            DECIMAL(12,2) DEFAULT NULL,
+    -- AR(1) variance correction inputs/outputs captured at save time so the
+    -- reports page can show the same Newsvendor disclosure as the live modal.
+    -- rho_used: lag-1 residual autocorrelation passed into /optimize.
+    -- std_inflation_factor: how much σ was widened (1.0 = no correction).
+    `rho_used`              DECIMAL(6,4)  DEFAULT NULL,
+    `std_inflation_factor`  DECIMAL(6,4)  DEFAULT NULL,
+    `generated_at`          TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     CONSTRAINT `fk_forecasts_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- For existing databases, add the AR(1) bookkeeping columns:
+--   ALTER TABLE `forecasts`
+--     ADD COLUMN `rho_used`             DECIMAL(6,4) DEFAULT NULL,
+--     ADD COLUMN `std_inflation_factor` DECIMAL(6,4) DEFAULT NULL;
 
 CREATE TABLE IF NOT EXISTS `seasonal_events` (
     `id`          INT          NOT NULL AUTO_INCREMENT,

@@ -42,6 +42,7 @@ require_once __DIR__ . '/../includes/header.php';
             $rows     = (int) ($_GET['rows']     ?? 0);
             $replaced = (int) ($_GET['replaced'] ?? 0);
             $skipped  = (int) ($_GET['skipped']  ?? 0);
+            $dropped  = (int) ($_GET['dropped']  ?? 0);
             $csvRows  = (int) ($_GET['csv_rows'] ?? 0);
         ?>
         <div class="import-success" style="flex-direction:column; align-items:flex-start; gap:0.5rem;">
@@ -55,11 +56,12 @@ require_once __DIR__ . '/../includes/header.php';
                         if ($rows > 0)     $parts[] = number_format($rows)     . ' new record' . ($rows !== 1 ? 's' : '') . ' imported';
                         if ($replaced > 0) $parts[] = number_format($replaced) . ' record' . ($replaced !== 1 ? 's' : '') . ' updated';
                         if ($skipped > 0)  $parts[] = number_format($skipped)  . ' row' . ($skipped !== 1 ? 's' : '') . ' skipped (already in database)';
+                        if ($dropped > 0)  $parts[] = number_format($dropped)  . ' row' . ($dropped !== 1 ? 's' : '') . ' dropped (invalid data)';
                         echo implode(', ', $parts) . '.';
                     ?>
                 </span>
             </div>
-            <?php if ($csvRows > 0 && $csvRows !== ($rows + $replaced + $skipped)): ?>
+            <?php if ($csvRows > 0 && $csvRows !== ($rows + $replaced + $skipped + $dropped)): ?>
             <p style="font-size:0.78rem; font-weight:400; opacity:0.75; margin:0;">
                 <?php echo number_format($csvRows); ?> CSV rows were processed into <?php echo number_format($rows + $replaced); ?> daily records.
                 Transactions for the same product on the same date are aggregated into a single daily total, as required by the forecasting model.
@@ -1183,7 +1185,7 @@ async function wDoImport(mapping, replace) {
 
         if (data.success) {
             wClearState();
-            window.location = '<?php echo BASE_URL; ?>/pages/import.view.php?imported=1&rows=' + data.rows + '&replaced=' + (data.replaced || 0) + '&skipped=' + (data.skipped || 0) + '&csv_rows=' + (data.csv_rows || 0);
+            window.location = '<?php echo BASE_URL; ?>/pages/import.view.php?imported=1&rows=' + data.rows + '&replaced=' + (data.replaced || 0) + '&skipped=' + (data.skipped || 0) + '&dropped=' + (data.dropped || 0) + '&csv_rows=' + (data.csv_rows || 0);
         } else {
             showMappingError('Import failed: ' + (data.error || 'Unknown error.'));
             btn.innerHTML = IMPORT_BTN_HTML;

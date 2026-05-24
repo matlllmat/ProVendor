@@ -42,7 +42,8 @@ function getForecastSessionRows(PDO $pdo, int $productId, string $generatedAt, i
                 MAX(f.restock_qty) AS restock_qty, MAX(f.cost_price) AS cost_price,
                 MAX(f.selling_price) AS selling_price, MAX(f.current_stock) AS current_stock,
                 MAX(f.total_std) AS total_std, MAX(f.optimal_total) AS optimal_total,
-                MAX(f.est_profit) AS est_profit
+                MAX(f.est_profit) AS est_profit,
+                MAX(f.rho_used) AS rho_used, MAX(f.std_inflation_factor) AS std_inflation_factor
          FROM forecasts f
          JOIN products p ON p.id = f.product_id
          WHERE f.product_id = ? AND f.generated_at = ? AND p.user_id = ?

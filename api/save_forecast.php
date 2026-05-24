@@ -22,6 +22,9 @@ $currentStock = isset($_POST['current_stock']) ? (int)   $_POST['current_stock']
 $totalStd     = isset($_POST['total_std'])     ? (float) $_POST['total_std']     : 0.0;
 $optimalTotal = isset($_POST['optimal_total']) ? (int)   $_POST['optimal_total'] : 0;
 $estProfit    = isset($_POST['est_profit'])    ? (float) $_POST['est_profit']    : 0.0;
+// AR(1) bookkeeping — null means "no backtest available, independence assumed".
+$rhoUsed            = (isset($_POST['rho_used'])             && $_POST['rho_used']             !== '') ? (float) $_POST['rho_used']             : null;
+$stdInflationFactor = (isset($_POST['std_inflation_factor']) && $_POST['std_inflation_factor'] !== '') ? (float) $_POST['std_inflation_factor'] : null;
 
 if (!$productId) {
     echo json_encode(['error' => 'Missing product.']);
@@ -43,5 +46,6 @@ if (!$stmt->fetch()) {
 }
 
 saveForecastRows($pdo, $productId, $forecastRows, $restockQty,
-    $costPrice, $sellingPrice, $currentStock, $totalStd, $optimalTotal, $estProfit);
+    $costPrice, $sellingPrice, $currentStock, $totalStd, $optimalTotal, $estProfit,
+    $rhoUsed, $stdInflationFactor);
 echo json_encode(['success' => true]);

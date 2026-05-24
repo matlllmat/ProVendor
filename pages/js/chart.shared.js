@@ -308,3 +308,167 @@ function buildChartAnnotations(visibleFrom, visibleTo, normalize, disabledIds) {
     });
     return annotations;
 }
+
+
+// ══════════════════════════════════════════════════════════════════
+// CUSTOM HTML CHART TOOLTIP
+// Replaces Chart.js's default canvas-drawn tooltip so we can render
+// colored bars, dot legends, signed +/- values, and the Prophet
+// component breakdown. Used by both the Demand Analysis chart on the
+// forecast page and the ChartModal on the forecast result + reports.
+// CSS class hooks live in pages/css/chart_modal.css (.cm-tooltip etc.).
+// ══════════════════════════════════════════════════════════════════
+function getOrCreateChartTooltipEl() {
+    var el = document.getElementById('cm-tooltip');
+    if (el) return el;
+    el = document.createElement('div');
+    el.id = 'cm-tooltip';
+    el.className = 'cm-tooltip';
+    el.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(el);
+    return el;
+}
+
+function hideChartTooltip() {
+    var el = document.getElementById('cm-tooltip');
+    if (el) el.style.opacity = '0';
+}
+
+function _ttCompRow(tone, label, value, signed) {
+    var n  = Math.round(value);
+    var vc = 'cm-tt-val';
+    var vt = signed ? ((n >= 0 ? '+' : '') + n) : ('' + n);
+    if (signed) {
+        if (n > 0) vc += ' is-pos';
+        else if (n < 0) vc += ' is-neg';
+    }
+    return '<div class="cm-tt-comp" data-tone="' + tone + '">'
+        +     '<span class="cm-tt-bar"></span>'
+        +     '<span class="cm-tt-comp-label">' + label + '</span>'
+        +     '<span class="' + vc + '">' + vt + '</span>'
+        +  '</div>';
+}
+
+// Builds the tooltip handler. `getState` is a function so the latest
+// fcComponents / disabledIds are read on every hover.
+//   state.fcComponents : { 'YYYY-MM-DD' (normalized) → component object }, optional
+//   state.disabledIds  : Set of disabled CHART_EVENTS ids, optional
+function externalChartTooltip(context, state) {
+    var tt = context.tooltip;
+    var el = getOrCreateChartTooltipEl();
+
+    if (!tt || tt.opacity === 0) { el.style.opacity = '0'; return; }
+
+    state = state || {};
+
+    // Keep visible, non-band datasets only.
+    var points = (tt.dataPoints || []).filter(function (p) {
+        return p.dataset.label !== '_upper'
+            && p.dataset.label !== '_lower'
+            && p.parsed.y != null;
+    });
+    if (!points.length) { el.style.opacity = '0'; return; }
+
+    var chart    = context.chart;
+    var isTime   = chart.options.scales.x && chart.options.scales.x.type === 'time';
+    var first    = points[0];
+    var dateLabel, normDate = null;
+
+    if (isTime) {
+        dateLabel = new Date(first.parsed.x).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+        normDate  = tsToDateStr(first.parsed.x);
+    } else {
+        // Category x-axis (bar charts): bucket label is whatever Chart.js stored
+        dateLabel = chart.data.labels ? chart.data.labels[first.dataIndex] : '';
+    }
+
+    var fcItem = points.find(function (p) {
+        return p.dataset.label === 'Projected Demand' || p.dataset.label === 'Forecast';
+    });
+
+    // ── Header ─────────────────────────────────────────────────────────────
+    var html = '<div class="cm-tt-head">'
+             +     '<p class="cm-tt-date">' + dateLabel + '</p>'
+             +     (fcItem
+                     ? '<p class="cm-tt-big">' + Math.round(fcItem.parsed.y) + ' <span class="cm-tt-big-unit">units</span></p>'
+                     : '')
+             +  '</div>';
+
+    // ── Dataset value rows ─────────────────────────────────────────────────
+    html += '<div class="cm-tt-rows">';
+    points.forEach(function (p) {
+        var color = p.dataset.borderColor || p.dataset.backgroundColor;
+        if (Array.isArray(color)) color = color[p.dataIndex] || '#1A6933';
+        var label = p.dataset.label;
+        if (label === 'Projected Demand') label = 'Forecast';
+        html += '<div class="cm-tt-row">'
+            +     '<span class="cm-tt-dot" style="background:' + color + '"></span>'
+            +     '<span class="cm-tt-label">' + label + '</span>'
+            +     '<span class="cm-tt-val">' + Math.round(p.parsed.y).toLocaleString() + '</span>'
+            +  '</div>';
+    });
+    html += '</div>';
+
+    // ── Component breakdown ───────────────────────────────────────────────
+    // Daily view: per-day components keyed by normalized date.
+    // Aggregated views (weekly/monthly/yearly): components summed across the
+    // days that fall into the hovered bucket, keyed by the bar's dataIndex.
+    if (fcItem) {
+        var comp = null;
+        if (isTime && state.fcComponents) {
+            comp = state.fcComponents[normDate];
+        } else if (!isTime && state.fcBucketComponents) {
+            comp = state.fcBucketComponents[fcItem.dataIndex];
+        }
+        if (comp) {
+            // Larger thresholds for aggregated views since the sums are bigger.
+            var threshold = isTime ? 0.5 : 1;
+            html += '<div class="cm-tt-section">'
+                +     '<p class="cm-tt-section-label">Why this number?</p>'
+                +     _ttCompRow('brown', 'Baseline trend', comp.trend, false);
+            if (Math.abs(comp.weekly) >= threshold) html += _ttCompRow('blue',  'Weekly effect', comp.weekly, true);
+            if (Math.abs(comp.yearly) >= threshold) html += _ttCompRow('green', 'Yearly effect', comp.yearly, true);
+            (comp.events || []).forEach(function (ev) {
+                if (Math.abs(ev.value) >= threshold) html += _ttCompRow('orange', ev.name, ev.value, true);
+            });
+            html += '</div>';
+        }
+    }
+
+    // ── Active CHART_EVENT annotations (daily only) ───────────────────────
+    if (isTime && normDate) {
+        var disabled = state.disabledIds || new Set();
+        var evts = getEventsOnNormDate(normDate, disabled);
+        if (evts.length) {
+            html += '<div class="cm-tt-section">'
+                +     '<p class="cm-tt-section-label">Active events</p>';
+            evts.forEach(function (ev) {
+                html += '<div class="cm-tt-evt">'
+                    +     '<span class="cm-tt-evt-dot" style="background:' + (ev.color || '#FF5722') + '"></span>'
+                    +     '<span>' + ev.name + '</span>'
+                    +  '</div>';
+            });
+            html += '</div>';
+        }
+    }
+
+    el.innerHTML = html;
+
+    // Position relative to chart canvas with cursor offset; flip sides if needed.
+    var canvas = context.chart.canvas;
+    var rect   = canvas.getBoundingClientRect();
+    var x      = rect.left + window.pageXOffset + tt.caretX;
+    var y      = rect.top  + window.pageYOffset + tt.caretY;
+
+    el.style.opacity = '1';
+    el.style.left    = (x + 14) + 'px';
+    el.style.top     = (y - 10) + 'px';
+
+    var ttRect = el.getBoundingClientRect();
+    if (rect.left + tt.caretX + 14 + ttRect.width > window.innerWidth - 8) {
+        el.style.left = (x - 14 - ttRect.width) + 'px';
+    }
+    if (rect.top + tt.caretY - 10 < 8) {
+        el.style.top = (y + 14) + 'px';
+    }
+}

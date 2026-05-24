@@ -304,6 +304,395 @@
 .cm-view-tab:hover           { opacity: 0.85; }
 .cm-view-tab.cm-view-tab-on  { background: #261F0E; color: #F0E8D0; opacity: 1; }
 
+/* ══════════════════════════════════════════════════════════════════
+   NEWSVENDOR CHART OVERLAY
+   Toggle button + active-state cues so it's obvious when the chart
+   is showing the Newsvendor-recommended order vs Prophet's forecast.
+   Color: deep pink (#FF1493) — deliberately outside YEAR_COLORS so it
+   never collides with any historical year's line.
+══════════════════════════════════════════════════════════════════ */
+.cm-toggle-btn.cm-nv-toggle.cm-btn-on {
+    background: #FF1493;
+    border-color: #FF1493;
+    color: #FFFFFF;
+}
+
+/* Active-state banner above the chart canvas */
+.cm-nv-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin: 0 0 0.75rem 0;
+    padding: 0.55rem 0.8rem;
+    background: rgba(255,20,147,0.08);
+    border: 1px solid rgba(255,20,147,0.35);
+    border-left: 3px solid #FF1493;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    color: #C2185B;
+    line-height: 1.45;
+}
+.cm-nv-banner svg    { flex-shrink: 0; color: #FF1493; }
+.cm-nv-banner strong { font-weight: 700; color: #FF1493; }
+
+/* Subtle pink halo on the chart wrap when Newsvendor is active */
+.cm-chart-wrap.cm-chart-wrap-nv-active #cm-canvas {
+    background: radial-gradient(ellipse at center, rgba(255,20,147,0.06) 0%, transparent 70%);
+    border-radius: 0.5rem;
+    transition: background 0.2s ease;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   CUSTOM HTML CHART TOOLTIP
+   Replaces Chart.js's default canvas tooltip so the forecast breakdown
+   can render with colored bars, dot legends, and signed +/- values.
+══════════════════════════════════════════════════════════════════ */
+.cm-tooltip {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    background: #261F0E;
+    color: #F0E8D0;
+    border: 1px solid rgba(240,232,208,0.15);
+    border-radius: 0.65rem;
+    padding: 0.65rem 0.8rem 0.75rem;
+    font-family: 'Lora', serif;
+    font-size: 0.78rem;
+    line-height: 1.5;
+    z-index: 10000;
+    min-width: 200px;
+    max-width: 300px;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.35);
+    transition: opacity 0.12s ease;
+    transform: translateZ(0); /* GPU layer to avoid sub-pixel jitter */
+}
+
+/* Header */
+.cm-tt-head {
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.55rem;
+    border-bottom: 1px solid rgba(240,232,208,0.16);
+}
+.cm-tt-date {
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #D2C8AE;
+    opacity: 0.75;
+    margin: 0 0 0.2rem 0;
+}
+.cm-tt-big {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #FF8A5C;
+    line-height: 1.15;
+}
+.cm-tt-big-unit {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #D2C8AE;
+    opacity: 0.75;
+    margin-left: 0.18rem;
+    letter-spacing: 0.05em;
+}
+
+/* Per-dataset value list (year overlay etc.) */
+.cm-tt-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+.cm-tt-row {
+    display: grid;
+    grid-template-columns: 10px 1fr auto;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 0.74rem;
+}
+.cm-tt-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+}
+.cm-tt-label {
+    color: #D2C8AE;
+    opacity: 0.88;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.cm-tt-val {
+    color: #F0E8D0;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.cm-tt-val.is-pos { color: #5BBA72; }
+.cm-tt-val.is-neg { color: #FF8A5C; }
+
+/* Separator-style section blocks (breakdown, events) */
+.cm-tt-section {
+    margin-top: 0.55rem;
+    padding-top: 0.55rem;
+    border-top: 1px solid rgba(240,232,208,0.16);
+}
+.cm-tt-section-label {
+    font-size: 0.58rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #D2C8AE;
+    opacity: 0.62;
+    margin: 0 0 0.4rem 0;
+}
+
+/* Component rows (breakdown for the forecast point) */
+.cm-tt-comp {
+    display: grid;
+    grid-template-columns: 4px 1fr auto;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.18rem 0;
+    font-size: 0.74rem;
+}
+.cm-tt-bar {
+    width: 4px;
+    height: 18px;
+    border-radius: 2px;
+    opacity: 0.85;
+}
+.cm-tt-comp-label {
+    color: #D2C8AE;
+    opacity: 0.88;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.cm-tt-comp[data-tone="brown"]  .cm-tt-bar { background: #D9B248; }
+.cm-tt-comp[data-tone="blue"]   .cm-tt-bar { background: #6FA0D6; }
+.cm-tt-comp[data-tone="green"]  .cm-tt-bar { background: #5BBA72; }
+.cm-tt-comp[data-tone="orange"] .cm-tt-bar { background: #FF8A5C; }
+
+/* Events section */
+.cm-tt-section-events { padding-top: 0.55rem; }
+.cm-tt-evt {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.16rem 0;
+    font-size: 0.74rem;
+    color: #D2C8AE;
+    opacity: 0.92;
+}
+.cm-tt-evt-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   FORECAST REASONING PANEL
+   "Why this forecast?" — breaks Prophet's prediction into its named
+   additive components (trend + weekly + yearly + each event regressor).
+══════════════════════════════════════════════════════════════════ */
+.cm-reasoning {
+    margin: 0 1.5rem 1.25rem;
+    padding: 1.15rem 1.25rem 1.25rem;
+    background: linear-gradient(135deg, rgba(59,110,165,0.06) 0%, rgba(38,31,14,0.025) 70%);
+    border: 1px solid #D2C8AE;
+    border-radius: 0.85rem;
+    position: relative;
+    overflow: hidden;
+}
+.cm-reasoning::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #8B6B14 0%, #3B6EA5 33%, #1A6933 66%, #FF5722 100%);
+    opacity: 0.78;
+}
+
+.cm-reasoning-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    margin-bottom: 0.95rem;
+}
+
+.cm-reasoning-icon {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.55rem;
+    background: rgba(59,110,165,0.13);
+    border: 1px solid rgba(59,110,165,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #3B6EA5;
+    flex-shrink: 0;
+}
+
+.cm-reasoning-header-text { flex: 1; min-width: 0; }
+
+.cm-reasoning-eyebrow {
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #3B6EA5;
+    margin-bottom: 0.15rem;
+}
+
+.cm-reasoning-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #261F0E;
+    margin-bottom: 0.25rem;
+    line-height: 1.3;
+}
+
+.cm-reasoning-sub {
+    font-size: 0.74rem;
+    color: #261F0E;
+    opacity: 0.6;
+    line-height: 1.45;
+}
+
+/* Component cards — one per Prophet driver */
+.cm-reasoning-cards {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.55rem;
+    margin-bottom: 0.85rem;
+}
+@media (max-width: 600px) {
+    .cm-reasoning-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.cm-rsn-card {
+    position: relative;
+    padding: 0.65rem 0.75rem 0.7rem;
+    background: rgba(240,232,208,0.65);
+    border: 1px solid #D2C8AE;
+    border-radius: 0.55rem;
+    min-width: 0;
+    overflow: hidden;
+}
+.cm-rsn-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 2px;
+    opacity: 0.6;
+}
+.cm-rsn-card[data-tone="brown"]::before  { background: #8B6B14; }
+.cm-rsn-card[data-tone="blue"]::before   { background: #3B6EA5; }
+.cm-rsn-card[data-tone="green"]::before  { background: #1A6933; }
+.cm-rsn-card[data-tone="orange"]::before { background: #FF5722; }
+
+.cm-rsn-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #261F0E;
+    line-height: 1.15;
+    margin-bottom: 0.2rem;
+}
+
+.cm-rsn-label {
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #261F0E;
+    opacity: 0.55;
+    margin-bottom: 0.1rem;
+}
+
+.cm-rsn-sub {
+    font-size: 0.62rem;
+    color: #261F0E;
+    opacity: 0.45;
+}
+
+/* Equation summary line below the cards */
+.cm-reasoning-equation {
+    margin: 0 0 0.85rem 0;
+    padding: 0.55rem 0.8rem;
+    background: rgba(38,31,14,0.04);
+    border: 1px solid rgba(210,200,174,0.7);
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    color: #261F0E;
+    opacity: 0.85;
+    line-height: 1.55;
+    text-align: center;
+}
+.cm-reasoning-equation strong { color: #261F0E; opacity: 1; font-weight: 700; }
+
+/* Event contribution list */
+.cm-reasoning-events { margin-top: 0.2rem; }
+
+.cm-reasoning-section-label {
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #261F0E;
+    opacity: 0.5;
+    margin-bottom: 0.5rem;
+}
+
+.cm-rsn-event-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.32rem;
+}
+
+.cm-rsn-event-list li {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.45rem 0.7rem;
+    background: rgba(240,232,208,0.6);
+    border: 1px solid rgba(210,200,174,0.6);
+    border-radius: 0.45rem;
+    font-size: 0.78rem;
+    color: #261F0E;
+}
+
+.cm-rsn-event-name {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.cm-rsn-event-days {
+    font-size: 0.65rem;
+    color: #261F0E;
+    opacity: 0.5;
+    white-space: nowrap;
+}
+
+.cm-rsn-event-val {
+    font-weight: 700;
+    white-space: nowrap;
+}
+.cm-rsn-event-val.is-pos { color: #1A6933; }
+.cm-rsn-event-val.is-neg { color: #FF5722; }
+
 /* ── Restock insight form ── */
 .cm-restock-form {
     margin: 0 1.5rem 1.25rem;
@@ -482,7 +871,10 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    flex-shrink: 0;
+    flex-wrap: wrap;            /* wrap onto multiple rows instead of overflowing */
+    justify-content: flex-end;  /* keep buttons right-aligned even when wrapped */
+    min-width: 0;
+    row-gap: 0.4rem;
 }
 
 .cm-toggle-btn {
@@ -654,6 +1046,186 @@
     opacity: 0.8;
     line-height: 1.5;
 }
+
+/* ── Newsvendor disclosure (independence / AR(1) correction) ── */
+.cm-nv-note {
+    margin: 0.6rem 1rem 0.4rem;
+    padding: 0.7rem 0.9rem;
+    background: rgba(38,31,14,0.04);
+    border: 1px solid rgba(38,31,14,0.12);
+    border-left: 3px solid #D2C8AE;
+    border-radius: 0.45rem;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: #261F0E;
+    opacity: 0.85;
+}
+.cm-nv-note strong { font-weight: 700; opacity: 1; }
+
+/* ── Header forecast-accuracy chip ── */
+.cm-accuracy-chip {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 0.4rem;
+    padding: 0.3rem 0.7rem;
+    font-size: 0.72rem;
+    font-weight: 500;
+    border-radius: 999px;
+    line-height: 1.3;
+    border: 1px solid transparent;
+}
+.cm-accuracy-chip strong { font-weight: 700; }
+
+.cm-accuracy-loading {
+    color: #261F0E;
+    background: rgba(210,200,174,0.35);
+    border-color: rgba(38,31,14,0.12);
+    opacity: 0.65;
+}
+.cm-accuracy-note {
+    color: #261F0E;
+    background: rgba(210,200,174,0.35);
+    border-color: rgba(38,31,14,0.12);
+    opacity: 0.7;
+}
+.cm-accuracy-good {
+    color: #1A6933;
+    background: rgba(26,105,51,0.10);
+    border-color: rgba(26,105,51,0.30);
+}
+.cm-accuracy-okay {
+    color: #B45309;
+    background: rgba(255,87,34,0.10);
+    border-color: rgba(255,87,34,0.28);
+}
+.cm-accuracy-low {
+    color: #c0392b;
+    background: rgba(255,26,26,0.08);
+    border-color: rgba(255,26,26,0.25);
+}
+
+/* ════════════════════════════════════════════
+   FORECAST ACCURACY METRICS PANEL (bottom of modal)
+════════════════════════════════════════════ */
+.cm-metrics-panel {
+    margin: 1.25rem 1.5rem 0.5rem;
+    padding: 1.4rem 1.5rem 1.25rem;
+    background: rgba(38,31,14,0.025);
+    border: 1px solid #D2C8AE;
+    border-radius: 0.85rem;
+}
+
+.cm-metrics-header { margin-bottom: 1.1rem; }
+
+.cm-metrics-eyebrow {
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #1A6933;
+    margin-bottom: 0.4rem;
+}
+
+.cm-metrics-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #261F0E;
+    margin-bottom: 0.35rem;
+    line-height: 1.3;
+}
+
+.cm-metrics-sub {
+    font-size: 0.78rem;
+    color: #261F0E;
+    opacity: 0.65;
+    line-height: 1.5;
+    max-width: 56ch;
+}
+
+.cm-metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.85rem;
+}
+
+.cm-metric-card {
+    background: #F0E8D0;
+    border: 1px solid #D2C8AE;
+    border-radius: 0.7rem;
+    padding: 1rem 1.05rem 0.95rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.cm-metric-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #261F0E;
+    opacity: 0.45;
+    margin-bottom: 0.45rem;
+}
+
+.cm-metric-value {
+    font-size: 1.55rem;
+    font-weight: 600;
+    color: #261F0E;
+    line-height: 1.1;
+    margin-bottom: 0.15rem;
+}
+
+.cm-metric-unit {
+    font-size: 0.7rem;
+    color: #261F0E;
+    opacity: 0.5;
+    margin-bottom: 0.6rem;
+}
+
+.cm-metric-explain {
+    font-size: 0.72rem;
+    line-height: 1.5;
+    color: #261F0E;
+    opacity: 0.82;
+    border-top: 1px solid rgba(38,31,14,0.08);
+    padding-top: 0.55rem;
+    margin-top: auto;
+}
+.cm-metric-explain strong { font-weight: 700; opacity: 1; }
+
+.cm-metrics-footer {
+    margin-top: 0.85rem;
+    font-size: 0.7rem;
+    color: #261F0E;
+    opacity: 0.5;
+    font-style: italic;
+}
+
+/* Stack cards on narrow viewports so values stay legible. */
+@media (max-width: 720px) {
+    .cm-metrics-grid { grid-template-columns: 1fr; }
+}
+
+/* Inline refresh button on the accuracy chip — forces a fresh backtest. */
+.cm-accuracy-refresh {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 0.45rem;
+    width: 1.15rem;
+    height: 1.15rem;
+    padding: 0;
+    border: 1px solid currentColor;
+    background: transparent;
+    color: inherit;
+    border-radius: 999px;
+    cursor: pointer;
+    opacity: 0.55;
+    transition: opacity 0.15s, transform 0.4s;
+}
+.cm-accuracy-refresh:hover  { opacity: 1; }
+.cm-accuracy-refresh:active { transform: rotate(180deg); }
+.cm-accuracy-loading .cm-accuracy-refresh { display: none; }
 
 /* ── Messages ── */
 .cm-msg {

@@ -4,6 +4,7 @@
 // and returns suggested field mappings as JSON.
 
 require_once __DIR__ . '/../config/bootstrap.php';
+require_once __DIR__ . '/import_helpers.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['user_id'])) {
@@ -77,11 +78,22 @@ fclose($handle);
 // ── Detect column types and suggest field mapping ─────────────────────────────
 $suggestions = detectColumnMapping($headers, $sampleRows);
 
+// ── Sniff date format for the suggested date column ───────────────────────────
+// Cached on session so preflight + import don't need to re-sniff. If the user
+// later picks a different date column in the mapping UI, preflight will re-sniff.
+$dateFormat = ['format' => null, 'ambiguous' => false];
+if ($suggestions['date'] !== null) {
+    $dateSamples = array_column($sampleRows, $suggestions['date']);
+    $dateFormat  = sniffDateFormat($dateSamples);
+}
+$_SESSION['temp_csv_date_format'] = $dateFormat;
+
 echo json_encode([
     'headers'     => $headers,
     'sample'      => array_slice($sampleRows, 0, 5),
     'suggestions' => $suggestions,
     'row_count'   => $rowCount,
+    'date_format' => $dateFormat,
 ]);
 
 // ── Helper: suggest which CSV column maps to which required field ─────────────

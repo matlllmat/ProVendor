@@ -38,13 +38,18 @@ $historical  = getProductSalesUpTo($pdo, $productId, $cutoffDate, $userId);
 // Extract session-level metadata from the first row (same value on every row).
 $first = $forecastRows[0];
 $meta  = [
-    'restock_qty'   => (int)   $first['restock_qty'],
-    'cost_price'    => $first['cost_price']    !== null ? (float) $first['cost_price']    : null,
-    'selling_price' => $first['selling_price'] !== null ? (float) $first['selling_price'] : null,
-    'current_stock' => $first['current_stock'] !== null ? (int)   $first['current_stock'] : null,
-    'total_std'     => $first['total_std']     !== null ? (float) $first['total_std']     : null,
-    'optimal_total' => $first['optimal_total'] !== null ? (int)   $first['optimal_total'] : null,
-    'est_profit'    => $first['est_profit']    !== null ? (float) $first['est_profit']    : null,
+    'restock_qty'          => (int)   $first['restock_qty'],
+    'cost_price'           => $first['cost_price']           !== null ? (float) $first['cost_price']           : null,
+    'selling_price'        => $first['selling_price']        !== null ? (float) $first['selling_price']        : null,
+    'current_stock'        => $first['current_stock']        !== null ? (int)   $first['current_stock']        : null,
+    'total_std'            => $first['total_std']            !== null ? (float) $first['total_std']            : null,
+    'optimal_total'        => $first['optimal_total']        !== null ? (int)   $first['optimal_total']        : null,
+    'est_profit'           => $first['est_profit']           !== null ? (float) $first['est_profit']           : null,
+    // AR(1) bookkeeping — drives the Newsvendor disclosure block in the modal.
+    // Null on legacy rows saved before this column existed; the modal treats
+    // that as "independence assumed" and shows the matching note.
+    'rho_used'             => $first['rho_used']             !== null ? (float) $first['rho_used']             : null,
+    'std_inflation_factor' => $first['std_inflation_factor'] !== null ? (float) $first['std_inflation_factor'] : null,
 ];
 
 // Cast historical and forecast to the right types; strip metadata from forecast rows.

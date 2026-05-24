@@ -34,6 +34,9 @@
     // redirects to the login page. Defined here so every page that loads csrf.js
     // already has it — no per-page wiring needed.
     window.pvLogout = function () {
+        // Per-product input cache (forecast dates, cost/price/stock) is scoped
+        // to a login session — wipe it before redirecting to login.
+        try { sessionStorage.removeItem('provendor_pi_v1'); } catch (e) {}
         var base   = (meta.dataset && meta.dataset.base) || '';
         var logout = base + '/api/logout.php';
         var login  = base + '/pages/login.view.php';

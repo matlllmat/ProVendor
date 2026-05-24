@@ -6,6 +6,7 @@
 // Does NOT write anything to the database.
 
 require_once __DIR__ . '/../config/bootstrap.php';
+require_once __DIR__ . '/import_helpers.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['user_id'])) {
@@ -46,6 +47,28 @@ foreach ([$colDate, $colProduct, $colQty] as $col) {
     }
 }
 
+// First pass: collect ~50 sample date values so we can sniff the format BEFORE
+// rejecting anything. Without this, if detect.php and preflight see different
+// date columns, we'd reject every row as "Unrecognized date format" because
+// strtotime would be guessing wrong.
+$dateColIdx = array_search($colDate, $headers, true);
+$dateSamples = [];
+$bufferedRows = [];
+while (($row = fgetcsv($handle)) !== false) {
+    $bufferedRows[] = $row;
+    if ($dateColIdx !== false && count($row) === count($headers)) {
+        $v = trim((string) ($row[$dateColIdx] ?? ''));
+        if ($v !== '' && count($dateSamples) < 50) $dateSamples[] = $v;
+    }
+    if (count($bufferedRows) >= 50 && count($dateSamples) >= 50) {
+        // Continue reading the rest below without re-sampling
+        break;
+    }
+}
+
+$dateFormat = sniffDateFormat($dateSamples);
+$_SESSION['temp_csv_date_format'] = $dateFormat; // cache for import.php
+
 $valid        = 0;
 $invalid      = 0;
 $errorSamples = [];
@@ -53,7 +76,13 @@ $minDate      = null;
 $maxDate      = null;
 $rowNum       = 1; // 1 = header row
 
+// Drain the rest of the file into the buffer so we process every row once below
 while (($row = fgetcsv($handle)) !== false) {
+    $bufferedRows[] = $row;
+}
+fclose($handle);
+
+foreach ($bufferedRows as $row) {
     $rowNum++;
     if (count($row) !== count($headers)) {
         $invalid++;
@@ -79,9 +108,9 @@ while (($row = fgetcsv($handle)) !== false) {
         $reason = 'Missing product name';
     } elseif ($dateRaw === '') {
         $reason = 'Missing date';
-    } elseif (pfNormalizeDate($dateRaw) === null) {
+    } elseif (normalizeDateStrict($dateRaw, $dateFormat['format']) === null) {
         $reason = 'Unrecognized date format: "' . mb_substr($dateRaw, 0, 30) . '"';
-    } elseif (!is_numeric($qtyRaw) || (int) $qtyRaw <= 0) {
+    } elseif (!is_numeric($qtyRaw) || (float) $qtyRaw <= 0 || (float) $qtyRaw != (int) $qtyRaw) {
         $reason = 'Quantity must be a whole number greater than 0 (got "' . mb_substr($qtyRaw, 0, 20) . '")';
     }
 
@@ -99,12 +128,11 @@ while (($row = fgetcsv($handle)) !== false) {
         continue;
     }
 
-    $date = pfNormalizeDate($dateRaw);
+    $date = normalizeDateStrict($dateRaw, $dateFormat['format']);
     $valid++;
     if ($minDate === null || $date < $minDate) $minDate = $date;
     if ($maxDate === null || $date > $maxDate) $maxDate = $date;
 }
-fclose($handle);
 
 // ── Overlap check ─────────────────────────────────────────────────────────────
 $overlapCount = 0;
@@ -118,17 +146,10 @@ echo json_encode([
     'valid'         => $valid,
     'invalid'       => $invalid,
     'error_samples' => $errorSamples,
+    'date_format'   => $dateFormat,
     'overlap'       => [
         'count'     => $overlapCount,
         'date_from' => $minDate,
         'date_to'   => $maxDate,
     ],
 ]);
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function pfNormalizeDate(string $raw): ?string
-{
-    $ts = strtotime($raw);
-    if ($ts === false) return null;
-    return date('Y-m-d', $ts);
-}

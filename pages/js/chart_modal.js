@@ -15,6 +15,159 @@
 //   ChartModal.showSaveMsg(type, html) — show error/success message in action row
 
 var ChartModal = (function () {
+    // ── Per-product input persistence (session-scoped) ───────────────────────
+    // Keyed by cfg.productId. Cleared on logout by pvLogout() in csrf.js.
+    var _PI_KEY = 'provendor_pi_v1';
+    function _piGet(pid) {
+        if (!pid) return {};
+        try { var all = JSON.parse(sessionStorage.getItem(_PI_KEY) || '{}'); return all[pid] || {}; }
+        catch (e) { return {}; }
+    }
+    function _piSet(pid, partial) {
+        if (!pid) return;
+        try {
+            var all = JSON.parse(sessionStorage.getItem(_PI_KEY) || '{}');
+            all[pid] = Object.assign(all[pid] || {}, partial);
+            sessionStorage.setItem(_PI_KEY, JSON.stringify(all));
+        } catch (e) {}
+    }
+
+    // ── Forecast accuracy chip ───────────────────────────────────────────────
+    // Hits api/run_product_accuracy.php which serves a cached value when fresh,
+    // or fires a fresh backtest via Flask. The chip renders a single user-
+    // friendly number: "Historical accuracy: 82% — tested on the last 30 days."
+    // The endpoint also caches `residual_rho` on the product row, which
+    // run_optimize.php reads back when computing the Newsvendor recommendation.
+    // Builds the refresh-button HTML used inside the chip. Adjacent button so
+    // the click handler can re-call _loadAccuracyChip(cfg, true) to force a
+    // fresh backtest, bypassing the cache.
+    function _refreshBtnHTML() {
+        return ' <button type="button" class="cm-accuracy-refresh" title="Re-run backtest now">'
+             +     '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">'
+             +         '<polyline points="23 4 23 10 17 10"/>'
+             +         '<polyline points="1 20 1 14 7 14"/>'
+             +         '<path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>'
+             +     '</svg>'
+             + '</button>';
+    }
+
+    // Hides the bottom metrics panel — used when accuracy isn't applicable
+    // (no productId, reports flow, insufficient history, fetch failure).
+    function _hideMetricsPanel() {
+        var panel = document.getElementById('cm-metrics-panel');
+        if (panel) panel.style.display = 'none';
+    }
+
+    // Fills the three metric cards from the same payload that drives the chip.
+    function _renderMetricsPanel(data) {
+        var panel = document.getElementById('cm-metrics-panel');
+        if (!panel) return;
+        panel.style.display = '';
+
+        var fmtPct  = function (v) { return v != null ? v.toFixed(1) + '%'    : '—'; };
+        var fmtUnit = function (v) { return v != null ? v.toFixed(1)           : '—'; };
+
+        var mapeEl = document.getElementById('cm-metric-mape');
+        var maeEl  = document.getElementById('cm-metric-mae');
+        var rmseEl = document.getElementById('cm-metric-rmse');
+        if (mapeEl) mapeEl.textContent = fmtPct(data.mape);
+        if (maeEl)  maeEl.textContent  = fmtUnit(data.mae);
+        if (rmseEl) rmseEl.textContent = fmtUnit(data.rmse);
+
+        var footer = document.getElementById('cm-metrics-footer');
+        if (footer) {
+            var bits = [];
+            if (data.horizon_days)     bits.push('Tested on ' + data.horizon_days + ' days of held-out sales.');
+            if (data.residual_rho != null) bits.push('Residual ρ = ' + data.residual_rho.toFixed(2) + ' (drives Newsvendor σ correction).');
+            footer.textContent = bits.join(' ');
+        }
+    }
+
+    function _loadAccuracyChip(cfg, forceRefresh) {
+        var chip = document.getElementById('cm-accuracy-chip');
+        if (!chip) return;
+        if (!cfg.productId || !cfg.accuracyBase) {
+            chip.style.display = 'none';
+            _hideMetricsPanel();
+            return;
+        }
+
+        chip.style.display = '';
+        chip.className     = 'cm-accuracy-chip cm-accuracy-loading';
+        chip.textContent   = forceRefresh ? 'Refreshing accuracy…' : 'Checking historical accuracy…';
+
+        var body = new FormData();
+        body.append('product_id', cfg.productId);
+        if (forceRefresh) body.append('refresh', '1');
+
+        fetch(cfg.accuracyBase + '/api/run_product_accuracy.php', { method: 'POST', body: body })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.error) {
+                    // Insufficient history is normal for new products — show a soft note.
+                    chip.className = 'cm-accuracy-chip cm-accuracy-note';
+                    chip.innerHTML = _escHtml(data.error) + _refreshBtnHTML();
+                    _wireRefreshBtn(chip, cfg);
+                    _hideMetricsPanel();
+                    return;
+                }
+                var pct     = Math.round(data.accuracy_pct);
+                var horizon = data.horizon_days || 0;
+                var tone    = pct >= 80 ? 'good' : pct >= 60 ? 'okay' : 'low';
+                chip.className = 'cm-accuracy-chip cm-accuracy-' + tone;
+                chip.innerHTML =
+                      '<strong>Historical accuracy: ' + pct + '%</strong>'
+                    + ' &nbsp;·&nbsp; tested on the last ' + horizon + ' days of real sales'
+                    + _refreshBtnHTML();
+                chip.title = 'MAPE-based: 100 − mean absolute % error on a held-out window.\n'
+                           + 'MAE = ' + (data.mae != null ? Math.round(data.mae) : '—') + ' units/day (average miss).\n'
+                           + 'RMSE = ' + (data.rmse != null ? Math.round(data.rmse) : '—') + ' units/day (penalizes large misses).\n'
+                           + 'Residual ρ = ' + (data.residual_rho != null ? data.residual_rho.toFixed(2) : '0')
+                           + ' (used to widen σ in the Newsvendor model).';
+                _wireRefreshBtn(chip, cfg);
+                _renderMetricsPanel(data);
+            })
+            .catch(function () {
+                chip.className = 'cm-accuracy-chip cm-accuracy-note';
+                chip.innerHTML = 'Accuracy check unavailable.' + _refreshBtnHTML();
+                _wireRefreshBtn(chip, cfg);
+                _hideMetricsPanel();
+            });
+    }
+
+    function _wireRefreshBtn(chip, cfg) {
+        var btn = chip.querySelector('.cm-accuracy-refresh');
+        if (!btn) return;
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            _loadAccuracyChip(cfg, true);
+        });
+    }
+
+    // Minimal HTML escape — only used for error strings from the server so an
+    // unexpected payload can't break out of the chip markup.
+    function _escHtml(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function _hydrateRestockForm(cfg) {
+        if (!cfg.productId) return;
+        var saved   = _piGet(cfg.productId);
+        var costEl  = document.getElementById('cm-rs-cost');
+        var priceEl = document.getElementById('cm-rs-price');
+        var stockEl = document.getElementById('cm-rs-stock');
+
+        // Pre-fill anything saved (input may not exist if locked by stored product price).
+        if (costEl  && saved.cost  != null && saved.cost  !== '') costEl.value  = saved.cost;
+        if (priceEl && saved.price != null && saved.price !== '') priceEl.value = saved.price;
+        if (stockEl && saved.stock != null && saved.stock !== '') stockEl.value = saved.stock;
+
+        // Save on every keystroke so closing the modal at any point preserves state.
+        if (costEl)  costEl.addEventListener('input',  function () { _piSet(cfg.productId, { cost:  costEl.value  }); });
+        if (priceEl) priceEl.addEventListener('input', function () { _piSet(cfg.productId, { price: priceEl.value }); });
+        if (stockEl) stockEl.addEventListener('input', function () { _piSet(cfg.productId, { stock: stockEl.value }); });
+    }
+
 
     // ── private state ─────────────────────────────────────────────────────────
     var _chart = null;
@@ -28,7 +181,28 @@ var ChartModal = (function () {
         view:         'daily',   // 'daily' | 'weekly' | 'monthly' | 'yearly'
         cfg:          null,      // last config (kept so view-switch can re-render)
         meta:         null,      // newsvendor result; null until user requests insight
+        fcComponents:       {},  // normalized-date → component breakdown (used by daily view + reasoning panel)
+        fcBucketComponents: {},  // bar-chart dataIndex → aggregated component breakdown for the bucket
+        showOptimal:        false, // toggled by the Newsvendor chart overlay button (only after restock generates)
     };
+
+    // Sums Prophet component values for a single forecast day into a bar-chart bucket.
+    function _aggregateInto(map, idx, comp) {
+        if (!comp) return;
+        if (!map[idx]) map[idx] = { trend: 0, weekly: 0, yearly: 0, events: [] };
+        var agg = map[idx];
+        agg.trend  += comp.trend  || 0;
+        agg.weekly += comp.weekly || 0;
+        agg.yearly += comp.yearly || 0;
+        (comp.events || []).forEach(function (ev) {
+            var existing = null;
+            for (var i = 0; i < agg.events.length; i++) {
+                if (agg.events[i].id === ev.id) { existing = agg.events[i]; break; }
+            }
+            if (existing) existing.value += ev.value;
+            else          agg.events.push({ id: ev.id, name: ev.name, value: ev.value });
+        });
+    }
 
     // ── modal DOM (created once, reused) ──────────────────────────────────────
     var _MODAL_HTML =
@@ -39,6 +213,9 @@ var ChartModal = (function () {
                     '<div style="min-width:0">' +
                         '<p id="cm-label" class="cm-label"></p>' +
                         '<h2 id="cm-title" class="cm-title">—</h2>' +
+                        // Accuracy chip — populated by _loadAccuracyChip(cfg)
+                        // once the backtest result comes back from the server.
+                        '<div id="cm-accuracy-chip" class="cm-accuracy-chip" style="display:none"></div>' +
                     '</div>' +
                     '<button id="cm-close" class="cm-close" title="Close">' +
                         '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
@@ -159,6 +336,11 @@ var ChartModal = (function () {
                             '<span style="display:inline-block;width:18px;height:10px;border-radius:3px;background:rgba(255,87,34,0.2)"></span>' +
                             ' Confidence band' +
                         '</span>' +
+                        '<span id="cm-nv-legend" class="cm-legend-item" style="display:none">' +
+                            '<svg width="18" height="10" viewBox="0 0 18 10"><line x1="0" y1="5" x2="18" y2="5" stroke="#FF1493" stroke-width="2.5" stroke-dasharray="3 3"/></svg>' +
+                            ' Newsvendor Order ' +
+                            '<span class="cm-legend-info" data-tip="Prophet&rsquo;s forecast scaled to the Newsvendor-optimal order quantity for your margin. Above the forecast = order extra (safety stock); below = order less (accept some stockout risk).">ⓘ</span>' +
+                        '</span>' +
                     '</div>' +
                     '<div class="cm-chart-btns">' +
                         '<div class="cm-view-tabs">' +
@@ -177,6 +359,14 @@ var ChartModal = (function () {
                             '</button>' +
                         '</div>' +
                         '<button id="cm-fo-btn" class="cm-toggle-btn">Forecast Only</button>' +
+                        '<button id="cm-nv-overlay-btn" class="cm-toggle-btn cm-nv-toggle" style="display:none" title="Overlay the Newsvendor-recommended order quantity on the chart">' +
+                            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                                '<circle cx="12" cy="12" r="10"/>' +
+                                '<circle cx="12" cy="12" r="6"/>' +
+                                '<circle cx="12" cy="12" r="2"/>' +
+                            '</svg>' +
+                            ' Newsvendor' +
+                        '</button>' +
                         '<button id="cm-zoom-btn" class="cm-ghost-btn">' +
                             '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>' +
                             ' Reset Zoom' +
@@ -184,8 +374,19 @@ var ChartModal = (function () {
                     '</div>' +
                 '</div>' +
                 '<div id="cm-year-sel" class="cm-year-selector"></div>' +
+                '<div id="cm-nv-banner" class="cm-nv-banner" style="display:none">' +
+                    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                        '<circle cx="12" cy="12" r="10"/>' +
+                        '<circle cx="12" cy="12" r="6"/>' +
+                        '<circle cx="12" cy="12" r="2"/>' +
+                    '</svg>' +
+                    '<span><strong>Newsvendor view active</strong> — green line/bars show Prophet&rsquo;s forecast scaled to your optimal order quantity.</span>' +
+                '</div>' +
                 '<canvas id="cm-canvas" style="max-height:280px"></canvas>' +
             '</div>' +
+
+            // Forecast reasoning — populated by _renderReasoning() from per-day components.
+            '<div id="cm-reasoning" class="cm-reasoning" style="display:none"></div>' +
 
             // Restock insight — initial form, then results after submission.
             '<div id="cm-restock-section">' +
@@ -206,6 +407,46 @@ var ChartModal = (function () {
                     '</div>' +
                 '</div>' +
             '</div>' +
+
+            // Forecast accuracy metrics — three standard error metrics computed
+            // by /forecast/product/evaluate. Populated by _loadAccuracyChip()
+            // (same fetch as the header chip). Hidden until data arrives.
+            '<div id="cm-metrics-panel" class="cm-metrics-panel" style="display:none">' +
+                '<div class="cm-metrics-header">' +
+                    '<p class="cm-metrics-eyebrow">Forecast Accuracy</p>' +
+                    '<h3 class="cm-metrics-title">How well does this model predict for this product?</h3>' +
+                    '<p class="cm-metrics-sub">Three standard error metrics, computed on a held-out window of the most recent sales. ' +
+                       'These tell different stories — read all three together rather than picking one.</p>' +
+                '</div>' +
+                '<div class="cm-metrics-grid">' +
+                    '<div class="cm-metric-card">' +
+                        '<p class="cm-metric-label">MAPE</p>' +
+                        '<p class="cm-metric-value" id="cm-metric-mape">—</p>' +
+                        '<p class="cm-metric-unit">average % error</p>' +
+                        '<p class="cm-metric-explain"><strong>Mean Absolute Percentage Error.</strong> The headline ' +
+                           'comparability number — easy to read across products. Becomes unreliable for low-volume ' +
+                           'items (zero-sale days inflate the average).</p>' +
+                    '</div>' +
+                    '<div class="cm-metric-card">' +
+                        '<p class="cm-metric-label">MAE</p>' +
+                        '<p class="cm-metric-value" id="cm-metric-mae">—</p>' +
+                        '<p class="cm-metric-unit">units/day off</p>' +
+                        '<p class="cm-metric-explain"><strong>Mean Absolute Error.</strong> Average units the forecast ' +
+                           'missed by, in the same scale as the data. The most direct &ldquo;how wrong is it&rdquo; ' +
+                           'measure — trust this when MAPE looks suspicious.</p>' +
+                    '</div>' +
+                    '<div class="cm-metric-card">' +
+                        '<p class="cm-metric-label">RMSE</p>' +
+                        '<p class="cm-metric-value" id="cm-metric-rmse">—</p>' +
+                        '<p class="cm-metric-unit">units/day off</p>' +
+                        '<p class="cm-metric-explain"><strong>Root Mean Square Error.</strong> Same units as MAE but ' +
+                           'penalizes large misses much more. When RMSE is noticeably bigger than MAE, the model ' +
+                           'has occasional big blow-ups, not just steady small misses.</p>' +
+                    '</div>' +
+                '</div>' +
+                '<p id="cm-metrics-footer" class="cm-metrics-footer"></p>' +
+            '</div>' +
+
             actionRow;
     }
 
@@ -222,6 +463,9 @@ var ChartModal = (function () {
         }
         document.getElementById('cm-fo-btn').addEventListener('click', _toggleForecastOnly);
         document.getElementById('cm-zoom-btn').addEventListener('click', function () { if (_chart) _chart.resetZoom(); });
+
+        var nvOverlayBtn = document.getElementById('cm-nv-overlay-btn');
+        if (nvOverlayBtn) nvOverlayBtn.addEventListener('click', _toggleNvOverlay);
 
         // View tabs (Daily / Weekly / Monthly / Yearly)
         document.querySelectorAll('.cm-view-tab').forEach(function (btn) {
@@ -312,6 +556,17 @@ var ChartModal = (function () {
         _renderStats(meta);
         _renderNv(meta);
 
+        // Reveal the Newsvendor chart overlay toggle and turn it on by default —
+        // the user just generated this number, surface it on the chart immediately.
+        _st.showOptimal = true;
+        var nvBtn = document.getElementById('cm-nv-overlay-btn');
+        if (nvBtn) {
+            nvBtn.style.display = '';
+            nvBtn.classList.add('cm-btn-on');
+        }
+        _applyNvBannerVisibility();
+        _renderView();
+
         // Enable save now that we have something to save.
         var saveBtn = document.getElementById('cm-save-btn');
         if (saveBtn) {
@@ -319,6 +574,26 @@ var ChartModal = (function () {
             saveBtn.style.opacity = '';
             saveBtn.style.cursor  = '';
         }
+    }
+
+    // ── Newsvendor overlay toggle ────────────────────────────────────────────
+    function _toggleNvOverlay() {
+        if (!_st.meta) return;             // shouldn't happen — button is hidden until restock generates
+        _st.showOptimal = !_st.showOptimal;
+        var btn = document.getElementById('cm-nv-overlay-btn');
+        if (btn) btn.classList.toggle('cm-btn-on', _st.showOptimal);
+        _applyNvBannerVisibility();
+        _renderView();
+    }
+
+    function _applyNvBannerVisibility() {
+        var banner = document.getElementById('cm-nv-banner');
+        var legend = document.getElementById('cm-nv-legend');
+        var wrap   = document.querySelector('.cm-chart-wrap');
+        var active = _st.showOptimal && _st.meta;
+        if (banner) banner.style.display = active ? '' : 'none';
+        if (legend) legend.style.display = active ? '' : 'none';
+        if (wrap)   wrap.classList.toggle('cm-chart-wrap-nv-active', !!active);
     }
 
     // ── render results into a container ──────────────────────────────────────
@@ -334,13 +609,26 @@ var ChartModal = (function () {
         _st.cfg          = cfg;
         _st.meta         = null;
 
+        // Index per-day Prophet components by normalized date so the tooltip and
+        // reasoning panel can look them up without rescanning the forecast array.
+        _st.fcComponents = {};
+        (cfg.forecast || []).forEach(function (r) {
+            if (r.components) _st.fcComponents[_nd(r.date)] = r.components;
+        });
+
+        // Newsvendor overlay starts hidden — only shown once restock is generated.
+        _st.showOptimal = false;
+
         container.innerHTML = _resultsHTML(cfg);
         _wire(cfg);
+        _hydrateRestockForm(cfg);
+        _loadAccuracyChip(cfg);
 
         var bandLegend = document.getElementById('cm-band-legend');
         if (bandLegend) bandLegend.style.display = cfg.hasBand ? '' : 'none';
 
         _renderView();
+        _renderReasoning(cfg.forecast);
 
         // Reports page passes meta directly (saved forecasts already have restock data).
         // Skip the form and show the results immediately.
@@ -388,6 +676,11 @@ var ChartModal = (function () {
         if (m) m.classList.add('hidden');
         document.body.style.overflow = '';
         _destroyCharts();
+        hideChartTooltip();
+        // Hide the accuracy chip so the next open doesn't briefly flash the
+        // previous product's number before the new fetch resolves.
+        var chip = document.getElementById('cm-accuracy-chip');
+        if (chip) { chip.style.display = 'none'; chip.textContent = ''; chip.className = 'cm-accuracy-chip'; }
     }
 
     // ── public: inline rendering (forecast results panel) ────────────────────
@@ -400,6 +693,7 @@ var ChartModal = (function () {
 
     function destroyIn() {
         _destroyCharts();
+        hideChartTooltip();
         if (_inlineContainer) { _inlineContainer.innerHTML = ''; _inlineContainer = null; }
     }
 
@@ -409,6 +703,7 @@ var ChartModal = (function () {
         if (!cfg) return;
 
         if (_chart) { _chart.destroy(); _chart = null; }
+        _st.fcBucketComponents = {};  // each view repopulates this for its own bucket scheme
 
         switch (_st.view) {
             case 'weekly':  _renderWeeklyView(cfg.historical, cfg.forecast); break;
@@ -424,12 +719,20 @@ var ChartModal = (function () {
         var zoomBtn    = document.getElementById('cm-zoom-btn');
         var bandLeg    = document.getElementById('cm-band-legend');
 
-        // Year pills only make sense for the aggregated views (weekly / monthly).
-        if (yearSel)   yearSel.style.display   = (_st.view === 'weekly' || _st.view === 'monthly') ? '' : 'none';
+        // Year pills make sense everywhere except the single-bar Yearly view.
+        if (yearSel)   yearSel.style.display   = _st.view === 'yearly' ? 'none' : '';
         if (eventsGrp) eventsGrp.style.display = _st.view === 'daily'  ? '' : 'none';
         if (foBtn)     foBtn.style.display     = _st.view === 'daily'  ? '' : 'none';
-        if (zoomBtn)   zoomBtn.style.display   = _st.view === 'daily'  ? '' : 'none';
         if (bandLeg)   bandLeg.style.display   = (_st.view === 'daily' && cfg.hasBand) ? '' : 'none';
+        // Reset Zoom is useful in every view now — bar charts support zoom too.
+        if (zoomBtn)   zoomBtn.style.display   = '';
+    }
+
+    // Custom HTML tooltip handler. The actual implementation lives in
+    // chart.shared.js (externalChartTooltip) so the Demand Analysis chart on
+    // the forecast page can reuse the exact same look.
+    function _externalTooltip(context) {
+        return externalChartTooltip(context, _st);
     }
 
     // ── normalize date to base year 2000 (year overlay) ──────────────────────
@@ -439,53 +742,60 @@ var ChartModal = (function () {
         return n === '2000-02-29' ? '2000-02-28' : n;
     }
 
-    // ── DAILY VIEW — single continuous timeline, historical → forecast ───────
-    // No year overlay here: the modal is showing a forecast, so the user needs
-    // to see the projected period sit naturally at the end of their history.
+    // ── DAILY VIEW — year-overlaid line chart, matches Demand Analysis ──────
+    // Each historical year is its own line on a shared Jan→Dec axis (year 2000
+    // base). Forecast dates are normalized the same way, so the projected
+    // line sits at the matching month-position of the year cycle.
     function _renderDailyView(historical, forecast, hasBand) {
-        var histData = historical.map(function (r) { return { x: r.date, y: r.actual }; });
-        var histDS = [{
-            label: 'Historical',
-            data: histData,
-            borderColor: '#1A6933',
-            backgroundColor: 'transparent',
-            borderWidth: 1.5,
-            pointRadius: 0, pointHoverRadius: 3,
-            fill: false, tension: 0.3,
-        }];
+        var byYear    = groupByYearNorm(historical);
+        var years     = Object.keys(byYear).sort();
+        var allActive = _st.activeYears.size === 0;
 
-        _st.fcStart = forecast.length ? forecast[0].date : null;
+        var histDS = years.map(function (yr, i) {
+            var c = YEAR_COLORS[i % YEAR_COLORS.length];
+            return {
+                label: yr, data: byYear[yr],
+                hidden: !(allActive || _st.activeYears.has(yr)),
+                borderColor: c, backgroundColor: 'transparent',
+                borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 3,
+                fill: false, tension: 0.3,
+            };
+        });
+
+        _st.fcStart = forecast.length ? _nd(forecast[0].date) : null;
         var fcDS = [];
         if (hasBand) {
-            fcDS.push({ label: '_upper', data: forecast.map(function (r) { return { x: r.date, y: r.upper }; }), borderColor: 'transparent', backgroundColor: 'rgba(255,87,34,0.13)', borderWidth: 0, pointRadius: 0, fill: '+1', tension: 0.3 });
-            fcDS.push({ label: '_lower', data: forecast.map(function (r) { return { x: r.date, y: r.lower }; }), borderColor: 'transparent', borderWidth: 0, pointRadius: 0, fill: false, tension: 0.3 });
+            fcDS.push({ label: '_upper', data: forecast.map(function (r) { return { x: _nd(r.date), y: r.upper }; }), borderColor: 'transparent', backgroundColor: 'rgba(255,87,34,0.13)', borderWidth: 0, pointRadius: 0, fill: '+1', tension: 0.3 });
+            fcDS.push({ label: '_lower', data: forecast.map(function (r) { return { x: _nd(r.date), y: r.lower }; }), borderColor: 'transparent', borderWidth: 0, pointRadius: 0, fill: false, tension: 0.3 });
         }
-        fcDS.push({ label: 'Projected Demand', data: forecast.map(function (r) { return { x: r.date, y: r.predicted }; }), borderColor: '#FF5722', borderWidth: 3, borderDash: [6, 3], backgroundColor: 'transparent', pointRadius: 0, pointHoverRadius: 4, fill: false, tension: 0.3 });
+        fcDS.push({ label: 'Projected Demand', data: forecast.map(function (r) { return { x: _nd(r.date), y: r.predicted }; }), borderColor: '#FF5722', borderWidth: 3, borderDash: [6, 3], backgroundColor: 'transparent', pointRadius: 0, pointHoverRadius: 4, fill: false, tension: 0.3 });
+
+        // Newsvendor overlay — Prophet's forecast scaled to the optimal order total.
+        if (_st.showOptimal && _st.meta && _st.meta.total_predicted > 0) {
+            var scale = _st.meta.optimal_total / _st.meta.total_predicted;
+            fcDS.push({
+                label: 'Newsvendor Order',
+                data: forecast.map(function (r) { return { x: _nd(r.date), y: r.predicted * scale }; }),
+                borderColor: '#FF1493', borderWidth: 3, borderDash: [3, 3],
+                backgroundColor: 'transparent',
+                pointRadius: 0, pointHoverRadius: 4,
+                fill: false, tension: 0.3,
+            });
+        }
 
         var datasets = histDS.concat(fcDS);
 
-        // Real-date bounds across all visible datasets
-        var minDate = null, maxDate = null;
+        var minN = '2000-12-31', maxN = '2000-01-01';
         datasets.forEach(function (ds) {
             if (ds.label === '_upper' || ds.label === '_lower') return;
             ds.data.forEach(function (p) {
-                if (!p.x) return;
-                if (!minDate || p.x < minDate) minDate = p.x;
-                if (!maxDate || p.x > maxDate) maxDate = p.x;
+                if (p.x && p.x < minN) minN = p.x;
+                if (p.x && p.x > maxN) maxN = p.x;
             });
         });
         var PAD  = 3 * 86400000;
-        var minT = minDate ? new Date(minDate).getTime() - PAD : 0;
-        var maxT = maxDate ? new Date(maxDate).getTime() + PAD : 0;
-
-        // Initial zoom: 12 months of context before the forecast (clamped to actual data).
-        var initMin = minDate;
-        if (_st.fcStart) {
-            var d = new Date(_st.fcStart + 'T00:00:00');
-            d.setMonth(d.getMonth() - 12);
-            var dStr = d.toISOString().slice(0, 10);
-            if (minDate && dStr > minDate) initMin = dStr;
-        }
+        var minT = new Date(minN).getTime() - PAD;
+        var maxT = new Date(maxN).getTime() + PAD;
 
         var ann = _st.fcStart ? { fcStart: buildForecastStartAnnotation(_st.fcStart) } : {};
 
@@ -503,35 +813,16 @@ var ChartModal = (function () {
                         limits: { x: { min: minT, max: maxT } },
                     },
                     tooltip: {
-                        backgroundColor: '#261F0E', titleColor: '#D2C8AE', bodyColor: '#F0E8D0', padding: 10,
-                        filter: function (item) { return item.dataset.label !== '_upper' && item.dataset.label !== '_lower'; },
-                        callbacks: {
-                            title: function (items) { return items.length ? new Date(items[0].parsed.x).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : ''; },
-                            label: function (ctx)   { return ctx.parsed.y == null ? null : ' ' + ctx.dataset.label + ': ' + Math.round(ctx.parsed.y) + ' units'; },
-                            afterBody: function (items) {
-                                if (!items.length) return null;
-                                var realDate = tsToDateStr(items[0].parsed.x);
-                                var seen = new Set(), evts = [];
-                                (CHART_EVENTS || []).forEach(function (ev) {
-                                    if (_st.disabledIds.has(ev.id)) return;
-                                    var end = ev.instance_end || ev.instance_start;
-                                    if (realDate >= ev.instance_start && realDate <= end && !seen.has(ev.name)) {
-                                        seen.add(ev.name);
-                                        evts.push(ev);
-                                    }
-                                });
-                                if (!evts.length) return null;
-                                return [' ', '📅 ' + evts.map(function (e) { return e.name; }).join(', ')];
-                            },
-                        },
+                        enabled: false,
+                        external: _externalTooltip,
                     },
                     annotation: { annotations: ann },
                 },
                 scales: {
                     x: {
-                        type: 'time', min: initMin, max: maxT,
-                        time: { minUnit: 'day', tooltipFormat: 'MMM d, yyyy', displayFormats: { day: 'MMM d', week: 'MMM d', month: 'MMM yyyy', year: 'yyyy' } },
-                        ticks: { color: 'rgba(38,31,14,0.45)', font: { family: 'Lora', size: 11 }, maxTicksLimit: 8, maxRotation: 0 },
+                        type: 'time', min: minT, max: maxT,
+                        time: { minUnit: 'day', tooltipFormat: 'MMM d', displayFormats: { day: 'MMM d', week: 'MMM d', month: 'MMM', year: 'MMM' } },
+                        ticks: { color: 'rgba(38,31,14,0.45)', font: { family: 'Lora', size: 11 }, maxTicksLimit: 10, maxRotation: 0 },
                         grid: { color: 'rgba(38,31,14,0.06)' },
                     },
                     y: { beginAtZero: true, ticks: { color: 'rgba(38,31,14,0.45)', font: { family: 'Lora', size: 11 } }, grid: { color: 'rgba(38,31,14,0.06)' } },
@@ -539,9 +830,7 @@ var ChartModal = (function () {
             },
         });
 
-        // No year pills in daily view — it's one continuous timeline now.
-        var sel = document.getElementById('cm-year-sel');
-        if (sel) sel.innerHTML = '';
+        _buildYearPills(years);
         if (_st.eventsOn) _applyAnnotations();
     }
 
@@ -572,9 +861,15 @@ var ChartModal = (function () {
         var years     = Object.keys(byYear).sort();
         var allActive = _st.activeYears.size === 0;
 
+        // Use null for buckets the year never reported in — Chart.js won't draw a
+        // bar AND the tooltip will skip the line, so empty weeks for one year
+        // don't crowd the hover or leave visual ghosts.
         var histDS = years.map(function (yr, i) {
             var c = YEAR_COLORS[i % YEAR_COLORS.length];
-            var data = Array.from({ length: maxWeek }, function (_, w) { return byYear[yr][w + 1] || 0; });
+            var data = Array.from({ length: maxWeek }, function (_, w) {
+                var v = byYear[yr][w + 1];
+                return v !== undefined ? v : null;
+            });
             return { label: yr, data: data, hidden: !(allActive || _st.activeYears.has(yr)),
                 backgroundColor: hexToRgba(c, 0.75), borderColor: c, borderWidth: 1, borderRadius: 2,
                 categoryPercentage: 0.85, barPercentage: 0.92 };
@@ -584,24 +879,44 @@ var ChartModal = (function () {
         forecast.forEach(function (r) {
             var wk = weekOfYear(r.date);
             fcByWeek[wk] = (fcByWeek[wk] || 0) + r.predicted;
+            // Aggregate Prophet components for this bar (dataIndex = wk - 1).
+            _aggregateInto(_st.fcBucketComponents, wk - 1, r.components);
         });
-        var fcData = Array.from({ length: maxWeek }, function (_, w) { return fcByWeek[w + 1] || null; });
+        var fcData = Array.from({ length: maxWeek }, function (_, w) {
+            var v = fcByWeek[w + 1];
+            return v !== undefined ? v : null;
+        });
         var fcDS = { label: 'Forecast', data: fcData, backgroundColor: 'rgba(255,87,34,0.78)', borderColor: '#FF5722', borderWidth: 1, borderRadius: 2,
             categoryPercentage: 0.85, barPercentage: 0.92 };
 
-        _chart = _barChart(labels, histDS.concat([fcDS]), function (items) { return items.length ? 'Week ' + (items[0].dataIndex + 1) : ''; });
+        var allDS = histDS.concat([fcDS]);
+
+        if (_st.showOptimal && _st.meta && _st.meta.total_predicted > 0) {
+            var scale = _st.meta.optimal_total / _st.meta.total_predicted;
+            allDS.push({
+                label: 'Newsvendor Order',
+                data: fcData.map(function (v) { return v == null ? null : v * scale; }),
+                backgroundColor: 'rgba(255,20,147,0.85)', borderColor: '#FF1493',
+                borderWidth: 1, borderRadius: 2,
+                categoryPercentage: 0.85, barPercentage: 0.92,
+            });
+        }
+
+        _chart = _barChart(labels, allDS, function (items) { return items.length ? 'Week ' + (items[0].dataIndex + 1) : ''; });
         _buildYearPills(years);
     }
 
     // ── MONTHLY VIEW — bar chart, Jan–Dec grouped by year ─────────────────────
     function _renderMonthlyView(historical, forecast) {
         var MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        // Track which (year, month) pairs actually have data so months a year never
+        // reported in stay null (no bar drawn, no tooltip line).
         var byYear = {};
         historical.forEach(function (r) {
             var yr = r.date.slice(0, 4);
             var m  = parseInt(r.date.slice(5, 7), 10) - 1;
-            if (!byYear[yr]) byYear[yr] = new Array(12).fill(0);
-            byYear[yr][m] += r.actual;
+            if (!byYear[yr]) byYear[yr] = new Array(12).fill(null);
+            byYear[yr][m] = (byYear[yr][m] || 0) + r.actual;
         });
 
         var years     = Object.keys(byYear).sort();
@@ -614,18 +929,31 @@ var ChartModal = (function () {
                 categoryPercentage: 0.8, barPercentage: 0.9 };
         });
 
-        var fcByMonth = new Array(12).fill(0);
-        var fcHasMonth = new Array(12).fill(false);
+        var fcByMonth = new Array(12).fill(null);
         forecast.forEach(function (r) {
             var m = parseInt(r.date.slice(5, 7), 10) - 1;
-            fcByMonth[m]  += r.predicted;
-            fcHasMonth[m] = true;
+            fcByMonth[m] = (fcByMonth[m] || 0) + r.predicted;
+            // Aggregate Prophet components for this month (dataIndex = m).
+            _aggregateInto(_st.fcBucketComponents, m, r.components);
         });
-        var fcData = fcByMonth.map(function (v, i) { return fcHasMonth[i] ? v : null; });
+        var fcData = fcByMonth;
         var fcDS = { label: 'Forecast', data: fcData, backgroundColor: 'rgba(255,87,34,0.78)', borderColor: '#FF5722', borderWidth: 1, borderRadius: 4,
             categoryPercentage: 0.8, barPercentage: 0.9 };
 
-        _chart = _barChart(MONTH_LABELS, histDS.concat([fcDS]));
+        var allDS = histDS.concat([fcDS]);
+
+        if (_st.showOptimal && _st.meta && _st.meta.total_predicted > 0) {
+            var scale = _st.meta.optimal_total / _st.meta.total_predicted;
+            allDS.push({
+                label: 'Newsvendor Order',
+                data: fcData.map(function (v) { return v == null ? null : v * scale; }),
+                backgroundColor: 'rgba(255,20,147,0.85)', borderColor: '#FF1493',
+                borderWidth: 1, borderRadius: 4,
+                categoryPercentage: 0.8, barPercentage: 0.9,
+            });
+        }
+
+        _chart = _barChart(MONTH_LABELS, allDS);
         _buildYearPills(years);
     }
 
@@ -637,16 +965,24 @@ var ChartModal = (function () {
             totals[yr] = (totals[yr] || 0) + r.actual;
         });
 
-        var fcTotalsByYear = {};
+        var fcTotalsByYear  = {};
+        var fcComponentsRows = []; // keep ref so we can aggregate after we know dataIndex
         forecast.forEach(function (r) {
             var yr = r.date.slice(0, 4);
             fcTotalsByYear[yr] = (fcTotalsByYear[yr] || 0) + r.predicted;
+            fcComponentsRows.push(r);
         });
 
         // Merge label list (some forecast years may already exist in historical)
         var allYears = new Set(Object.keys(totals).concat(Object.keys(fcTotalsByYear)));
         var years    = Array.from(allYears).sort();
         var colors   = years.map(function (_, i) { return YEAR_COLORS[i % YEAR_COLORS.length]; });
+
+        // Aggregate Prophet components into each year's bucket (dataIndex = position in years[]).
+        fcComponentsRows.forEach(function (r) {
+            var idx = years.indexOf(r.date.slice(0, 4));
+            if (idx >= 0) _aggregateInto(_st.fcBucketComponents, idx, r.components);
+        });
 
         var histDS = {
             label: 'Historical',
@@ -663,7 +999,20 @@ var ChartModal = (function () {
             categoryPercentage: 0.7, barPercentage: 0.85,
         };
 
-        _chart = _barChart(years, [histDS, fcDS], function (items) { return items.length ? items[0].label : ''; });
+        var allDS = [histDS, fcDS];
+
+        if (_st.showOptimal && _st.meta && _st.meta.total_predicted > 0) {
+            var scale = _st.meta.optimal_total / _st.meta.total_predicted;
+            allDS.push({
+                label: 'Newsvendor Order',
+                data: years.map(function (y) { return fcTotalsByYear[y] ? fcTotalsByYear[y] * scale : null; }),
+                backgroundColor: 'rgba(255,20,147,0.85)', borderColor: '#FF1493',
+                borderWidth: 1, borderRadius: 6,
+                categoryPercentage: 0.7, barPercentage: 0.85,
+            });
+        }
+
+        _chart = _barChart(years, allDS, function (items) { return items.length ? items[0].label : ''; });
     }
 
     // ── shared bar-chart factory ──────────────────────────────────────────────
@@ -673,18 +1022,20 @@ var ChartModal = (function () {
             data: { labels: labels, datasets: datasets },
             options: {
                 responsive: true,
+                // Without this, Chart.js reserves a slot in every category for
+                // each dataset even when the value is null — leaving visible
+                // gaps where one year had no data but another did.
+                skipNull: true,
                 interaction: { mode: 'index', intersect: false },
                 plugins: {
                     legend: { display: false },
+                    zoom: {
+                        zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' },
+                        pan:  { enabled: true, mode: 'x' },
+                    },
                     tooltip: {
-                        backgroundColor: '#261F0E', titleColor: '#D2C8AE', bodyColor: '#F0E8D0', padding: 10,
-                        callbacks: {
-                            title: titleCb,
-                            label: function (ctx) {
-                                if (ctx.parsed.y == null) return null;
-                                return ' ' + ctx.dataset.label + ': ' + Math.round(ctx.parsed.y).toLocaleString() + ' units';
-                            },
-                        },
+                        enabled: false,
+                        external: _externalTooltip,
                     },
                 },
                 scales: {
@@ -767,9 +1118,9 @@ var ChartModal = (function () {
         if (!ch || !ch.scales || !ch.scales.x) return;
         if (_st.view !== 'daily') return;  // annotations only apply to the time-axis daily view
         var base = _st.fcStart ? { fcStart: buildForecastStartAnnotation(_st.fcStart) } : {};
-        // Daily view is a real timeline now — pass normalize=false so event dates aren't remapped to year 2000.
+        // Daily view uses the year-overlay axis (base year 2000) — match with normalize=true.
         ch.options.plugins.annotation.annotations = _st.eventsOn
-            ? Object.assign(base, buildChartAnnotations(tsToDateStr(ch.scales.x.min), tsToDateStr(ch.scales.x.max), false, _st.disabledIds))
+            ? Object.assign(base, buildChartAnnotations(tsToDateStr(ch.scales.x.min), tsToDateStr(ch.scales.x.max), true, _st.disabledIds))
             : base;
         ch.update('none');
     }
@@ -781,6 +1132,104 @@ var ChartModal = (function () {
         var chev = document.getElementById('cm-nv-chev');
         if (body) body.style.display      = _st.nvOpen ? '' : 'none';
         if (chev) chev.style.transform    = _st.nvOpen ? 'rotate(0deg)' : 'rotate(-90deg)';
+    }
+
+    // ── forecast reasoning panel ─────────────────────────────────────────────
+    // Aggregates Prophet's per-day components into a "Why this forecast?" card.
+    // Each prediction's yhat = trend + weekly + yearly + Σ event regressors —
+    // summing each piece over the window tells the user what's driving the total.
+    function _renderReasoning(forecast) {
+        var container = document.getElementById('cm-reasoning');
+        if (!container) return;
+        if (!forecast || !forecast.length || !forecast[0] || !forecast[0].components) {
+            container.style.display = 'none';
+            return;
+        }
+
+        var total       = 0;
+        var totalTrend  = 0, totalWeekly = 0, totalYearly = 0;
+        var eventTotals = {};   // id → { name, total, days }
+
+        forecast.forEach(function (r) {
+            total += r.predicted || 0;
+            if (!r.components) return;
+            totalTrend  += r.components.trend  || 0;
+            totalWeekly += r.components.weekly || 0;
+            totalYearly += r.components.yearly || 0;
+            (r.components.events || []).forEach(function (ev) {
+                if (!eventTotals[ev.id]) eventTotals[ev.id] = { name: ev.name, total: 0, days: 0 };
+                eventTotals[ev.id].total += ev.value;
+                eventTotals[ev.id].days  += 1;
+            });
+        });
+
+        var eventList   = Object.keys(eventTotals).map(function (k) { return eventTotals[k]; })
+                              .sort(function (a, b) { return Math.abs(b.total) - Math.abs(a.total); });
+        var totalEvents = eventList.reduce(function (s, e) { return s + e.total; }, 0);
+
+        function signed(n)   { var r = Math.round(n); return (r >= 0 ? '+' : '') + r.toLocaleString(); }
+        function unsigned(n) { return Math.round(n).toLocaleString(); }
+
+        var html = ''
+            + '<div class="cm-reasoning-header">'
+                + '<div class="cm-reasoning-icon">'
+                    + '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">'
+                        + '<circle cx="12" cy="12" r="10"/>'
+                        + '<path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>'
+                        + '<line x1="12" y1="17" x2="12.01" y2="17"/>'
+                    + '</svg>'
+                + '</div>'
+                + '<div class="cm-reasoning-header-text">'
+                    + '<p class="cm-reasoning-eyebrow">Why this forecast?</p>'
+                    + '<h3 class="cm-reasoning-title">What Prophet considered</h3>'
+                    + '<p class="cm-reasoning-sub">Every prediction is the sum of these named pieces. Hover any forecast day on the chart to see its individual breakdown.</p>'
+                + '</div>'
+            + '</div>'
+            + '<div class="cm-reasoning-cards">'
+                + '<div class="cm-rsn-card" data-tone="brown">'
+                    + '<p class="cm-rsn-value">' + unsigned(totalTrend) + '</p>'
+                    + '<p class="cm-rsn-label">Baseline trend</p>'
+                    + '<p class="cm-rsn-sub">long-term level</p>'
+                + '</div>'
+                + '<div class="cm-rsn-card" data-tone="blue">'
+                    + '<p class="cm-rsn-value">' + signed(totalWeekly) + '</p>'
+                    + '<p class="cm-rsn-label">Weekly effect</p>'
+                    + '<p class="cm-rsn-sub">day-of-week net</p>'
+                + '</div>'
+                + '<div class="cm-rsn-card" data-tone="green">'
+                    + '<p class="cm-rsn-value">' + signed(totalYearly) + '</p>'
+                    + '<p class="cm-rsn-label">Yearly seasonality</p>'
+                    + '<p class="cm-rsn-sub">month-of-year net</p>'
+                + '</div>'
+                + '<div class="cm-rsn-card" data-tone="orange">'
+                    + '<p class="cm-rsn-value">' + signed(totalEvents) + '</p>'
+                    + '<p class="cm-rsn-label">Your events</p>'
+                    + '<p class="cm-rsn-sub">' + eventList.length + ' event' + (eventList.length === 1 ? '' : 's') + '</p>'
+                + '</div>'
+            + '</div>'
+            + '<p class="cm-reasoning-equation"><strong>' + unsigned(total) + ' units total</strong> &nbsp;=&nbsp; '
+                + unsigned(totalTrend) + ' baseline'
+                + ' &nbsp;' + signed(totalWeekly).replace(/^([+\-])/, '$1 ').replace(/  /g, ' ') + ' weekly'
+                + ' &nbsp;' + signed(totalYearly).replace(/^([+\-])/, '$1 ').replace(/  /g, ' ') + ' yearly'
+                + ' &nbsp;' + signed(totalEvents).replace(/^([+\-])/, '$1 ').replace(/  /g, ' ') + ' events</p>';
+
+        if (eventList.length) {
+            html += '<div class="cm-reasoning-events">';
+            html += '<p class="cm-reasoning-section-label">Event contributions across this window</p>';
+            html += '<ul class="cm-rsn-event-list">';
+            eventList.slice(0, 5).forEach(function (ev) {
+                html += '<li>'
+                    + '<span class="cm-rsn-event-name">' + ev.name + '</span>'
+                    + '<span class="cm-rsn-event-days">' + ev.days + ' day' + (ev.days === 1 ? '' : 's') + '</span>'
+                    + '<strong class="cm-rsn-event-val ' + (ev.total >= 0 ? 'is-pos' : 'is-neg') + '">' + signed(ev.total) + ' units</strong>'
+                    + '</li>';
+            });
+            html += '</ul>';
+            html += '</div>';
+        }
+
+        container.innerHTML   = html;
+        container.style.display = '';
     }
 
     // ── stat cards ────────────────────────────────────────────────────────────
@@ -808,13 +1257,36 @@ var ChartModal = (function () {
         }
         var low = m.total_std != null ? Math.max(0, Math.round(tot - 1.96 * m.total_std)) : null;
         var hi  = m.total_std != null ? Math.round(tot + 1.96 * m.total_std) : null;
+
+        // Disclosure block — explains the AR(1) correction status and the
+        // residual independence assumption. Two cases:
+        //   1. rho ≠ 0 → backtest detected day-to-day correlation; we widened σ.
+        //   2. rho = 0 → no backtest yet (or zero observed); σ assumes
+        //      independence and we say so plainly.
+        var rho        = m.rho_used;
+        var inflation  = m.std_inflation_factor;
+        var noteHtml;
+        if (rho != null && rho !== 0 && inflation != null && inflation !== 1) {
+            var pctWider = Math.round((inflation - 1) * 100);
+            noteHtml =
+                '<strong>Variance correction applied.</strong> Backtest residuals for this product show ' +
+                'lag-1 autocorrelation ρ = ' + rho.toFixed(2) + ', so σ was widened by ~' + pctWider +
+                '% to account for day-to-day demand clustering (events, weekends).';
+        } else {
+            noteHtml =
+                '<strong>Independence assumption.</strong> Total uncertainty here treats each day as ' +
+                'independent. Real demand often clusters around events and weekends, so this may ' +
+                'slightly underestimate risk for highly eventful products.';
+        }
+
         body.innerHTML =
               row('Price / Cost',     '₱' + p.toFixed(2) + ' selling &nbsp;·&nbsp; ₱' + c.toFixed(2) + ' cost &nbsp;·&nbsp; ₱' + mg.toFixed(2) + ' margin (' + cr + '%)')
             + row('Critical ratio',   '<strong>' + cr + '%</strong> — ' + strategy)
             + row('Under-stock cost', '₱' + mg.toFixed(2) + ' per unit — profit lost when you run out of stock')
             + row('Over-stock cost',  '₱' + c.toFixed(2)  + ' per unit — money tied up in unsold inventory')
             + (low != null ? row('Demand range (95%)', low + ' – ' + hi + ' units &nbsp;·&nbsp; avg ' + Math.round(tot) + ' units &nbsp;·&nbsp; σ = ' + Math.round(m.total_std) + ' units') : '')
-            + row('Optimal supply',   m.optimal_total + ' units total &nbsp;·&nbsp; ' + (m.current_stock || 0) + ' on hand + <strong>' + m.restock_qty + ' to order</strong>');
+            + row('Optimal supply',   m.optimal_total + ' units total &nbsp;·&nbsp; ' + (m.current_stock || 0) + ' on hand + <strong>' + m.restock_qty + ' to order</strong>')
+            + '<div class="cm-nv-note">' + noteHtml + '</div>';
     }
 
     function _destroyCharts() {

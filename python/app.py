@@ -331,26 +331,52 @@ def forecast_product():
     historical.columns = ['date', 'actual']
     historical['date'] = historical['date'].dt.strftime('%Y-%m-%d')
 
-    future_rows = forecast[forecast['ds'] > last_actual][['ds', 'yhat', 'yhat_lower', 'yhat_upper']].copy()
-    future_rows.columns = ['date', 'predicted', 'lower', 'upper']
-    future_rows['date']      = future_rows['date'].dt.strftime('%Y-%m-%d')
-    future_rows['predicted'] = future_rows['predicted'].clip(lower=0).round(2)
-    future_rows['lower']     = future_rows['lower'].clip(lower=0).round(2)
-    future_rows['upper']     = future_rows['upper'].round(2)
+    # Build the future-portion forecast records WITH the component breakdown that
+    # Prophet uses internally (yhat = trend + weekly + yearly + Σ regressors).
+    # Exposing those components is the basis for the "Why this forecast?" panel
+    # — each prediction can be explained as a sum of named drivers.
+    fc_future = forecast[forecast['ds'] > last_actual].copy()
+
+    future_records = []
+    for _, row in fc_future.iterrows():
+        # Per-event contributions for this day (only include non-trivial ones)
+        event_contribs = []
+        for ev in events:
+            col = event_col_map.get(ev['id'])
+            if col and col in row.index:
+                val = float(row[col])
+                if abs(val) > 0.01:
+                    event_contribs.append({
+                        'id':    ev['id'],
+                        'name':  ev['name'],
+                        'value': round(val, 2),
+                    })
+
+        record = {
+            'date':      row['ds'].strftime('%Y-%m-%d'),
+            'predicted': round(max(0, float(row['yhat'])),       2),
+            'lower':     round(max(0, float(row['yhat_lower'])), 2),
+            'upper':     round(float(row['yhat_upper']),         2),
+            'components': {
+                'trend':  round(float(row['trend']),  2),
+                'weekly': round(float(row['weekly']), 2) if 'weekly' in row.index else 0.0,
+                'yearly': round(float(row['yearly']), 2) if 'yearly' in row.index else 0.0,
+                'events': event_contribs,
+            },
+        }
+        future_records.append(record)
 
     # Trim to the requested window (from_date → to_date).
     # Prophet always forecasts from last_actual forward; we just hide rows outside the window.
     if from_date and to_date:
-        future_rows = future_rows[
-            (future_rows['date'] >= from_date) &
-            (future_rows['date'] <= to_date)
-        ]
-        if future_rows.empty:
+        future_records = [r for r in future_records
+                          if from_date <= r['date'] <= to_date]
+        if not future_records:
             return jsonify({'error': 'No forecast data falls within the selected date range.'}), 400
 
     result = {
         'historical': historical.to_dict(orient='records'),
-        'forecast':   future_rows.to_dict(orient='records'),
+        'forecast':   future_records,
     }
     if event_coefficients:
         result['event_coefficients'] = event_coefficients
@@ -359,8 +385,10 @@ def forecast_product():
 
 
 # ── Newsvendor optimization ────────────────────────────────────────────────────
-# Input  (JSON): { forecast: [{date, predicted, lower, upper}], cost_price, selling_price, current_stock }
-# Output (JSON): { total_predicted, restock_qty, order_qty, est_profit }
+# Input  (JSON): { forecast: [{date, predicted, lower, upper}], cost_price, selling_price,
+#                  current_stock, residual_rho (optional, lag-1 autocorrelation from backtest) }
+# Output (JSON): { total_predicted, total_std, restock_qty, optimal_total, est_profit,
+#                  rho_used, std_inflation_factor }
 @app.route('/optimize', methods=['POST'])
 def optimize():
     body          = request.get_json()
@@ -368,6 +396,15 @@ def optimize():
     cost_price    = float(body.get('cost_price', 0))
     selling_price = float(body.get('selling_price', 0))
     current_stock = int(body.get('current_stock', 0))
+
+    # Lag-1 residual autocorrelation from the holdout backtest (0 if none).
+    # Used to widen σ when real demand is positively autocorrelated — see below.
+    try:
+        residual_rho = float(body.get('residual_rho') or 0)
+    except (TypeError, ValueError):
+        residual_rho = 0.0
+    # Clamp into the strictly-stationary AR(1) range to keep the inflation formula stable.
+    residual_rho = max(-0.95, min(0.95, residual_rho))
 
     if selling_price <= cost_price:
         return jsonify({'error': 'Selling price must be greater than cost price.'}), 400
@@ -380,9 +417,23 @@ def optimize():
 
     # Estimate total std dev from Prophet confidence intervals.
     # Each day's CI is ~95%, so σ_day ≈ (upper - lower) / (2 * 1.96).
-    # Assuming daily demand is independent: total variance = sum of daily variances.
+    # Independent-day baseline: total variance = sum of daily variances.
     daily_var_sum = sum(((r['upper'] - r['lower']) / (2 * 1.96)) ** 2 for r in forecast_data)
     total_std     = math.sqrt(daily_var_sum) if daily_var_sum > 0 else total_predicted * 0.2
+
+    # AR(1) variance correction. Real daily demand is rarely independent —
+    # payday/event clusters span multiple days, weather effects persist.
+    # Under AR(1) with autocorrelation ρ and equal daily variance σ²:
+    #   Var(S) = σ² · [n + 2 · Σ_{k=1}^{n-1} (n-k) ρ^k]
+    # We approximate the variable-variance case by applying the same inflation
+    # factor to total_std. ρ comes from the per-product backtest residuals; if
+    # the product has no backtest yet, ρ=0 and the factor is 1.
+    n = len(forecast_data)
+    inflation_factor = 1.0
+    if n > 1 and residual_rho != 0:
+        correlation_sum  = sum((n - k) * (residual_rho ** k) for k in range(1, n))
+        inflation_factor = math.sqrt(max(0.0, 1.0 + 2.0 * correlation_sum / n))
+        total_std       *= inflation_factor
 
     # Newsvendor critical ratio: CR = (p - c) / p
     # Underage cost Cu = p - c  (lost profit per unit short)
@@ -394,17 +445,166 @@ def optimize():
     optimal_total = max(0, round(total_predicted + z_star * total_std))
     order_qty     = max(0, optimal_total - current_stock)
 
-    # Estimated profit: revenue from expected sales minus cost of new stock ordered
-    total_supply   = current_stock + order_qty
-    expected_sales = min(total_supply, total_predicted)
-    est_profit     = round(selling_price * expected_sales - cost_price * order_qty, 2)
+    # Expected sales under demand D ~ N(μ, σ²) with supply level S:
+    #   E[min(S, D)] = μ - σ · (φ(z) - z · (1 - Φ(z)))   where  z = (S - μ) / σ
+    # This is the true newsvendor objective. The previous `min(supply, mean)`
+    # treats demand as deterministic — fine if σ=0, optimistic otherwise.
+    total_supply = current_stock + order_qty
+    if total_std > 0:
+        z              = (total_supply - total_predicted) / total_std
+        expected_sales = total_predicted - total_std * (norm.pdf(z) - z * (1 - norm.cdf(z)))
+        expected_sales = max(0.0, expected_sales)
+    else:
+        expected_sales = min(total_supply, total_predicted)
+    est_profit = round(selling_price * expected_sales - cost_price * order_qty, 2)
 
     return jsonify({
-        'total_predicted': round(total_predicted, 2),
-        'total_std':       round(total_std, 2),
-        'restock_qty':     order_qty,
-        'optimal_total':   optimal_total,
-        'est_profit':      est_profit,
+        'total_predicted':       round(total_predicted, 2),
+        'total_std':             round(total_std, 2),
+        'restock_qty':           order_qty,
+        'optimal_total':         optimal_total,
+        'est_profit':            est_profit,
+        'rho_used':              round(residual_rho, 4),
+        'std_inflation_factor':  round(inflation_factor, 4),
+    })
+
+
+# ── Per-product forecast accuracy backtest ────────────────────────────────────
+# Walks forward: trains Prophet on all-but-the-last-N days of this product's
+# sales, predicts the held-out window, and compares to actuals. Returns the
+# three standard error metrics — MAPE, MAE, RMSE — plus a headline accuracy %
+# and the lag-1 residual autocorrelation that feeds the Newsvendor AR(1)
+# variance correction.
+#
+# Input  (JSON): { user_id, product_id, horizon_days (optional, default auto) }
+# Output (JSON): { accuracy_pct, mape, mae, rmse, horizon_days, n_test_days, residual_rho }
+@app.route('/forecast/product/evaluate', methods=['POST'])
+def evaluate_product_forecast():
+    body       = request.get_json()
+    user_id    = body.get('user_id')
+    product_id = body.get('product_id')
+
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT s.sale_date AS ds, s.quantity_sold AS y
+                FROM sales s
+                JOIN products p ON p.id = s.product_id
+                WHERE s.product_id = %s AND p.user_id = %s
+                ORDER BY s.sale_date
+            """, (product_id, user_id))
+            rows = cur.fetchall()
+
+            cur.execute("""
+                SELECT id, name, event_start, event_end, recurrence, is_last_day
+                FROM seasonal_events
+                WHERE (user_id IS NULL OR user_id = %s)
+                  AND id NOT IN (
+                      SELECT event_id FROM user_hidden_events WHERE user_id = %s
+                  )
+            """, (user_id, user_id))
+            events = cur.fetchall()
+    finally:
+        conn.close()
+
+    # Need enough history for a meaningful split: ≥45 train + ≥7 test.
+    if len(rows) < 52:
+        return jsonify({
+            'error': 'Need at least 52 days of sales history for accuracy testing.',
+            'available_days': len(rows),
+        }), 400
+
+    df       = pd.DataFrame(rows)
+    df['ds'] = pd.to_datetime(df['ds'])
+    df['y']  = df['y'].astype(float)
+
+    # Holdout horizon: caller may override; otherwise pick min(30, 25% of history)
+    # with a 7-day floor. Keeps the training set large enough on short histories.
+    try:
+        requested_horizon = int(body.get('horizon_days') or 0)
+    except (TypeError, ValueError):
+        requested_horizon = 0
+    if requested_horizon > 0:
+        horizon = max(7, min(requested_horizon, len(df) - 45))
+    else:
+        horizon = max(7, min(30, len(df) // 4))
+
+    train = df.iloc[:-horizon].copy()
+    test  = df.iloc[-horizon:].copy()
+
+    if len(train) < 45 or len(test) < 7:
+        return jsonify({'error': 'Insufficient data for a usable train/test split.'}), 400
+
+    # Mirror the production model: same event regressors so the evaluation
+    # number reflects what the user actually sees in /forecast/product.
+    model = Prophet(
+        yearly_seasonality = True,
+        weekly_seasonality = True,
+        daily_seasonality  = False,
+    )
+
+    event_col_map  = {}
+    train_date_idx = pd.DatetimeIndex(train['ds'])
+    for ev in events:
+        col = f'ev_{ev["id"]}'
+        train[col] = get_event_active_series(ev, train_date_idx).values
+        model.add_regressor(col, mode='additive')
+        event_col_map[ev['id']] = col
+
+    try:
+        model.fit(train)
+    except Exception as exc:
+        return jsonify({'error': f'Model fit failed: {exc}'}), 500
+
+    # Predict for the held-out test dates.
+    future          = pd.DataFrame({'ds': test['ds'].values})
+    future_date_idx = pd.DatetimeIndex(future['ds'])
+    for ev in events:
+        col = event_col_map[ev['id']]
+        future[col] = get_event_active_series(ev, future_date_idx).values
+
+    forecast = model.predict(future)
+    predicted = forecast['yhat'].clip(lower=0).values
+    actual    = test['y'].values
+
+    # The three standard error metrics. Each tells a different story:
+    #   MAPE — average % error. Friendly headline number, but distorts on
+    #          low-actual days, so we floor the denominator at 1.
+    #   MAE  — average absolute units off. Same scale as the data.
+    #   RMSE — same units as MAE but penalizes big misses much more (squares
+    #          each error). When RMSE >> MAE the forecast has occasional
+    #          large blow-outs even if it's generally close.
+    errors          = actual - predicted
+    denom           = pd.Series(actual).clip(lower=1).values
+    abs_pct_errors  = abs(errors) / denom
+    mape            = float(abs_pct_errors.mean() * 100)
+    mae             = float(abs(errors).mean())
+    rmse            = float(math.sqrt((errors ** 2).mean()))
+
+    # Accuracy = 100 - MAPE, floored at 0. Reported as a single friendly number.
+    accuracy_pct = max(0.0, 100.0 - mape)
+
+    # Lag-1 autocorrelation of residuals — feeds /optimize's AR(1) σ correction.
+    residuals = actual - predicted
+    if len(residuals) > 2 and residuals.std() > 0:
+        # Pearson correlation between residuals[:-1] and residuals[1:]
+        r0, r1 = residuals[:-1], residuals[1:]
+        m0, m1 = r0.mean(), r1.mean()
+        num = ((r0 - m0) * (r1 - m1)).sum()
+        den = math.sqrt(((r0 - m0) ** 2).sum() * ((r1 - m1) ** 2).sum())
+        residual_rho = float(num / den) if den > 0 else 0.0
+    else:
+        residual_rho = 0.0
+
+    return jsonify({
+        'accuracy_pct':  round(accuracy_pct, 2),
+        'mape':          round(mape, 2),
+        'mae':           round(mae, 2),
+        'rmse':          round(rmse, 2),
+        'horizon_days':  horizon,
+        'n_test_days':   len(test),
+        'residual_rho':  round(residual_rho, 4),
     })
 
 
