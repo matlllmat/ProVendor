@@ -1,9 +1,12 @@
 <?php
 // api/preflight.php
-// Pre-import validation: scans the temp CSV with the confirmed column mapping and returns
-// (a) invalid rows (bad dates, zero qty, missing product) with up to 10 examples, and
-// (b) overlap count — how many existing records fall in the CSV's date range.
-// Does NOT write anything to the database.
+// Pre-import validation: scans the temp CSV with the confirmed column mapping and
+// returns a 3-bucket breakdown for the editor UI:
+//   - new      : valid rows that don't exist in the DB yet (green)
+//   - overlap  : valid rows whose (product, date) already exists with a different qty (yellow)
+//   - invalid  : rows that can't be accepted, with the reason (red)
+// Same-qty overlaps are silent no-ops — surfacing them as decisions would be noise.
+// Writes nothing to the DB.
 
 require_once __DIR__ . '/../config/bootstrap.php';
 require_once __DIR__ . '/import_helpers.php';
@@ -38,7 +41,6 @@ if (!$handle) {
 
 $headers = array_map('trim', fgetcsv($handle));
 
-// Verify the mapped columns exist
 foreach ([$colDate, $colProduct, $colQty] as $col) {
     if (!in_array($col, $headers)) {
         fclose($handle);
@@ -47,12 +49,9 @@ foreach ([$colDate, $colProduct, $colQty] as $col) {
     }
 }
 
-// First pass: collect ~50 sample date values so we can sniff the format BEFORE
-// rejecting anything. Without this, if detect.php and preflight see different
-// date columns, we'd reject every row as "Unrecognized date format" because
-// strtotime would be guessing wrong.
-$dateColIdx = array_search($colDate, $headers, true);
-$dateSamples = [];
+// Sniff the date format BEFORE rejecting anything — see api/import_helpers.php.
+$dateColIdx   = array_search($colDate, $headers, true);
+$dateSamples  = [];
 $bufferedRows = [];
 while (($row = fgetcsv($handle)) !== false) {
     $bufferedRows[] = $row;
@@ -60,41 +59,33 @@ while (($row = fgetcsv($handle)) !== false) {
         $v = trim((string) ($row[$dateColIdx] ?? ''));
         if ($v !== '' && count($dateSamples) < 50) $dateSamples[] = $v;
     }
-    if (count($bufferedRows) >= 50 && count($dateSamples) >= 50) {
-        // Continue reading the rest below without re-sampling
-        break;
-    }
+    if (count($bufferedRows) >= 50 && count($dateSamples) >= 50) break;
 }
-
-$dateFormat = sniffDateFormat($dateSamples);
-$_SESSION['temp_csv_date_format'] = $dateFormat; // cache for import.php
-
-$valid        = 0;
-$invalid      = 0;
-$errorSamples = [];
-$minDate      = null;
-$maxDate      = null;
-$rowNum       = 1; // 1 = header row
-
-// Drain the rest of the file into the buffer so we process every row once below
 while (($row = fgetcsv($handle)) !== false) {
     $bufferedRows[] = $row;
 }
 fclose($handle);
 
+$dateFormat = sniffDateFormat($dateSamples);
+$_SESSION['temp_csv_date_format'] = $dateFormat;
+
+// ── First pass: parse rows + classify by validity ─────────────────────────────
+// We collect valid rows by their (product_name, date) key so we can later
+// aggregate same-key CSV rows into a single record before comparing with the DB.
+$invalid        = []; // [['row', 'product', 'date', 'qty', 'reason'], ...]
+$validByPair    = []; // pairKey => ['product_name', 'date', 'qty', 'first_row']
+$rowNum         = 1;
+
 foreach ($bufferedRows as $row) {
     $rowNum++;
     if (count($row) !== count($headers)) {
-        $invalid++;
-        if (count($errorSamples) < 10) {
-            $errorSamples[] = [
-                'row'    => $rowNum,
-                'product'=> '',
-                'date'   => '',
-                'qty'    => '',
-                'reason' => 'Row has wrong number of columns',
-            ];
-        }
+        $invalid[] = [
+            'row'     => $rowNum,
+            'product' => '',
+            'date'    => '',
+            'qty'     => '',
+            'reason'  => 'Row has wrong number of columns',
+        ];
         continue;
     }
 
@@ -104,52 +95,113 @@ foreach ($bufferedRows as $row) {
     $qtyRaw      = trim($r[$colQty]     ?? '');
 
     $reason = null;
-    if ($productName === '') {
-        $reason = 'Missing product name';
-    } elseif ($dateRaw === '') {
-        $reason = 'Missing date';
-    } elseif (normalizeDateStrict($dateRaw, $dateFormat['format']) === null) {
+    if ($productName === '')      $reason = 'Missing product name';
+    elseif ($dateRaw === '')      $reason = 'Missing date';
+    elseif ($qtyRaw === '')       $reason = 'Missing quantity';
+
+    $date = $reason ? null : normalizeDateStrict($dateRaw, $dateFormat['format']);
+    if (!$reason && $date === null) {
         $reason = 'Unrecognized date format: "' . mb_substr($dateRaw, 0, 30) . '"';
-    } elseif (!is_numeric($qtyRaw) || (float) $qtyRaw <= 0 || (float) $qtyRaw != (int) $qtyRaw) {
+    }
+    if (!$reason && (!is_numeric($qtyRaw) || (float) $qtyRaw <= 0 || (float) $qtyRaw != (int) $qtyRaw)) {
         $reason = 'Quantity must be a whole number greater than 0 (got "' . mb_substr($qtyRaw, 0, 20) . '")';
     }
 
     if ($reason) {
-        $invalid++;
-        if (count($errorSamples) < 10) {
-            $errorSamples[] = [
-                'row'    => $rowNum,
-                'product'=> $productName ?: '(empty)',
-                'date'   => $dateRaw    ?: '(empty)',
-                'qty'    => $qtyRaw     ?: '(empty)',
-                'reason' => $reason,
-            ];
-        }
+        $invalid[] = [
+            'row'     => $rowNum,
+            'product' => $productName ?: '(empty)',
+            'date'    => $dateRaw    ?: '(empty)',
+            'qty'     => $qtyRaw     ?: '(empty)',
+            'reason'  => $reason,
+        ];
         continue;
     }
 
-    $date = normalizeDateStrict($dateRaw, $dateFormat['format']);
-    $valid++;
-    if ($minDate === null || $date < $minDate) $minDate = $date;
-    if ($maxDate === null || $date > $maxDate) $maxDate = $date;
+    $qty     = (int) $qtyRaw;
+    $pairKey = $productName . '|' . $date;
+
+    // Aggregate same-key CSV rows so the preview reflects what would actually
+    // be inserted (one row per product/day).
+    if (isset($validByPair[$pairKey])) {
+        $validByPair[$pairKey]['qty'] += $qty;
+    } else {
+        $validByPair[$pairKey] = [
+            'product_name' => $productName,
+            'date'         => $date,
+            'qty'          => $qty,
+            'first_row'    => $rowNum,
+        ];
+    }
 }
 
-// ── Overlap check ─────────────────────────────────────────────────────────────
-$overlapCount = 0;
-if ($minDate && $maxDate) {
-    require_once __DIR__ . '/../config/db.php';
-    require_once __DIR__ . '/../queries/import.query.php';
-    $overlapCount = countExistingSalesInRange($pdo, $_SESSION['user_id'], $minDate, $maxDate);
+// ── Second pass: classify each valid pair as new / overlap-changed / no-op ────
+require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../queries/import.query.php';
+
+// Existing sales for this user, keyed by "<product_name>|<sale_date>" so we can
+// compare against the CSV's product names without needing a pre-existing
+// product_id lookup (new products simply don't match).
+$existing = getExistingSalesByName($pdo, $_SESSION['user_id']);
+
+$newRows      = [];
+$overlapRows  = [];
+$noopCount    = 0;
+$minDate      = null;
+$maxDate      = null;
+
+foreach ($validByPair as $pairKey => $v) {
+    if ($minDate === null || $v['date'] < $minDate) $minDate = $v['date'];
+    if ($maxDate === null || $v['date'] > $maxDate) $maxDate = $v['date'];
+
+    $existingKey = $v['product_name'] . '|' . $v['date'];
+    if (!isset($existing[$existingKey])) {
+        $newRows[] = [
+            'row'     => $v['first_row'],
+            'product' => $v['product_name'],
+            'date'    => $v['date'],
+            'qty'     => $v['qty'],
+        ];
+        continue;
+    }
+
+    $existingQty = (int) $existing[$existingKey];
+    if ($existingQty === $v['qty']) {
+        $noopCount++;
+        continue;
+    }
+
+    $overlapRows[] = [
+        'row'          => $v['first_row'],
+        'product'      => $v['product_name'],
+        'date'         => $v['date'],
+        'qty_new'      => $v['qty'],
+        'qty_existing' => $existingQty,
+    ];
 }
+
+// Cap sample rows at 50 each so the UI table stays scannable.
+$sampleCap = 50;
 
 echo json_encode([
-    'valid'         => $valid,
-    'invalid'       => $invalid,
-    'error_samples' => $errorSamples,
-    'date_format'   => $dateFormat,
-    'overlap'       => [
-        'count'     => $overlapCount,
-        'date_from' => $minDate,
-        'date_to'   => $maxDate,
+    'date_format' => $dateFormat,
+    'csv_rows'    => count($bufferedRows),
+    'date_range'  => ['from' => $minDate, 'to' => $maxDate],
+    'buckets' => [
+        'new' => [
+            'count'   => count($newRows),
+            'samples' => array_slice($newRows, 0, $sampleCap),
+        ],
+        'overlap' => [
+            'count'   => count($overlapRows),
+            'samples' => array_slice($overlapRows, 0, $sampleCap),
+        ],
+        'invalid' => [
+            'count'   => count($invalid),
+            'samples' => array_slice($invalid, 0, $sampleCap),
+        ],
+        'noop' => [
+            'count' => $noopCount,
+        ],
     ],
 ]);

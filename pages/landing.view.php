@@ -621,20 +621,23 @@ async function submitImport() {
             return;
         }
 
-        var hasIssues = data.invalid > 0 || data.overlap.count > 0;
-        if (!hasIssues) {
-            preflightDone = true;
-            btn.innerHTML = IMPORT_BTN_HTML;
-            btn.disabled  = false;
-            await doImport(mapping, false);
-            return;
-        }
+        // Always show the preview so the user sees totals + breakdown before
+        // anything commits — no auto-commit branch, even for a "clean" upload.
+        renderPreviewCard(data);
+        preflightDone = true;
 
-        renderPreflightPanel(data);
-        preflightDone     = true;
-        btn.innerHTML     = 'Proceed with import <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
-        btn.disabled      = false;
-        btn.style.opacity = '1';
+        var b          = data.buckets;
+        var hasAnything = b.new.count > 0 || b.overlap.count > 0;
+
+        if (!hasAnything) {
+            btn.innerHTML     = 'No changes to apply';
+            btn.disabled      = true;
+            btn.style.opacity = '0.55';
+        } else {
+            btn.innerHTML     = 'Apply changes <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+            btn.disabled      = false;
+            btn.style.opacity = '1';
+        }
     } catch(e) {
         showMappingError('Network error during check. Please try again.');
         btn.innerHTML = IMPORT_BTN_HTML;
@@ -642,43 +645,102 @@ async function submitImport() {
     }
 }
 
-function renderPreflightPanel(data) {
-    var html = '<div class="preflight-panel">';
-    html += '<div class="preflight-panel-title">Review before importing</div>';
+// 3-color preview card: green new / orange overlap / red invalid.
+// Header shows the totals at a glance; buckets below have expandable sample tables.
+function renderPreviewCard(data) {
+    var b = data.buckets;
+    var html = '<div class="preview-card">';
+    html += '<div class="preview-card-title">Preview of changes</div>';
 
-    if (data.invalid > 0) {
-        html += '<div class="preflight-section">';
-        html += '<div class="preflight-section-head preflight-warn">';
-        html += '<svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
-        html += '<span><strong>' + data.invalid.toLocaleString() + ' row' + (data.invalid !== 1 ? 's' : '') + '</strong> will be skipped due to data issues.</span>';
-        html += '</div>';
-        if (data.error_samples && data.error_samples.length) {
-            html += '<details class="preflight-samples">';
-            html += '<summary class="preflight-samples-toggle">View examples (' + Math.min(data.error_samples.length, 10) + ' shown)</summary>';
-            html += '<div class="preflight-samples-table-wrap"><table class="preflight-samples-table">';
-            html += '<thead><tr><th>Row</th><th>Product</th><th>Date</th><th>Qty</th><th>Issue</th></tr></thead><tbody>';
-            data.error_samples.forEach(function(e) {
-                html += '<tr><td>' + e.row + '</td><td>' + escHtml(e.product) + '</td><td>' + escHtml(e.date) + '</td><td>' + escHtml(e.qty) + '</td><td>' + escHtml(e.reason) + '</td></tr>';
-            });
-            html += '</tbody></table></div></details>';
-        }
-        html += '</div>';
+    html += renderSummary(data);
+
+    html += renderBucket('new', 'Will be added',
+        b.new.count, b.new.samples,
+        ['Row', 'Product', 'Date', 'Qty'],
+        function(r) { return [r.row, r.product, r.date, r.qty]; });
+
+    html += renderBucket('overlap', 'Will conflict with existing data',
+        b.overlap.count, b.overlap.samples,
+        ['Row', 'Product', 'Date', 'Existing', 'New'],
+        function(r) { return [r.row, r.product, r.date, r.qty_existing, r.qty_new]; });
+
+    if (b.overlap.count > 0) {
+        html += '<label class="preview-replace-label">';
+        html += '<input type="checkbox" id="replace-overlap" class="preview-replace-check">';
+        html += '<span>Replace the existing values with the new ones</span>';
+        html += '</label>';
+        html += '<p class="preview-replace-help">Leave unchecked to keep the existing values and skip these rows.</p>';
     }
 
-    if (data.overlap && data.overlap.count > 0) {
-        var df = data.overlap.date_from, dt = data.overlap.date_to;
-        var rangeLabel = df === dt ? df : df + ' to ' + dt;
-        html += '<div class="preflight-section">';
-        html += '<div class="preflight-section-head preflight-overlap">';
-        html += '<svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
-        html += '<span><strong>' + data.overlap.count.toLocaleString() + ' existing record' + (data.overlap.count !== 1 ? 's' : '') + '</strong> fall within this file\'s date range (' + escHtml(rangeLabel) + ').</span>';
-        html += '</div>';
-        html += '<label class="preflight-replace-label"><input type="checkbox" id="replace-overlap" class="preflight-replace-check"><span>Replace overlapping records with values from this file</span></label>';
-        html += '</div>';
+    html += renderBucket('invalid', 'Can\'t be accepted',
+        b.invalid.count, b.invalid.samples,
+        ['Row', 'Product', 'Date', 'Qty', 'Reason'],
+        function(r) { return [r.row, r.product, r.date, r.qty, r.reason]; });
+
+    if (b.noop && b.noop.count > 0) {
+        html += '<p class="preview-noop">';
+        html += b.noop.count.toLocaleString() + ' row' + (b.noop.count !== 1 ? 's' : '') + ' already match what\'s in the database — no change needed.';
+        html += '</p>';
     }
 
     html += '</div>';
     document.getElementById('preflight-container').innerHTML = html;
+}
+
+function renderBucket(kind, title, count, samples, columns, rowFn) {
+    var icon = bucketIcon(kind);
+    var html = '<div class="preview-bucket preview-bucket-' + kind + '">';
+    html += '<div class="preview-bucket-head">';
+    html += icon;
+    html += '<span><strong>' + count.toLocaleString() + '</strong> ' + title + '</span>';
+    html += '</div>';
+
+    if (count > 0 && samples && samples.length) {
+        var shown = Math.min(samples.length, count);
+        html += '<details class="preview-bucket-samples">';
+        html += '<summary>View examples (' + shown + ' of ' + count.toLocaleString() + ')</summary>';
+        html += '<div class="preview-samples-wrap"><table class="preview-samples-table">';
+        html += '<thead><tr>';
+        columns.forEach(function(c) { html += '<th>' + c + '</th>'; });
+        html += '</tr></thead><tbody>';
+        samples.forEach(function(r) {
+            html += '<tr>';
+            rowFn(r).forEach(function(v) { html += '<td>' + escHtml(String(v)) + '</td>'; });
+            html += '</tr>';
+        });
+        html += '</tbody></table></div></details>';
+    }
+
+    html += '</div>';
+    return html;
+}
+
+function renderSummary(data) {
+    var b   = data.buckets;
+    var tot = (data.csv_rows || 0).toLocaleString();
+    var rows = [
+        { cls: 'preview-summary-total', label: 'Total rows in file', value: tot },
+        { cls: 'preview-summary-new',   label: 'Will be added',      value: b.new.count.toLocaleString() },
+    ];
+    if (b.overlap.count > 0) rows.push({ cls: 'preview-summary-overlap', label: 'Conflicts with existing data', value: b.overlap.count.toLocaleString() });
+    if (b.invalid.count > 0) rows.push({ cls: 'preview-summary-invalid', label: 'Can’t be accepted',       value: b.invalid.count.toLocaleString() });
+    if (b.noop && b.noop.count > 0) rows.push({ cls: 'preview-summary-noop', label: 'Already match (no change)', value: b.noop.count.toLocaleString() });
+
+    var html = '<div class="preview-summary">';
+    rows.forEach(function(r) {
+        html += '<div class="preview-summary-row ' + r.cls + '">';
+        html += '<span class="preview-summary-label">' + r.label + '</span>';
+        html += '<span class="preview-summary-value">' + r.value + '</span>';
+        html += '</div>';
+    });
+    html += '</div>';
+    return html;
+}
+
+function bucketIcon(kind) {
+    if (kind === 'new')     return '<svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    if (kind === 'overlap') return '<svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+    return                        '<svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
 }
 
 async function doImport(mapping, replace) {

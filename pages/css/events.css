@@ -1,6 +1,75 @@
 /* pages/css/events.css
    Styles for the Events management page. */
 
+/* ── Page header ── */
+.events-subtitle {
+    font-size: 0.875rem;
+    color: #261F0E;
+    opacity: 0.5;
+    margin-top: 0.25rem;
+}
+
+/* PHP renders all event rows into this pool; JS moves them into the visible
+   list on render. Hidden via class instead of inline style. */
+.event-rows-pool {
+    display: none;
+}
+
+/* Form-label "(optional)" qualifier. */
+.form-label-optional {
+    opacity: 0.5;
+    font-weight: 400;
+}
+
+/* Add Event button can't shrink in the wrap-flow toolbar. */
+.events-add-btn {
+    flex-shrink: 0;
+}
+
+/* Suggestions-loading spinner — kept as a class so the @keyframes can live
+   here instead of being injected into <head> by JS. */
+.events-spinner {
+    flex-shrink: 0;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Fade-out transitions used when removing rows / cards from the DOM.
+   The JS adds the class, waits ~260ms, then removes the element. */
+.event-row-leaving,
+.suggestion-card-leaving,
+.hidden-event-row-leaving {
+    opacity: 0;
+    transition: opacity 0.25s;
+}
+
+/* Hidden-presets footer + panel spacing — previously inline styles. */
+.hidden-events-footer {
+    margin-top: 1.25rem;
+}
+.hidden-events-panel {
+    margin-top: 0.625rem;
+}
+.hidden-events-empty {
+    font-size: 0.78rem;
+    opacity: 0.45;
+    margin: 0.25rem 0;
+}
+.hidden-event-dot {
+    flex-shrink: 0;
+}
+
+/* Info modal is wider than the form modal and gets a roomier body. */
+.event-modal-wide {
+    max-width: 560px;
+}
+.event-modal-body-info {
+    gap: 1.25rem;
+}
+
 /* ── Events list ── */
 .events-list {
     background: #F0E8D0;
@@ -20,8 +89,11 @@
 
 .event-row {
     display: grid;
-    /* dot | name | schedule | confidence | next-occ | actions */
-    grid-template-columns: 0.5rem 1fr 210px 68px 90px 100px;
+    /* dot | name | schedule | confidence | next-occ | actions
+       Confidence widened from 68→95 so "Moderate" (the longest label) fits
+       the new chunky chip without near-overflow; next-occ widened from
+       90→110 so the matching chunky pill ("Next Dec 24") has the same room. */
+    grid-template-columns: 0.5rem 1fr 210px 95px 110px 100px;
     align-items: center;
     column-gap: 1rem;
     padding: 0.875rem 1.25rem;
@@ -45,15 +117,23 @@
     justify-self: center;
 }
 
-/* ── Confidence badges ── */
+/* ── Confidence badges ──
+   Chunky rounded-square chip. The colored background + border already carry
+   the semantic signal (green/amber/red), so we keep the label to one word
+   without an extra status dot — in the list view the dot just added noise
+   next to the adjacent "Next" pill. Kept in sync with event_detail.css. */
 .event-conf-badge {
-    font-size: 0.63rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
     font-weight: 700;
-    padding: 0.15rem 0.5rem;
-    border-radius: 999px;
-    flex-shrink: 0;
+    padding: 0.32rem 0.7rem;
+    border-radius: 0.45rem;
     border: 1px solid transparent;
     letter-spacing: 0.02em;
+    line-height: 1;
+    flex-shrink: 0;
 }
 .conf-strong   { background: rgba(26,105,51,0.1);  color: #1A6933; border-color: rgba(26,105,51,0.28); }
 .conf-moderate { background: rgba(180,83,9,0.09);  color: #B45309; border-color: rgba(180,83,9,0.25);  }
@@ -733,17 +813,25 @@
     border-bottom: 1px solid #D2C8AE;
 }
 
-/* ── Next-occurrence chip ── */
+/* ── Next-occurrence chip ──
+   Sits next to the confidence badge in each row. Uses neutral khaki tones
+   on purpose — green here would clash with the green of Strong-confidence
+   badges, and the chip carries no semantic meaning beyond "when's this next".
+   Matches the confidence badge's chunky proportions so the two chips read
+   as siblings, not competing labels. */
 .event-next-occ {
-    font-size: 0.68rem;
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.7rem;
     font-weight: 600;
-    padding: 0.15rem 0.5rem;
-    border-radius: 999px;
-    background: rgba(26,105,51,0.1);
-    color: #1A6933;
-    border: 1px solid rgba(26,105,51,0.25);
+    padding: 0.32rem 0.65rem;
+    border-radius: 0.45rem;
+    background: rgba(38,31,14,0.05);
+    color: #261F0E;
+    border: 1px solid rgba(38,31,14,0.14);
     flex-shrink: 0;
     white-space: nowrap;
+    opacity: 0.75;
 }
 
 /* ── Pagination ── */

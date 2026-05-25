@@ -68,7 +68,7 @@ function updateUserPassword(PDO $pdo, int $userId, string $newHash): void
         ->execute([$newHash, $userId]);
 }
 
-// Permanently deletes all imported data for a user: forecasts → sales → import sessions → products.
+// Permanently deletes all imported data for a user: forecasts → sales → versions → products.
 // The user account and store name are preserved.
 function clearUserData(PDO $pdo, int $userId): void
 {
@@ -79,14 +79,15 @@ function clearUserData(PDO $pdo, int $userId): void
          WHERE p.user_id = ?'
     )->execute([$userId]);
 
-    // Sales reference both products and import_sessions — delete next.
+    // Sales reference products — delete next so products can go.
     $pdo->prepare(
         'DELETE s FROM sales s
          JOIN products p ON p.id = s.product_id
          WHERE p.user_id = ?'
     )->execute([$userId]);
 
-    // Import sessions and products can now be deleted safely.
-    $pdo->prepare('DELETE FROM import_sessions WHERE user_id = ?')->execute([$userId]);
+    // Version snapshots also reference products (via sales_snapshots) — drop them
+    // before products so the snapshot FK doesn't block the delete.
+    $pdo->prepare('DELETE FROM dataset_versions WHERE user_id = ?')->execute([$userId]);
     $pdo->prepare('DELETE FROM products WHERE user_id = ?')->execute([$userId]);
 }

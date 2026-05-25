@@ -1,16 +1,7 @@
 <?php
 // queries/import.query.php
-// All SQL for saving import sessions, upserting products, and batch-inserting sales.
-
-function saveImportSession(PDO $pdo, int $userId, string $filename, array $mapping, string $granularity): int
-{
-    $stmt = $pdo->prepare(
-        'INSERT INTO import_sessions (user_id, filename, column_mapping, granularity)
-         VALUES (?, ?, ?, ?)'
-    );
-    $stmt->execute([$userId, $filename, json_encode($mapping), $granularity]);
-    return (int) $pdo->lastInsertId();
-}
+// All SQL for upserting products and batch-inserting/updating sales rows.
+// Version history (snapshots/restore) lives in queries/version.query.php.
 
 // Returns the product id.
 // Inserts if the product doesn't exist yet.
@@ -74,6 +65,25 @@ function getExistingSalesPairs(PDO $pdo, int $userId): array
     return $pairs;
 }
 
+// Returns map of "<product_name>|<sale_date>" → quantity_sold for the user's
+// current sales. Keyed by name (not product_id) so the preflight UI can compare
+// against new products that don't exist in the DB yet.
+function getExistingSalesByName(PDO $pdo, int $userId): array
+{
+    $stmt = $pdo->prepare(
+        'SELECT p.name, s.sale_date, s.quantity_sold
+         FROM sales s
+         JOIN products p ON p.id = s.product_id
+         WHERE p.user_id = ?'
+    );
+    $stmt->execute([$userId]);
+    $out = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $out[$row['name'] . '|' . $row['sale_date']] = (int) $row['quantity_sold'];
+    }
+    return $out;
+}
+
 // Counts existing sales records within a date range for overlap detection.
 function countExistingSalesInRange(PDO $pdo, int $userId, string $dateFrom, string $dateTo): int
 {
@@ -121,82 +131,54 @@ function updateSaleQty(PDO $pdo, int $saleId, int $userId, int $qty): bool
     return true;
 }
 
-// Bulk-updates quantity_sold + import_session_id for many sales rows in one query
-// per chunk, using a CASE WHEN id construct instead of N individual UPDATEs.
-// $rows is the same shape produced by api/import.php replace-mode:
-//   [['sale_id' => int, 'qty' => int, 'session_id' => int], ...]
-// 5 placeholders per row (qty WHEN-THEN pair, session WHEN-THEN pair, IN list entry).
-// Chunk size 500 → 2,500 placeholders per query, well under MySQL's 65,535 limit.
+// Bulk-updates quantity_sold for many sales rows in one query per chunk,
+// using a CASE WHEN id construct instead of N individual UPDATEs.
+// $rows shape: [['sale_id' => int, 'qty' => int], ...]
 function bulkUpdateSalesByPair(PDO $pdo, array $rows): void
 {
     if (empty($rows)) return;
 
     $chunkSize = 500;
     foreach (array_chunk($rows, $chunkSize) as $chunk) {
-        $qtyWhen   = '';
-        $sessWhen  = '';
-        $idPlaces  = [];
-        $qtyArgs   = [];
-        $sessArgs  = [];
-        $idArgs    = [];
+        $qtyWhen  = '';
+        $idPlaces = [];
+        $qtyArgs  = [];
+        $idArgs   = [];
 
         foreach ($chunk as $r) {
             $qtyWhen   .= ' WHEN ? THEN ?';
-            $sessWhen  .= ' WHEN ? THEN ?';
             $idPlaces[] = '?';
-            $qtyArgs[]  = $r['sale_id']; $qtyArgs[]  = $r['qty'];
-            $sessArgs[] = $r['sale_id']; $sessArgs[] = $r['session_id'];
+            $qtyArgs[]  = $r['sale_id']; $qtyArgs[] = $r['qty'];
             $idArgs[]   = $r['sale_id'];
         }
 
-        $sql = "UPDATE sales SET
-                    quantity_sold     = CASE id $qtyWhen END,
-                    import_session_id = CASE id $sessWhen END
+        $sql = "UPDATE sales SET quantity_sold = CASE id $qtyWhen END
                 WHERE id IN (" . implode(',', $idPlaces) . ")";
 
-        $pdo->prepare($sql)->execute(array_merge($qtyArgs, $sessArgs, $idArgs));
+        $pdo->prepare($sql)->execute(array_merge($qtyArgs, $idArgs));
     }
 }
 
-// Batch-inserts sales rows in chunks to stay under MySQL's 65,535 placeholder limit.
-// 4 placeholders per row → max 500 rows per chunk (2,000 placeholders, well within limit).
+// Batch-inserts sales rows in chunks. 3 placeholders per row → 500 rows per
+// chunk fits well under MySQL's 65,535 placeholder limit.
 function insertSalesBatch(PDO $pdo, array $rows): void
 {
     if (empty($rows)) return;
 
     $chunkSize = 500;
     foreach (array_chunk($rows, $chunkSize) as $chunk) {
-        $placeholders = implode(', ', array_fill(0, count($chunk), '(?, ?, ?, ?)'));
-        $sql = "INSERT INTO sales (product_id, import_session_id, quantity_sold, sale_date) VALUES $placeholders";
+        $placeholders = implode(', ', array_fill(0, count($chunk), '(?, ?, ?)'));
+        $sql = "INSERT INTO sales (product_id, quantity_sold, sale_date) VALUES $placeholders";
 
         $values = [];
         foreach ($chunk as $row) {
             $values[] = $row['product_id'];
-            $values[] = $row['import_session_id'];
             $values[] = $row['quantity_sold'];
             $values[] = $row['sale_date'];
         }
 
         $pdo->prepare($sql)->execute($values);
     }
-}
-
-// Returns all import sessions for a user with the sales count and date range per session.
-function getImportSessions(PDO $pdo, int $userId): array
-{
-    $stmt = $pdo->prepare(
-        'SELECT imp.id, imp.filename, imp.granularity, imp.imported_at,
-                COUNT(s.id)       AS row_count,
-                MIN(s.sale_date)  AS date_from,
-                MAX(s.sale_date)  AS date_to
-         FROM import_sessions imp
-         LEFT JOIN sales s ON s.import_session_id = imp.id
-         WHERE imp.user_id = ?
-         GROUP BY imp.id
-         ORDER BY imp.imported_at DESC'
-    );
-    $stmt->execute([$userId]);
-    return $stmt->fetchAll();
 }
 
 // Returns total product and sales counts for this user.
@@ -208,7 +190,7 @@ function getImportSummary(PDO $pdo, int $userId): array
         'SELECT
             (SELECT COUNT(*) FROM products WHERE user_id = ?)                                                        AS total_products,
             (SELECT COUNT(s.id) FROM sales s JOIN products p ON p.id = s.product_id WHERE p.user_id = ?)             AS total_sales,
-            (SELECT COUNT(*) FROM import_sessions WHERE user_id = ?)                                                 AS total_sessions,
+            (SELECT COUNT(*) FROM dataset_versions WHERE user_id = ?)                                                AS total_versions,
             (SELECT MIN(s.sale_date) FROM sales s JOIN products p ON p.id = s.product_id WHERE p.user_id = ?)        AS date_from,
             (SELECT MAX(s.sale_date) FROM sales s JOIN products p ON p.id = s.product_id WHERE p.user_id = ?)        AS date_to,
             (SELECT COUNT(*) FROM seasonal_events
@@ -219,48 +201,3 @@ function getImportSummary(PDO $pdo, int $userId): array
     return $stmt->fetch();
 }
 
-// Returns one page of sales records for a session, joined with product info.
-function getSessionRecords(PDO $pdo, int $sessionId, int $userId, int $page, int $perPage): array
-{
-    $offset = ($page - 1) * $perPage;
-    $stmt   = $pdo->prepare(
-        'SELECT s.id AS sale_id, p.name AS product_name, p.category, s.sale_date, s.quantity_sold
-         FROM sales s
-         JOIN products p          ON p.id   = s.product_id
-         JOIN import_sessions imp ON imp.id = s.import_session_id
-         WHERE s.import_session_id = ? AND imp.user_id = ?
-         ORDER BY s.sale_date DESC, p.name
-         LIMIT ? OFFSET ?'
-    );
-    $stmt->execute([$sessionId, $userId, $perPage, $offset]);
-    return $stmt->fetchAll();
-}
-
-function countSessionRecords(PDO $pdo, int $sessionId, int $userId): int
-{
-    $stmt = $pdo->prepare(
-        'SELECT COUNT(*)
-         FROM sales s
-         JOIN import_sessions imp ON imp.id = s.import_session_id
-         WHERE s.import_session_id = ? AND imp.user_id = ?'
-    );
-    $stmt->execute([$sessionId, $userId]);
-    return (int) $stmt->fetchColumn();
-}
-
-// Deletes a single import session (and its sales rows) after verifying ownership.
-// Returns true on success, false if the session doesn't exist or belongs to another user.
-function deleteImportSession(PDO $pdo, int $sessionId, int $userId): bool
-{
-    // Verify ownership before touching anything
-    $stmt = $pdo->prepare(
-        'SELECT id FROM import_sessions WHERE id = ? AND user_id = ? LIMIT 1'
-    );
-    $stmt->execute([$sessionId, $userId]);
-    if (!$stmt->fetchColumn()) return false;
-
-    // Delete associated sales rows first (FK is ON DELETE SET NULL, so we cascade manually)
-    $pdo->prepare('DELETE FROM sales WHERE import_session_id = ?')->execute([$sessionId]);
-    $pdo->prepare('DELETE FROM import_sessions WHERE id = ?')->execute([$sessionId]);
-    return true;
-}

@@ -1,15 +1,22 @@
 /* pages/css/event_detail.css
    Styles for the Event Detail (product impact) page. */
 
-/* ── Shared confidence badge — same as events.css ── */
+/* ── Shared confidence badge — same as events.css ──
+   Chunky rounded-square chip. Background + border + colored text already
+   carry the semantic signal; no status dot needed. Kept in sync with the
+   duplicate in events.css. */
 .event-conf-badge {
-    font-size: 0.63rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
     font-weight: 700;
-    padding: 0.15rem 0.5rem;
-    border-radius: 999px;
-    flex-shrink: 0;
+    padding: 0.32rem 0.7rem;
+    border-radius: 0.45rem;
     border: 1px solid transparent;
     letter-spacing: 0.02em;
+    line-height: 1;
+    flex-shrink: 0;
 }
 .conf-strong   { background: rgba(26,105,51,0.1);  color: #1A6933; border-color: rgba(26,105,51,0.28); }
 .conf-moderate { background: rgba(180,83,9,0.09);  color: #B45309; border-color: rgba(180,83,9,0.25);  }
@@ -370,6 +377,26 @@
     color: #261F0E;
 }
 
+/* Confidence cluster — "CONFIDENCE [Moderate]" on the right of the title row.
+   The label uses the same uppercase styling as the product table's column
+   headers so the two read as part of the same visual system. */
+.prophet-confidence-cluster {
+    margin-left: auto;             /* push the cluster to the right edge */
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.prophet-confidence-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #261F0E;
+    opacity: 0.4;
+}
+
 .prophet-card-sub {
     font-size: 0.75rem;
     color: #261F0E;
@@ -430,11 +457,84 @@
     opacity: 0.35;
 }
 
+/* ── Methodology explainer ──
+   Sits between the card subtitle and the summary row. Two side-by-side
+   panels (Confidence + Model Impact) that document how the numbers below
+   are derived, so the whole card stays self-explanatory. */
+.prophet-methodology {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.875rem;
+    padding: 1rem 1.25rem;
+    background: rgba(38,31,14,0.025);
+    border-bottom: 1px solid rgba(210,200,174,0.6);
+}
+
+.methodology-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+}
+
+.methodology-icon-wrap {
+    flex-shrink: 0;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.methodology-icon-wrap svg {
+    width: 0.95rem;
+    height: 0.95rem;
+}
+.methodology-icon-conf   { background: rgba(180,83,9,0.10);  color: #B45309; }
+.methodology-icon-impact { background: rgba(26,105,51,0.10); color: #1A6933; }
+
+.methodology-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #261F0E;
+    margin-bottom: 0.3rem;
+}
+
+.methodology-desc {
+    font-size: 0.74rem;
+    color: #261F0E;
+    opacity: 0.65;
+    line-height: 1.5;
+}
+
+.methodology-formula {
+    display: block;
+    margin-top: 0.4rem;
+    padding: 0.35rem 0.55rem;
+    background: rgba(38,31,14,0.06);
+    border-radius: 0.35rem;
+    font-family: 'Lora', serif;
+    font-style: italic;
+    font-size: 0.72rem;
+    color: #261F0E;
+    opacity: 0.85;
+}
+
+/* On narrow viewports the two methodology panels stack instead of squeezing. */
+@media (max-width: 720px) {
+    .prophet-methodology { grid-template-columns: 1fr; }
+}
+
+/* ── Product table ──
+   Three columns now read as three distinct zones: Product (identity) | Confidence
+   (evidence) | Model Impact (effect). The 1px divider on the impact column makes
+   the boundary obvious so the eye doesn't blur the two right-side cells together. */
 .prophet-product-list-header {
     display: grid;
-    grid-template-columns: 1fr 90px 120px;
-    gap: 0.75rem;
-    padding: 0.5rem 1.25rem;
+    grid-template-columns: 1fr 150px 180px;
+    gap: 1rem;
+    padding: 0.6rem 1.25rem;
     background: rgba(210,200,174,0.2);
     border-bottom: 1px solid rgba(210,200,174,0.5);
 }
@@ -448,12 +548,19 @@
     opacity: 0.4;
 }
 
+.prophet-impact-col-head {
+    text-align: right;
+    /* Subtle line that lines up with the divider on each row's impact cell. */
+    padding-left: 1rem;
+    border-left: 1px solid rgba(210,200,174,0.6);
+}
+
 .prophet-product-row {
     display: grid;
-    grid-template-columns: 1fr 90px 120px;
-    gap: 0.75rem;
+    grid-template-columns: 1fr 150px 180px;
+    gap: 1rem;
     align-items: center;
-    padding: 0.75rem 1.25rem;
+    padding: 0.875rem 1.25rem;
     border-bottom: 1px solid rgba(210,200,174,0.4);
 }
 
@@ -472,8 +579,28 @@
     margin-top: 0.1rem;
 }
 
+/* Confidence cell — badge on top, "N occurrences" subtext underneath so the
+   reader sees both the qualitative label and the raw count it came from. */
+.prophet-conf-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+}
+
+.prophet-conf-detail {
+    font-size: 0.68rem;
+    color: #261F0E;
+    opacity: 0.45;
+    line-height: 1;
+}
+
+/* Impact cell — %, then "+X.X units/day · mean Y.Y/day" subtext, then the bar.
+   The left border is the visual separator that splits Confidence from Impact. */
 .prophet-pct-cell {
     text-align: right;
+    padding-left: 1rem;
+    border-left: 1px solid rgba(210,200,174,0.6);
 }
 
 .prophet-pct {
@@ -486,6 +613,15 @@
 .prophet-pct.positive { color: #1A6933; }
 .prophet-pct.negative { color: #D94B1A; }
 .prophet-pct.neutral  { color: #261F0E; opacity: 0.35; }
+
+.prophet-pct-detail {
+    display: block;
+    margin-top: 0.2rem;
+    font-size: 0.68rem;
+    color: #261F0E;
+    opacity: 0.5;
+    line-height: 1.2;
+}
 
 /* ── Pagination ── (same as events.css, keep in sync) */
 .pagination {

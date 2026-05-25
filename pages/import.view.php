@@ -70,6 +70,16 @@ require_once __DIR__ . '/../includes/header.php';
         </div>
         <?php endif; ?>
 
+        <!-- Restore success notice -->
+        <?php if (isset($_GET['restored'])): ?>
+        <div class="import-success">
+            <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 10 9 10"/>
+            </svg>
+            <span>Version restored. The previous state was auto-saved at the top of your history if you need to undo.</span>
+        </div>
+        <?php endif; ?>
+
         <!-- ── Prophet Pipeline Explainer ──────────────────────────────────
              Shows the academic panel exactly how the system uses the rows
              below: data → Prophet decomposition → forecast.
@@ -188,8 +198,8 @@ require_once __DIR__ . '/../includes/header.php';
                 <div class="summary-card-label">Sales Records</div>
             </div>
             <div class="summary-card">
-                <div class="summary-card-value"><?php echo number_format($summary['total_sessions']); ?></div>
-                <div class="summary-card-label">Import Sessions</div>
+                <div class="summary-card-value"><?php echo number_format($summary['total_versions']); ?></div>
+                <div class="summary-card-label">Saved Versions</div>
             </div>
         </div>
 
@@ -362,66 +372,74 @@ require_once __DIR__ . '/../includes/header.php';
             </div><!-- /wizard-body -->
         </div><!-- /wizard-panel -->
 
-        <!-- ── Sessions list ── -->
+        <!-- ── Version history ── -->
         <div class="section-header">
-            <span class="section-title">Import History</span>
+            <span class="section-title">Version History</span>
             <button onclick="openWizard()" class="upload-btn-primary">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
-                Upload New Data
+                Update Sales Data
             </button>
         </div>
 
-        <div class="sessions-list" id="sessions-list">
-            <?php if (empty($sessions)): ?>
-            <div class="sessions-empty">No imports yet. Upload your first CSV to get started.</div>
+        <p class="versions-help">
+            Each import saves a snapshot. Restore any version to roll your sales data back —
+            the current state is auto-saved first so the restore itself is reversible.
+            Only the most recent <?php echo MAX_VERSIONS_PER_USER; ?> versions are kept.
+        </p>
+
+        <div class="versions-list" id="versions-list">
+            <?php if (empty($versions)): ?>
+            <div class="versions-empty">No saved versions yet. Upload your first CSV to get started.</div>
             <?php else: ?>
-                <?php foreach ($sessions as $s): ?>
-                <div class="session-entry" id="session-<?php echo $s['id']; ?>">
+                <?php foreach ($versions as $v): ?>
+                <div class="version-entry<?php echo $v['is_pre_restore_snapshot'] ? ' version-pre-restore' : ''; ?>"
+                     id="version-<?php echo $v['id']; ?>">
 
-                    <div class="session-row">
+                    <div class="version-row">
 
-                        <div class="session-icon">
-                            <svg class="w-4 h-4 text-[#261F0E]" style="opacity:0.4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                        <div class="version-icon">
+                            <?php if ($v['is_pre_restore_snapshot']): ?>
+                            <!-- Counter-clockwise arrow: pre-restore safety snapshot -->
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 10 9 10"/>
+                            </svg>
+                            <?php else: ?>
+                            <!-- Document: regular import snapshot -->
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                                 <polyline points="14 2 14 8 20 8"/>
                             </svg>
+                            <?php endif; ?>
                         </div>
 
-                        <span class="session-filename" title="<?php echo htmlspecialchars($s['filename']); ?>">
-                            <?php echo htmlspecialchars($s['filename']); ?>
+                        <span class="version-label" title="<?php echo htmlspecialchars($v['label']); ?>">
+                            <?php echo htmlspecialchars($v['label']); ?>
                         </span>
 
-                        <div class="session-meta">
-                            <?php if ($s['granularity']): ?>
-                            <span class="session-badge"><?php echo htmlspecialchars($s['granularity']); ?></span>
+                        <div class="version-meta">
+                            <?php if ($v['rows_added'] > 0): ?>
+                            <span class="version-badge version-badge-added">+<?php echo number_format($v['rows_added']); ?> added</span>
                             <?php endif; ?>
-                            <?php if ($s['date_from'] && $s['date_to']): ?>
-                            <span class="session-daterange">
-                                <?php
-                                    $df = date('M Y', strtotime($s['date_from']));
-                                    $dt = date('M Y', strtotime($s['date_to']));
-                                    echo $df === $dt ? $df : $df . ' – ' . $dt;
-                                ?>
-                            </span>
+                            <?php if ($v['rows_changed'] > 0): ?>
+                            <span class="version-badge version-badge-changed"><?php echo number_format($v['rows_changed']); ?> changed</span>
                             <?php endif; ?>
-                            <span class="session-rows"><?php echo number_format($s['row_count']); ?> records</span>
-                            <span class="session-date"><?php echo date('M j, Y', strtotime($s['imported_at'])); ?></span>
+                            <span class="version-rows"><?php echo number_format($v['total_rows']); ?> records</span>
+                            <span class="version-date"><?php echo date('M j, Y · g:i A', strtotime($v['created_at'])); ?></span>
                         </div>
 
-                        <button id="records-toggle-<?php echo $s['id']; ?>"
-                                class="session-view-btn"
-                                onclick="toggleRecords(<?php echo $s['id']; ?>)"
-                                title="View records">
+                        <button class="version-restore-btn"
+                                onclick="confirmRestoreVersion(<?php echo $v['id']; ?>, <?php echo htmlspecialchars(json_encode($v['label']), ENT_QUOTES); ?>)"
+                                title="Restore this version">
                             <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="6 9 12 15 18 9"/>
+                                <path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 10 9 10"/>
                             </svg>
                         </button>
 
-                        <button class="session-delete-btn"
-                                onclick="confirmDeleteSession(<?php echo $s['id']; ?>, <?php echo htmlspecialchars(json_encode($s['filename']), ENT_QUOTES); ?>)"
-                                title="Delete this import">
+                        <button class="version-delete-btn"
+                                onclick="confirmDeleteVersion(<?php echo $v['id']; ?>, <?php echo htmlspecialchars(json_encode($v['label']), ENT_QUOTES); ?>)"
+                                title="Delete this version (current data is unaffected)">
                             <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <polyline points="3 6 5 6 21 6"/>
                                 <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
@@ -431,8 +449,6 @@ require_once __DIR__ . '/../includes/header.php';
                         </button>
 
                     </div>
-
-                    <div class="session-records-panel hidden" id="records-panel-<?php echo $s['id']; ?>"></div>
 
                 </div>
                 <?php endforeach; ?>
@@ -1108,20 +1124,23 @@ async function wSubmitImport() {
             return;
         }
 
-        var hasIssues = data.invalid > 0 || data.overlap.count > 0;
-        if (!hasIssues) {
-            wPreflightDone = true;
-            btn.innerHTML  = IMPORT_BTN_HTML;
-            btn.disabled   = false;
-            await wDoImport(mapping, false);
-            return;
-        }
+        // Always show the preview so the user sees totals + breakdown before
+        // anything commits — no auto-commit branch, even for a "clean" upload.
+        wRenderPreviewCard(data);
+        wPreflightDone = true;
 
-        wRenderPreflightPanel(data);
-        wPreflightDone    = true;
-        btn.innerHTML     = 'Proceed with import <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
-        btn.disabled      = false;
-        btn.style.opacity = '1';
+        var b          = data.buckets;
+        var hasAnything = b.new.count > 0 || b.overlap.count > 0;
+
+        if (!hasAnything) {
+            btn.innerHTML     = 'No changes to apply';
+            btn.disabled      = true;
+            btn.style.opacity = '0.55';
+        } else {
+            btn.innerHTML     = 'Apply changes <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+            btn.disabled      = false;
+            btn.style.opacity = '1';
+        }
     } catch(e) {
         showMappingError('Network error during check. Please try again.');
         btn.innerHTML = IMPORT_BTN_HTML;
@@ -1129,44 +1148,102 @@ async function wSubmitImport() {
     }
 }
 
-function wRenderPreflightPanel(data) {
-    var html = '<div class="preflight-panel">';
-    html += '<div class="preflight-panel-title">Review before importing</div>';
+// Renders the 3-color preview card. Header shows the totals at a glance;
+// each colored bucket below has its own expandable sample table.
+function wRenderPreviewCard(data) {
+    var b = data.buckets;
+    var html = '<div class="preview-card">';
+    html += '<div class="preview-card-title">Preview of changes</div>';
 
-    if (data.invalid > 0) {
-        html += '<div class="preflight-section">';
-        html += '<div class="preflight-section-head preflight-warn">';
-        html += '<svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
-        html += '<span><strong>' + data.invalid.toLocaleString() + ' row' + (data.invalid !== 1 ? 's' : '') + '</strong> will be skipped due to data issues.</span>';
-        html += '</div>';
+    html += wRenderSummary(data);
 
-        if (data.error_samples && data.error_samples.length) {
-            html += '<details class="preflight-samples">';
-            html += '<summary class="preflight-samples-toggle">View examples (' + Math.min(data.error_samples.length, 10) + ' shown)</summary>';
-            html += '<div class="preflight-samples-table-wrap"><table class="preflight-samples-table">';
-            html += '<thead><tr><th>Row</th><th>Product</th><th>Date</th><th>Qty</th><th>Issue</th></tr></thead><tbody>';
-            data.error_samples.forEach(function(e) {
-                html += '<tr><td>' + e.row + '</td><td>' + escHtml(e.product) + '</td><td>' + escHtml(e.date) + '</td><td>' + escHtml(e.qty) + '</td><td>' + escHtml(e.reason) + '</td></tr>';
-            });
-            html += '</tbody></table></div></details>';
-        }
-        html += '</div>';
+    html += wRenderBucket('new', 'Will be added',
+        b.new.count, b.new.samples,
+        ['Row', 'Product', 'Date', 'Qty'],
+        function(r) { return [r.row, r.product, r.date, r.qty]; });
+
+    html += wRenderBucket('overlap', 'Will conflict with existing data',
+        b.overlap.count, b.overlap.samples,
+        ['Row', 'Product', 'Date', 'Existing', 'New'],
+        function(r) { return [r.row, r.product, r.date, r.qty_existing, r.qty_new]; });
+
+    if (b.overlap.count > 0) {
+        html += '<label class="preview-replace-label">';
+        html += '<input type="checkbox" id="w-replace-overlap" class="preview-replace-check">';
+        html += '<span>Replace the existing values with the new ones</span>';
+        html += '</label>';
+        html += '<p class="preview-replace-help">Leave unchecked to keep the existing values and skip these rows.</p>';
     }
 
-    if (data.overlap && data.overlap.count > 0) {
-        var df = data.overlap.date_from, dt = data.overlap.date_to;
-        var rangeLabel = df === dt ? df : df + ' to ' + dt;
-        html += '<div class="preflight-section">';
-        html += '<div class="preflight-section-head preflight-overlap">';
-        html += '<svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
-        html += '<span><strong>' + data.overlap.count.toLocaleString() + ' existing record' + (data.overlap.count !== 1 ? 's' : '') + '</strong> fall within this file\'s date range (' + escHtml(rangeLabel) + ').</span>';
-        html += '</div>';
-        html += '<label class="preflight-replace-label"><input type="checkbox" id="w-replace-overlap" class="preflight-replace-check"><span>Replace overlapping records with values from this file</span></label>';
-        html += '</div>';
+    html += wRenderBucket('invalid', 'Can\'t be accepted',
+        b.invalid.count, b.invalid.samples,
+        ['Row', 'Product', 'Date', 'Qty', 'Reason'],
+        function(r) { return [r.row, r.product, r.date, r.qty, r.reason]; });
+
+    if (b.noop.count > 0) {
+        html += '<p class="preview-noop">';
+        html += b.noop.count.toLocaleString() + ' row' + (b.noop.count !== 1 ? 's' : '') + ' already match what\'s in the database — no change needed.';
+        html += '</p>';
     }
 
     html += '</div>';
     document.getElementById('w-preflight-container').innerHTML = html;
+}
+
+function wRenderBucket(kind, title, count, samples, columns, rowFn) {
+    var icon = wBucketIcon(kind);
+    var html = '<div class="preview-bucket preview-bucket-' + kind + '">';
+    html += '<div class="preview-bucket-head">';
+    html += icon;
+    html += '<span><strong>' + count.toLocaleString() + '</strong> ' + title + '</span>';
+    html += '</div>';
+
+    if (count > 0 && samples && samples.length) {
+        var shown = Math.min(samples.length, count);
+        html += '<details class="preview-bucket-samples">';
+        html += '<summary>View examples (' + shown + ' of ' + count.toLocaleString() + ')</summary>';
+        html += '<div class="preview-samples-wrap"><table class="preview-samples-table">';
+        html += '<thead><tr>';
+        columns.forEach(function(c) { html += '<th>' + c + '</th>'; });
+        html += '</tr></thead><tbody>';
+        samples.forEach(function(r) {
+            html += '<tr>';
+            rowFn(r).forEach(function(v) { html += '<td>' + escHtml(String(v)) + '</td>'; });
+            html += '</tr>';
+        });
+        html += '</tbody></table></div></details>';
+    }
+
+    html += '</div>';
+    return html;
+}
+
+function wRenderSummary(data) {
+    var b   = data.buckets;
+    var tot = (data.csv_rows || 0).toLocaleString();
+    var rows = [
+        { cls: 'preview-summary-total',   label: 'Total rows in file',          value: tot },
+        { cls: 'preview-summary-new',     label: 'Will be added',               value: b.new.count.toLocaleString() },
+    ];
+    if (b.overlap.count > 0) rows.push({ cls: 'preview-summary-overlap', label: 'Conflicts with existing data', value: b.overlap.count.toLocaleString() });
+    if (b.invalid.count > 0) rows.push({ cls: 'preview-summary-invalid', label: 'Can’t be accepted',       value: b.invalid.count.toLocaleString() });
+    if (b.noop && b.noop.count > 0) rows.push({ cls: 'preview-summary-noop', label: 'Already match (no change)', value: b.noop.count.toLocaleString() });
+
+    var html = '<div class="preview-summary">';
+    rows.forEach(function(r) {
+        html += '<div class="preview-summary-row ' + r.cls + '">';
+        html += '<span class="preview-summary-label">' + r.label + '</span>';
+        html += '<span class="preview-summary-value">' + r.value + '</span>';
+        html += '</div>';
+    });
+    html += '</div>';
+    return html;
+}
+
+function wBucketIcon(kind) {
+    if (kind === 'new')     return '<svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    if (kind === 'overlap') return '<svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+    return                        '<svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
 }
 
 async function wDoImport(mapping, replace) {
@@ -1225,196 +1302,64 @@ function downloadSampleCsv(e) {
     URL.revokeObjectURL(url);
 }
 
-// ── Inline qty edit ───────────────────────────────────────────────────────────
-function startQtyEdit(saleId, currentQty) {
-    var cell = document.getElementById('qty-cell-' + saleId);
-    if (!cell) return;
-    cell.innerHTML =
-        '<input id="qty-input-' + saleId + '" type="number" min="1" value="' + currentQty + '" ' +
-        'class="qty-edit-input" ' +
-        'onkeydown="qtyKeyDown(event,' + saleId + ',' + currentQty + ')" ' +
-        'onblur="saveQty(' + saleId + ',' + currentQty + ')">';
-    var inp = document.getElementById('qty-input-' + saleId);
-    inp.focus(); inp.select();
-}
-
-function qtyKeyDown(e, saleId, originalQty) {
-    if (e.key === 'Enter')  { e.preventDefault(); saveQty(saleId, originalQty); }
-    if (e.key === 'Escape') { e.preventDefault(); cancelQtyEdit(saleId, originalQty); }
-}
-
-function cancelQtyEdit(saleId, originalQty)  { restoreQtyCell(saleId, originalQty); }
-
-function restoreQtyCell(saleId, qty) {
-    var cell = document.getElementById('qty-cell-' + saleId);
-    if (cell) cell.innerHTML = qtyDisplay(saleId, qty);
-}
-
-function qtyDisplay(saleId, qty) {
-    return parseInt(qty).toLocaleString() +
-        ' <button class="qty-edit-btn" onclick="startQtyEdit(' + saleId + ',' + qty + ')" title="Edit quantity">' +
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-        '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>' +
-        '<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>' +
-        '</svg></button>';
-}
-
-var wQtyConfirmPending = false;
-
-function saveQty(saleId, originalQty) {
-    if (wQtyConfirmPending) return;
-
-    var inp = document.getElementById('qty-input-' + saleId);
-    if (!inp) return;
-    var newQty = parseInt(inp.value);
-
-    if (isNaN(newQty) || newQty <= 0)    { cancelQtyEdit(saleId, originalQty); return; }
-    if (newQty === parseInt(originalQty)) { cancelQtyEdit(saleId, originalQty); return; }
-
-    wQtyConfirmPending = true;
-    inp.disabled = true;
-
+// ── Version history actions ───────────────────────────────────────────────────
+function confirmRestoreVersion(versionId, label) {
     showConfirm({
-        title:        'Update Quantity?',
-        message:      'Change the quantity from ' + parseInt(originalQty).toLocaleString() + ' to ' + newQty.toLocaleString() + '? This will affect forecasting calculations for this product.',
-        confirmText:  'Update',
+        title:        'Restore this version?',
+        message:      'Your sales data will be replaced with the snapshot from "' + label + '". ' +
+                      'The current state is auto-saved first, so you can undo this restore from the history.',
+        confirmText:  'Restore',
         confirmStyle: 'warning',
-        onConfirm: async function() {
-            wQtyConfirmPending = false;
-            var cell = document.getElementById('qty-cell-' + saleId);
-            if (cell) cell.innerHTML = '<span class="qty-saving">Saving…</span>';
-
-            var formData = new FormData();
-            formData.append('sale_id',  saleId);
-            formData.append('quantity', newQty);
-
-            try {
-                var res  = await fetch('<?php echo BASE_URL; ?>/api/update_sale.php', { method: 'POST', body: formData });
-                var data = await res.json();
-                if (data.success) {
-                    restoreQtyCell(saleId, newQty);
-                } else {
-                    restoreQtyCell(saleId, originalQty);
-                    alert('Could not save: ' + (data.error || 'Unknown error.'));
-                }
-            } catch(e) {
-                restoreQtyCell(saleId, originalQty);
-                alert('Network error. Please try again.');
-            }
-        },
-        onCancel: function() {
-            wQtyConfirmPending = false;
-            cancelQtyEdit(saleId, originalQty);
-        },
+        onConfirm:    function() { restoreVersion(versionId); },
     });
 }
 
-// ── Session records expand / collapse ─────────────────────────────────────────
-var recordsState = {};
-
-function toggleRecords(sessionId) {
-    var panel  = document.getElementById('records-panel-' + sessionId);
-    var toggle = document.getElementById('records-toggle-' + sessionId);
-    var isOpen = !panel.classList.contains('hidden');
-
-    if (isOpen) { panel.classList.add('hidden'); toggle.classList.remove('active'); return; }
-
-    panel.classList.remove('hidden');
-    toggle.classList.add('active');
-
-    if (!recordsState[sessionId]) {
-        recordsState[sessionId] = { page: 1 };
-        loadRecords(sessionId, 1);
-    }
-}
-
-async function loadRecords(sessionId, page) {
-    var panel = document.getElementById('records-panel-' + sessionId);
-    panel.innerHTML = '<div class="records-loading">Loading records…</div>';
-
-    try {
-        var res  = await fetch('<?php echo BASE_URL; ?>/api/session_records.php?session_id=' + sessionId + '&page=' + page);
-        var data = await res.json();
-
-        if (data.error) { panel.innerHTML = '<div class="records-empty">' + escHtml(data.error) + '</div>'; return; }
-
-        recordsState[sessionId].page = page;
-        renderRecords(sessionId, data);
-    } catch(e) {
-        panel.innerHTML = '<div class="records-empty">Failed to load records. Please try again.</div>';
-    }
-}
-
-function renderRecords(sessionId, data) {
-    var panel = document.getElementById('records-panel-' + sessionId);
-
-    if (!data.records || !data.records.length) {
-        panel.innerHTML = '<div class="records-empty">No records in this import.</div>';
-        return;
-    }
-
-    var start = (data.page - 1) * data.per_page + 1;
-    var end   = Math.min(data.page * data.per_page, data.total);
-
-    var html = '<div class="records-header">';
-    html += '<span class="records-count">Showing ' + start.toLocaleString() + '–' + end.toLocaleString() + ' of <strong>' + data.total.toLocaleString() + '</strong> daily records</span>';
-    html += '<div class="records-pagination">';
-    if (data.page > 1)              html += '<button class="records-page-btn" onclick="loadRecords(' + sessionId + ', ' + (data.page - 1) + ')">← Prev</button>';
-    if (data.page < data.total_pages) html += '<button class="records-page-btn" onclick="loadRecords(' + sessionId + ', ' + (data.page + 1) + ')">Next →</button>';
-    html += '</div></div>';
-
-    html += '<div class="records-table-wrap"><table class="records-table">';
-    html += '<thead><tr><th>Date</th><th>Product</th><th>Category</th><th style="text-align:right">Qty Sold</th></tr></thead>';
-    html += '<tbody>';
-    data.records.forEach(function(r) {
-        html += '<tr>';
-        html += '<td>' + escHtml(r.sale_date) + '</td>';
-        html += '<td>' + escHtml(r.product_name) + '</td>';
-        html += '<td>' + (r.category ? escHtml(r.category) : '<span style="opacity:0.28">—</span>') + '</td>';
-        html += '<td style="text-align:right" id="qty-cell-' + r.sale_id + '">' + qtyDisplay(r.sale_id, r.quantity_sold) + '</td>';
-        html += '</tr>';
-    });
-    html += '</tbody></table></div>';
-
-    html += '<div class="records-header" style="margin-top:0.75rem; margin-bottom:0;">';
-    html += '<span class="records-count">Page ' + data.page + ' of ' + data.total_pages + '</span>';
-    html += '<div class="records-pagination">';
-    if (data.page > 1)              html += '<button class="records-page-btn" onclick="loadRecords(' + sessionId + ', ' + (data.page - 1) + ')">← Prev</button>';
-    if (data.page < data.total_pages) html += '<button class="records-page-btn" onclick="loadRecords(' + sessionId + ', ' + (data.page + 1) + ')">Next →</button>';
-    html += '</div></div>';
-
-    panel.innerHTML = html;
-}
-
-// ── Delete import session ─────────────────────────────────────────────────────
-function confirmDeleteSession(sessionId, filename) {
-    showConfirm({
-        title:        'Delete Import?',
-        message:      'This will permanently delete "' + filename + '" and all its associated sales records. This cannot be undone.',
-        confirmText:  'Delete',
-        confirmStyle: 'danger',
-        onConfirm:    function() { deleteSession(sessionId); },
-    });
-}
-
-async function deleteSession(sessionId) {
+async function restoreVersion(versionId) {
     var formData = new FormData();
-    formData.append('session_id', sessionId);
+    formData.append('version_id', versionId);
 
     try {
-        var res  = await fetch('<?php echo BASE_URL; ?>/api/delete_import.php', { method: 'POST', body: formData });
+        var res  = await fetch('<?php echo BASE_URL; ?>/api/restore_version.php', { method: 'POST', body: formData });
         var data = await res.json();
 
         if (data.success) {
-            var row = document.getElementById('session-' + sessionId);
+            window.location = '<?php echo BASE_URL; ?>/pages/import.view.php?restored=1';
+        } else {
+            alert('Restore failed: ' + (data.error || 'Unknown error.'));
+        }
+    } catch(e) {
+        alert('Network error. Please try again.');
+    }
+}
+
+function confirmDeleteVersion(versionId, label) {
+    showConfirm({
+        title:        'Delete this version?',
+        message:      'The snapshot "' + label + '" will be permanently removed from history. Your current sales data is not affected.',
+        confirmText:  'Delete',
+        confirmStyle: 'danger',
+        onConfirm:    function() { deleteVersion(versionId); },
+    });
+}
+
+async function deleteVersion(versionId) {
+    var formData = new FormData();
+    formData.append('version_id', versionId);
+
+    try {
+        var res  = await fetch('<?php echo BASE_URL; ?>/api/delete_version.php', { method: 'POST', body: formData });
+        var data = await res.json();
+
+        if (data.success) {
+            var row = document.getElementById('version-' + versionId);
             if (row) {
                 row.style.transition = 'opacity 0.25s';
                 row.style.opacity    = '0';
                 setTimeout(function() {
                     row.remove();
-                    var list = document.getElementById('sessions-list');
-                    if (!list.querySelector('.session-row')) {
-                        list.innerHTML = '<div class="sessions-empty">No imports yet. Upload your first CSV to get started.</div>';
+                    var list = document.getElementById('versions-list');
+                    if (list && !list.querySelector('.version-entry')) {
+                        list.innerHTML = '<div class="versions-empty">No saved versions yet. Upload your first CSV to get started.</div>';
                     }
                 }, 260);
             }

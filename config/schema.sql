@@ -48,38 +48,59 @@ CREATE TABLE IF NOT EXISTS `products` (
 --     ADD COLUMN `accuracy_residual_rho` DECIMAL(6,4) DEFAULT NULL,
 --     ADD COLUMN `accuracy_computed_at`  TIMESTAMP    NULL DEFAULT NULL;
 
--- import_sessions defined before sales so the FK reference is valid
-CREATE TABLE IF NOT EXISTS `import_sessions` (
-    `id`             INT          NOT NULL AUTO_INCREMENT,
-    `user_id`        INT          NOT NULL,
-    `filename`       VARCHAR(255) NOT NULL,
-    `column_mapping` JSON         DEFAULT NULL,
-    `granularity`    VARCHAR(20)  DEFAULT NULL,
-    `imported_at`    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`),
-    CONSTRAINT `fk_import_sessions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
 CREATE TABLE IF NOT EXISTS `sales` (
-    `id`                INT       NOT NULL AUTO_INCREMENT,
-    `product_id`        INT       NOT NULL,
-    `import_session_id` INT       DEFAULT NULL,
-    `quantity_sold`     INT       NOT NULL,
-    `sale_date`         DATE      NOT NULL,
-    `created_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `id`            INT       NOT NULL AUTO_INCREMENT,
+    `product_id`    INT       NOT NULL,
+    `quantity_sold` INT       NOT NULL,
+    `sale_date`     DATE      NOT NULL,
+    `created_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     -- Daily aggregation invariant: one row per (product, day). The importer
     -- already enforces this in PHP, but a UNIQUE key makes it true at the DB
     -- level too — so a concurrent import or a stray INSERT can't sneak past it.
     UNIQUE KEY `sales_product_date_unique` (`product_id`, `sale_date`),
-    CONSTRAINT `fk_sales_product` FOREIGN KEY (`product_id`)        REFERENCES `products` (`id`)        ON DELETE CASCADE,
-    CONSTRAINT `fk_sales_import`  FOREIGN KEY (`import_session_id`) REFERENCES `import_sessions` (`id`) ON DELETE SET NULL
+    CONSTRAINT `fk_sales_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- For existing databases, add the uniqueness guard (run after de-duping any
--- pre-existing (product_id, sale_date) collisions, else the ALTER will fail):
---   ALTER TABLE `sales`
---     ADD UNIQUE KEY `sales_product_date_unique` (`product_id`, `sale_date`);
+-- For existing databases:
+--   ALTER TABLE `sales` ADD UNIQUE KEY `sales_product_date_unique` (`product_id`, `sale_date`);
+--   -- Drop the legacy import_session_id column (FK first, then the column).
+--   ALTER TABLE `sales` DROP FOREIGN KEY `fk_sales_import`;
+--   ALTER TABLE `sales` DROP COLUMN `import_session_id`;
+--   DROP TABLE `import_sessions`;
+
+-- ── Dataset versions ────────────────────────────────────────────────────────
+-- Each import auto-creates a version snapshotting the resulting sales table.
+-- Restores create an extra pre-restore snapshot first so "undo the undo" works.
+-- Versions are capped per user (oldest auto-versions are pruned on overflow).
+CREATE TABLE IF NOT EXISTS `dataset_versions` (
+    `id`                      INT          NOT NULL AUTO_INCREMENT,
+    `user_id`                 INT          NOT NULL,
+    `label`                   VARCHAR(150) NOT NULL,
+    `note`                    TEXT         DEFAULT NULL,
+    `rows_added`              INT          NOT NULL DEFAULT 0,
+    `rows_changed`            INT          NOT NULL DEFAULT 0,
+    `total_rows`              INT          NOT NULL DEFAULT 0,
+    -- is_pre_restore_snapshot = 1 marks the safety snapshot taken right before
+    -- a restore. The UI shows these with a distinct icon ("auto-saved before
+    -- restoring v3") so they don't look like regular edits.
+    `is_pre_restore_snapshot` TINYINT(1)   NOT NULL DEFAULT 0,
+    `created_at`              TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `dataset_versions_user_idx` (`user_id`, `created_at`),
+    CONSTRAINT `fk_dataset_versions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `sales_snapshots` (
+    `version_id`    INT NOT NULL,
+    `product_id`    INT NOT NULL,
+    `sale_date`     DATE NOT NULL,
+    `quantity_sold` INT NOT NULL,
+    PRIMARY KEY (`version_id`, `product_id`, `sale_date`),
+    KEY `sales_snapshots_version_idx` (`version_id`),
+    CONSTRAINT `fk_sales_snapshots_version` FOREIGN KEY (`version_id`) REFERENCES `dataset_versions` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_sales_snapshots_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`)         ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `forecasts` (
     `id`                    INT           NOT NULL AUTO_INCREMENT,

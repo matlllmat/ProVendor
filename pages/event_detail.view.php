@@ -124,9 +124,60 @@ if ($hasProphet) {
                     <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
                 </svg>
                 <span class="prophet-card-title">Forecast Model Analysis</span>
-                <span class="event-conf-badge conf-<?php echo $confCss; ?>"><?php echo $confLabel; ?> confidence</span>
+                <!-- Confidence cluster — pushed to the right; label matches the
+                     uppercase column-header style used in the product table below. -->
+                <span class="prophet-confidence-cluster">
+                    <span class="prophet-confidence-label">Confidence</span>
+                    <span class="event-conf-badge conf-<?php echo $confCss; ?>"><?php echo $confLabel; ?></span>
+                </span>
             </div>
             <p class="prophet-card-sub">What the model has learned about how this event affects your sales, based on your full sales history.</p>
+        </div>
+
+        <!-- ── Methodology explainer ─────────────────────────────────────────
+             Always-visible explanation of how the two key numbers (Confidence
+             and Model Impact) are produced. Surfacing the formula here means
+             panelists can see the math without us having to defend "trust the
+             model" hand-waving — every figure in the table below has a
+             traceable derivation written right above it. -->
+        <div class="prophet-methodology">
+            <div class="methodology-item">
+                <span class="methodology-icon-wrap methodology-icon-conf">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    </svg>
+                </span>
+                <div>
+                    <div class="methodology-title">Confidence</div>
+                    <div class="methodology-desc">
+                        Based on how many times this event has appeared in your sales history.
+                        More occurrences &rarr; the model has more evidence to learn from.
+                        <?php if ($rec === 'monthly'): ?>
+                        <strong>Monthly:</strong> 12+ &rarr; Strong &middot; 6&ndash;11 &rarr; Moderate &middot; &lt;6 &rarr; Weak.
+                        <?php else: ?>
+                        <strong>Yearly:</strong> 4+ &rarr; Strong &middot; 2&ndash;3 &rarr; Moderate &middot; 1 &rarr; Weak.
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+            <div class="methodology-item">
+                <span class="methodology-icon-wrap methodology-icon-impact">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                    </svg>
+                </span>
+                <div>
+                    <div class="methodology-title">Model Impact</div>
+                    <div class="methodology-desc">
+                        Prophet treats this event as an additive regressor. The model fits a
+                        coefficient (in units of daily sales) for it, isolated from trend and
+                        weekly seasonality. We express it as a percent:
+                        <span class="methodology-formula">impact % = coefficient &divide; mean daily sales &times; 100</span>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="prophet-summary-row">
@@ -150,7 +201,7 @@ if ($hasProphet) {
             <div class="prophet-product-list-header">
                 <span>Product</span>
                 <span>Confidence</span>
-                <span style="text-align:right">Model Impact</span>
+                <span class="prophet-impact-col-head">Model Impact</span>
             </div>
             <?php foreach ($prophetCache as $pc):
                 $pPct   = (float) $pc['impact_pct'];
@@ -165,6 +216,9 @@ if ($hasProphet) {
                     $pConfCss   = $pOcc >= 4  ? 'strong' : ($pOcc >= 2  ? 'moderate' : 'weak');
                     $pConfLabel = $pOcc >= 4  ? 'Strong' : ($pOcc >= 2  ? 'Moderate' : 'Weak');
                 }
+                $pCoef  = (float) $pc['coefficient'];
+                $pMean  = (float) $pc['mean_daily_sales'];
+                $pCoefSign = $pCoef >= 0 ? '+' : '';
             ?>
             <div class="prophet-product-row">
                 <div>
@@ -173,13 +227,22 @@ if ($hasProphet) {
                     <div class="prophet-product-cat"><?php echo htmlspecialchars($pc['category']); ?></div>
                     <?php endif; ?>
                 </div>
-                <span class="event-conf-badge conf-<?php echo $pConfCss; ?>"
-                      title="<?php echo $pOcc; ?> occurrence<?php echo $pOcc !== 1 ? 's' : ''; ?> in training data">
-                    <?php echo $pConfLabel; ?>
-                </span>
+                <div class="prophet-conf-cell">
+                    <span class="event-conf-badge conf-<?php echo $pConfCss; ?>"
+                          title="<?php echo $pOcc; ?> occurrence<?php echo $pOcc !== 1 ? 's' : ''; ?> in training data">
+                        <?php echo $pConfLabel; ?>
+                    </span>
+                    <span class="prophet-conf-detail">
+                        <?php echo $pOcc; ?> occurrence<?php echo $pOcc !== 1 ? 's' : ''; ?>
+                    </span>
+                </div>
                 <div class="prophet-pct-cell">
                     <span class="prophet-pct <?php echo $pDir; ?>">
                         <?php echo $pArrow . ' ' . $pSign . number_format($pPct, 1); ?>%
+                    </span>
+                    <span class="prophet-pct-detail">
+                        <?php echo $pCoefSign . number_format($pCoef, 1); ?> units/day
+                        &middot; mean <?php echo number_format($pMean, 1); ?>/day
                     </span>
                     <div class="impact-bar-wrap">
                         <div class="impact-bar <?php echo $pDir !== 'neutral' ? $pDir : 'positive'; ?>"

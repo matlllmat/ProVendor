@@ -12,10 +12,11 @@ if (!isset($_SESSION['user_id'])) {
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../queries/import.query.php';
 require_once __DIR__ . '/../queries/user.query.php';
+require_once __DIR__ . '/../queries/version.query.php';
 
 // Full profile is used by both the navbar (name) and the Profile tab.
 $profile  = getUserProfile($pdo, $_SESSION['user_id']);
 $userName = $profile ? $profile['name'] : 'Store Owner';
 
-$sessions = getImportSessions($pdo, $_SESSION['user_id']);
+$versions = listDatasetVersions($pdo, $_SESSION['user_id']);
 $summary  = getImportSummary($pdo, $_SESSION['user_id']);

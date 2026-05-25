@@ -104,6 +104,8 @@ if (!$dateFormat) {
 }
 
 // ── Detect granularity from date gaps ─────────────────────────────────────────
+// Computed on every import for the response. Forecasting recomputes from `sales`
+// when it needs this — we no longer persist it.
 $rawDates    = array_column(array_column($dataRows, 'data'), $colDate);
 $granularity = detectGranularity($rawDates, $dateFormat['format']);
 
@@ -112,18 +114,10 @@ require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../queries/import.query.php';
 require_once __DIR__ . '/../queries/user.query.php';
 require_once __DIR__ . '/../queries/forecast.query.php';
+require_once __DIR__ . '/../queries/version.query.php';
 
 try {
     $pdo->beginTransaction();
-
-    // Save import session first so we have its id for sales rows
-    $sessionId = saveImportSession(
-        $pdo,
-        $_SESSION['user_id'],
-        $filename,
-        $mapping,
-        $granularity
-    );
 
     // Fetch existing (product_id|sale_date) pairs for duplicate detection.
     // In replace mode we also need the sale IDs so we can UPDATE them.
@@ -247,9 +241,8 @@ try {
                 } else {
                     $updateBatchIdx[$pairKey] = count($updateBatch);
                     $updateBatch[] = [
-                        'sale_id'    => $existingPairsWithIds[$pairKey],
-                        'qty'        => $qty,
-                        'session_id' => $sessionId,
+                        'sale_id' => $existingPairsWithIds[$pairKey],
+                        'qty'     => $qty,
                     ];
                 }
                 $replacedCount++;
@@ -267,10 +260,9 @@ try {
             $salesBatchIdx[$pairKey]  = count($salesBatch);
             $existingPairs[$pairKey]  = true; // prevent DB-duplicate check from matching later rows
             $salesBatch[] = [
-                'product_id'        => $pid,
-                'import_session_id' => $sessionId,
-                'quantity_sold'     => $qty,
-                'sale_date'         => $date,
+                'product_id'    => $pid,
+                'quantity_sold' => $qty,
+                'sale_date'     => $date,
             ];
         }
     }
@@ -292,15 +284,28 @@ try {
     // wipe it so the next forecast modal recomputes the backtest.
     invalidateProductAccuracy($pdo, array_values($productCache));
 
+    // Snapshot the resulting state so the user can roll back this import.
+    // Label uses the source filename for traceability — counts come from the
+    // pass we just did so they're consistent with what the user sees in the UI.
+    $rowsAdded   = count($salesBatch);
+    $rowsChanged = $replacedCount;
+    $versionId   = saveDatasetVersion(
+        $pdo,
+        $_SESSION['user_id'],
+        $filename,
+        $rowsAdded,
+        $rowsChanged
+    );
+
     $pdo->commit();
 
     // Clean up temp file
     unlink($tempPath);
-    unset($_SESSION['temp_csv'], $_SESSION['temp_csv_name']);
+    unset($_SESSION['temp_csv'], $_SESSION['temp_csv_name'], $_SESSION['temp_csv_date_format']);
 
     echo json_encode([
         'success'         => true,
-        'rows'            => count($salesBatch),
+        'rows'            => $rowsAdded,
         'replaced'        => $replacedCount,
         'skipped'         => $skippedDupes,
         'dropped'         => $dropped,
@@ -309,6 +314,7 @@ try {
         'products'        => count($productCache),
         'granularity'     => $granularity,
         'date_format'     => $dateFormat,
+        'version_id'      => $versionId,
     ]);
 
 } catch (PDOException $e) {
