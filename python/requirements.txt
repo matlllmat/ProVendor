@@ -1,6 +1,12 @@
-flask
-prophet
-pandas
+flask - Flask, request, jsonify
+pandas as pd
 pymysql
-scipy
-plotly
+logging
+math
+calendar as cal_lib
+prophet - Prophet
+prophet.utilities - regressor_coefficients
+scipy.stats - norm
+datetime - date as date_cls
+
+DB - pymysql.cursors.DictCursor as cursorclass 

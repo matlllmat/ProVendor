@@ -1,3 +1,4 @@
 notes/
 uploads/*
 !uploads/.gitkeep
+python/pract.py

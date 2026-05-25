@@ -129,7 +129,6 @@ CREATE TABLE IF NOT EXISTS `seasonal_events` (
 INSERT IGNORE INTO `seasonal_events` (`id`, `user_id`, `name`, `event_start`, `event_end`, `recurrence`, `is_last_day`, `is_seeded`, `color`) VALUES
   (101, NULL, 'New Year\'s Day',     '2024-01-01', NULL, 'yearly',  0, 1, '#3B82F6'),
   (103, NULL, 'End-of-month Payday', '2024-01-31', NULL, 'monthly', 1, 1, '#059669'),
-  (104, NULL, 'All Souls Day',       '2024-11-02', NULL, 'yearly',  0, 1, '#8B5CF6'),
   (105, NULL, 'Christmas Eve',       '2024-12-24', NULL, 'yearly',  0, 1, '#F59E0B'),
   (106, NULL, 'Christmas Day',       '2024-12-25', NULL, 'yearly',  0, 1, '#EF4444'),
   (107, NULL, 'New Year\'s Eve',     '2024-12-31', NULL, 'yearly',  0, 1, '#6366F1');

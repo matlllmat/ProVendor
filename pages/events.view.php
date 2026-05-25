@@ -1023,7 +1023,7 @@ async function doHideEvent(id) {
                 <p class="info-section-title">Preset events</p>
                 <p class="info-section-body">
                     Built-in events for common Filipino convenience store patterns (paydays, Christmas,
-                    New Year, All Souls Day, etc.). You can hide any preset you don't need — click the
+                    New Year, etc.). You can hide any preset you don't need — click the
                     eye-off icon on its row. Hidden presets won't appear on your charts or affect your forecast.
                     To restore them, click <strong>Show hidden presets</strong> at the bottom of the events list.
                 </p>

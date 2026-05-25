@@ -5,12 +5,12 @@
 
 from flask import Flask, request, jsonify
 import pandas as pd
-from prophet import Prophet
-from prophet.utilities import regressor_coefficients
 import pymysql
 import logging
 import math
 import calendar as cal_lib
+from prophet import Prophet
+from prophet.utilities import regressor_coefficients
 from scipy.stats import norm
 from datetime import date as date_cls
 
@@ -23,10 +23,10 @@ logging.getLogger('prophet.plot').setLevel(logging.ERROR)
 
 # ── Database credentials (matches with config/db.php) ───────────────────────────
 DB = {
-    'host':        'localhost',
-    'user':        'root',
-    'password':    '',
-    'database':    'provendor',
+    'host': 'localhost',
+    'user': 'root',
+    'password': '',
+    'database': 'provendor',
     'cursorclass': pymysql.cursors.DictCursor,
 }
 
