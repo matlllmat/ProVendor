@@ -621,23 +621,11 @@ async function submitImport() {
             return;
         }
 
-        // Always show the preview so the user sees totals + breakdown before
-        // anything commits — no auto-commit branch, even for a "clean" upload.
+        // Always show the editable preview so the user can see + tweak every
+        // row before anything commits.
         renderPreviewCard(data);
         preflightDone = true;
-
-        var b          = data.buckets;
-        var hasAnything = b.new.count > 0 || b.overlap.count > 0;
-
-        if (!hasAnything) {
-            btn.innerHTML     = 'No changes to apply';
-            btn.disabled      = true;
-            btn.style.opacity = '0.55';
-        } else {
-            btn.innerHTML     = 'Apply changes <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
-            btn.disabled      = false;
-            btn.style.opacity = '1';
-        }
+        refreshSummary();
     } catch(e) {
         showMappingError('Network error during check. Please try again.');
         btn.innerHTML = IMPORT_BTN_HTML;
@@ -645,102 +633,381 @@ async function submitImport() {
     }
 }
 
-// 3-color preview card: green new / orange overlap / red invalid.
-// Header shows the totals at a glance; buckets below have expandable sample tables.
+// ── Editable preview state ────────────────────────────────────────────────────
+var previewRows   = [];
+var previewData   = null;
+var previewFilter = 'all';
+var previewPage   = 1;
+var PER_PAGE      = 50;
+var sortColumn    = null;
+var sortDir       = 'asc';
+
 function renderPreviewCard(data) {
-    var b = data.buckets;
+    previewData = data;
+    previewRows = data.rows.map(function (r) {
+        r.originalStatus = r.status;
+        r.originalQty    = r.qty;
+        r.originalDate   = r.date;
+        r.edited         = false;
+        return r;
+    });
+
     var html = '<div class="preview-card">';
     html += '<div class="preview-card-title">Preview of changes</div>';
+    html += renderSummary();
 
-    html += renderSummary(data);
+    html += '<div class="preview-toolbar">';
+    html += '<div class="preview-filter-chips" id="filter-chips">';
+    html += filterChip('all',     'All');
+    html += filterChip('new',     'New');
+    html += filterChip('overlap', 'Conflict');
+    html += filterChip('invalid', 'Invalid');
+    html += filterChip('noop',    'Unchanged');
+    html += '</div>';
+    html += '<label class="preview-replace-label">';
+    html += '<input type="checkbox" id="replace-overlap" class="preview-replace-check">';
+    html += '<span>Replace existing values for un-edited conflicts</span>';
+    html += '</label>';
+    html += '</div>';
 
-    html += renderBucket('new', 'Will be added',
-        b.new.count, b.new.samples,
-        ['Row', 'Product', 'Date', 'Qty'],
-        function(r) { return [r.row, r.product, r.date, r.qty]; });
+    html += '<div class="preview-table-wrap"><table class="preview-table">';
+    html += '<thead><tr>';
+    html += sortableTh('row',      'Row');
+    html += sortableTh('product',  'Product');
+    html += sortableTh('date',     'Date');
+    html += sortableTh('qty',      'Qty');
+    html += sortableTh('existing', 'Existing');
+    html += sortableTh('status',   'Status');
+    html += '<th>Actions</th>';
+    html += '</tr></thead>';
+    html += '<tbody id="preview-tbody"></tbody>';
+    html += '</table></div>';
 
-    html += renderBucket('overlap', 'Will conflict with existing data',
-        b.overlap.count, b.overlap.samples,
-        ['Row', 'Product', 'Date', 'Existing', 'New'],
-        function(r) { return [r.row, r.product, r.date, r.qty_existing, r.qty_new]; });
+    html += '<div class="preview-pagination" id="preview-pagination"></div>';
 
-    if (b.overlap.count > 0) {
-        html += '<label class="preview-replace-label">';
-        html += '<input type="checkbox" id="replace-overlap" class="preview-replace-check">';
-        html += '<span>Replace the existing values with the new ones</span>';
-        html += '</label>';
-        html += '<p class="preview-replace-help">Leave unchecked to keep the existing values and skip these rows.</p>';
-    }
-
-    html += renderBucket('invalid', 'Can\'t be accepted',
-        b.invalid.count, b.invalid.samples,
-        ['Row', 'Product', 'Date', 'Qty', 'Reason'],
-        function(r) { return [r.row, r.product, r.date, r.qty, r.reason]; });
-
-    if (b.noop && b.noop.count > 0) {
-        html += '<p class="preview-noop">';
-        html += b.noop.count.toLocaleString() + ' row' + (b.noop.count !== 1 ? 's' : '') + ' already match what\'s in the database — no change needed.';
-        html += '</p>';
-    }
+    html += '<p class="preview-edit-help">Click <strong>Edit</strong> on any row to change its Qty or Date, then <strong>Save</strong>. Edited rows show a yellow indicator and are always applied on commit; un-edited conflicts respect the toggle above.</p>';
 
     html += '</div>';
     document.getElementById('preflight-container').innerHTML = html;
+    renderRows();
 }
 
-function renderBucket(kind, title, count, samples, columns, rowFn) {
-    var icon = bucketIcon(kind);
-    var html = '<div class="preview-bucket preview-bucket-' + kind + '">';
-    html += '<div class="preview-bucket-head">';
-    html += icon;
-    html += '<span><strong>' + count.toLocaleString() + '</strong> ' + title + '</span>';
-    html += '</div>';
-
-    if (count > 0 && samples && samples.length) {
-        var shown = Math.min(samples.length, count);
-        html += '<details class="preview-bucket-samples">';
-        html += '<summary>View examples (' + shown + ' of ' + count.toLocaleString() + ')</summary>';
-        html += '<div class="preview-samples-wrap"><table class="preview-samples-table">';
-        html += '<thead><tr>';
-        columns.forEach(function(c) { html += '<th>' + c + '</th>'; });
-        html += '</tr></thead><tbody>';
-        samples.forEach(function(r) {
-            html += '<tr>';
-            rowFn(r).forEach(function(v) { html += '<td>' + escHtml(String(v)) + '</td>'; });
-            html += '</tr>';
-        });
-        html += '</tbody></table></div></details>';
-    }
-
-    html += '</div>';
-    return html;
-}
-
-function renderSummary(data) {
-    var b   = data.buckets;
-    var tot = (data.csv_rows || 0).toLocaleString();
-    var rows = [
-        { cls: 'preview-summary-total', label: 'Total rows in file', value: tot },
-        { cls: 'preview-summary-new',   label: 'Will be added',      value: b.new.count.toLocaleString() },
-    ];
-    if (b.overlap.count > 0) rows.push({ cls: 'preview-summary-overlap', label: 'Conflicts with existing data', value: b.overlap.count.toLocaleString() });
-    if (b.invalid.count > 0) rows.push({ cls: 'preview-summary-invalid', label: 'Can’t be accepted',       value: b.invalid.count.toLocaleString() });
-    if (b.noop && b.noop.count > 0) rows.push({ cls: 'preview-summary-noop', label: 'Already match (no change)', value: b.noop.count.toLocaleString() });
+function renderSummary() {
+    var s   = computePreviewCounts(previewRows);
+    var tot = (previewData.csv_rows || 0).toLocaleString();
 
     var html = '<div class="preview-summary">';
-    rows.forEach(function(r) {
-        html += '<div class="preview-summary-row ' + r.cls + '">';
-        html += '<span class="preview-summary-label">' + r.label + '</span>';
-        html += '<span class="preview-summary-value">' + r.value + '</span>';
-        html += '</div>';
-    });
+    html += summaryRow('preview-summary-total',   'Total rows in file', tot);
+    html += summaryRow('preview-summary-new',     'Will be added',      s.new.toLocaleString());
+    if (s.overlap > 0) html += summaryRow('preview-summary-overlap', 'Conflicts with existing data', s.overlap.toLocaleString());
+    if (s.invalid > 0) html += summaryRow('preview-summary-invalid', 'Can’t be accepted',       s.invalid.toLocaleString());
+    if (s.noop > 0)    html += summaryRow('preview-summary-noop',    'Already match (no change)', s.noop.toLocaleString());
+    if (s.edited > 0)  html += summaryRow('preview-summary-edited',  'Manually edited', s.edited.toLocaleString());
     html += '</div>';
     return html;
 }
 
-function bucketIcon(kind) {
-    if (kind === 'new')     return '<svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
-    if (kind === 'overlap') return '<svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
-    return                        '<svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+function summaryRow(cls, label, value) {
+    return '<div class="preview-summary-row ' + cls + '">' +
+           '<span class="preview-summary-label">' + label + '</span>' +
+           '<span class="preview-summary-value">' + value + '</span></div>';
+}
+
+function filterChip(key, label) {
+    var active = previewFilter === key ? ' preview-filter-chip-active' : '';
+    return '<button type="button" class="preview-filter-chip' + active + '" ' +
+           'data-filter="' + key + '" onclick="setFilter(\'' + key + '\')">' + label + '</button>';
+}
+
+function setFilter(key) {
+    previewFilter = key;
+    previewPage   = 1; // changing filter shrinks/grows the row set — restart paging
+    document.querySelectorAll('#filter-chips .preview-filter-chip').forEach(function (el) {
+        el.classList.toggle('preview-filter-chip-active', el.dataset.filter === key);
+    });
+    renderRows();
+}
+
+function goToPage(p) {
+    previewPage = p;
+    renderRows();
+}
+
+function sortableTh(col, label) {
+    var active = sortColumn === col;
+    var arrow  = active ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
+    var cls    = 'preview-th-sortable' + (active ? ' preview-th-sorted' : '');
+    return '<th class="' + cls + '" data-col="' + col + '" onclick="setSort(\'' + col + '\')">' + label +
+           '<span class="preview-sort-arrow">' + arrow + '</span></th>';
+}
+
+function setSort(col) {
+    if (sortColumn === col) {
+        if (sortDir === 'asc')      sortDir    = 'desc';
+        else                      { sortColumn = null; sortDir = 'asc'; }
+    } else {
+        sortColumn = col;
+        sortDir    = 'asc';
+    }
+    previewPage = 1;
+    updateSortHeaders();
+    renderRows();
+}
+
+function updateSortHeaders() {
+    document.querySelectorAll('#preflight-container .preview-th-sortable').forEach(function (th) {
+        var col   = th.dataset.col;
+        var arrow = th.querySelector('.preview-sort-arrow');
+        if (sortColumn === col) {
+            th.classList.add('preview-th-sorted');
+            if (arrow) arrow.textContent = sortDir === 'asc' ? ' ▲' : ' ▼';
+        } else {
+            th.classList.remove('preview-th-sorted');
+            if (arrow) arrow.textContent = '';
+        }
+    });
+}
+
+function applySort() {
+    if (!sortColumn) {
+        var defaultOrder = { invalid: 0, overlap: 1, new: 2, noop: 3 };
+        previewRows.sort(function (a, b) {
+            var sa = defaultOrder[a.status] !== undefined ? defaultOrder[a.status] : 9;
+            var sb = defaultOrder[b.status] !== undefined ? defaultOrder[b.status] : 9;
+            if (sa !== sb) return sa - sb;
+            return a.rowNum - b.rowNum;
+        });
+        return;
+    }
+    var dir = sortDir === 'asc' ? 1 : -1;
+    previewRows.sort(function (a, b) { return compareRows(a, b, sortColumn) * dir; });
+}
+
+function compareRows(a, b, col) {
+    if (col === 'row')      return a.rowNum - b.rowNum;
+    if (col === 'product')  return String(a.product || '').localeCompare(String(b.product || ''));
+    if (col === 'date')     return String(a.date || '').localeCompare(String(b.date || ''));
+    if (col === 'qty') {
+        var aq = (a.qty === null || a.qty === undefined) ? -Infinity : a.qty;
+        var bq = (b.qty === null || b.qty === undefined) ? -Infinity : b.qty;
+        return aq - bq;
+    }
+    if (col === 'existing') {
+        var ae = a.existing_qty === undefined ? -Infinity : a.existing_qty;
+        var be = b.existing_qty === undefined ? -Infinity : b.existing_qty;
+        return ae - be;
+    }
+    if (col === 'status') {
+        var order = { invalid: 0, overlap: 1, new: 2, noop: 3 };
+        return (order[a.status] !== undefined ? order[a.status] : 9) -
+               (order[b.status] !== undefined ? order[b.status] : 9);
+    }
+    return 0;
+}
+
+function renderRows() {
+    var tbody = document.getElementById('preview-tbody');
+    if (!tbody) return;
+
+    applySort();
+
+    var filtered = [];
+    previewRows.forEach(function (r, idx) {
+        if (previewFilter === 'all' || r.status === previewFilter) {
+            filtered.push({ row: r, idx: idx });
+        }
+    });
+
+    var totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+    if (previewPage > totalPages) previewPage = totalPages;
+    if (previewPage < 1)          previewPage = 1;
+
+    var start = (previewPage - 1) * PER_PAGE;
+    var slice = filtered.slice(start, start + PER_PAGE);
+
+    var html = '';
+    slice.forEach(function (entry) { html += renderRow(entry.row, entry.idx); });
+    if (!html) html = '<tr><td colspan="7" class="preview-empty">No rows match this filter.</td></tr>';
+    tbody.innerHTML = html;
+
+    renderPagination(filtered.length, totalPages, start, slice.length);
+}
+
+function renderPagination(totalFiltered, totalPages, start, shown) {
+    var el = document.getElementById('preview-pagination');
+    if (!el) return;
+    if (totalFiltered === 0) { el.innerHTML = ''; return; }
+
+    var from = (start + 1).toLocaleString();
+    var to   = (start + shown).toLocaleString();
+    var tot  = totalFiltered.toLocaleString();
+
+    var html = '<div class="preview-pagination-info">Showing ' + from + '–' + to + ' of <strong>' + tot + '</strong></div>';
+    html += '<div class="preview-pagination-controls">';
+    html += '<button type="button" class="preview-page-btn" onclick="goToPage(1)"'                        + (previewPage === 1          ? ' disabled' : '') + '>« First</button>';
+    html += '<button type="button" class="preview-page-btn" onclick="goToPage(' + (previewPage - 1) + ')"' + (previewPage === 1          ? ' disabled' : '') + '>← Prev</button>';
+    html += '<span class="preview-pagination-page">Page ' + previewPage + ' of ' + totalPages + '</span>';
+    html += '<button type="button" class="preview-page-btn" onclick="goToPage(' + (previewPage + 1) + ')"' + (previewPage === totalPages ? ' disabled' : '') + '>Next →</button>';
+    html += '<button type="button" class="preview-page-btn" onclick="goToPage(' + totalPages       + ')"'  + (previewPage === totalPages ? ' disabled' : '') + '>Last »</button>';
+    html += '</div>';
+    el.innerHTML = html;
+}
+
+function renderRow(r, idx) {
+    var rowClass = 'preview-row preview-row-' + r.status + (r.edited ? ' preview-row-edited' : '');
+    var qtyVal   = r.qty === null || r.qty === undefined ? (r.raw_qty || '') : r.qty;
+    var dateVal  = r.date || r.raw_date || '';
+    var qtyDisp  = typeof qtyVal === 'number' ? qtyVal.toLocaleString() : escHtml(String(qtyVal));
+
+    var html = '<tr class="' + rowClass + '" data-idx="' + idx + '">';
+    html += '<td class="preview-row-num">' + r.rowNum + (r.agg_count > 1 ? ' <span class="preview-agg">+' + (r.agg_count - 1) + '</span>' : '') + '</td>';
+    html += '<td class="preview-product" title="' + escHtml(r.product) + '">' + escHtml(r.product || '(empty)') + '</td>';
+
+    // Date + Qty render as plain text by default; Edit swaps in the inputs.
+    if (r.editing) {
+        html += '<td><input type="text" class="preview-input preview-input-date" value="' + escHtml(String(dateVal)) + '" ' +
+                'placeholder="YYYY-MM-DD" onchange="onRowEdit(' + idx + ', \'date\', this.value)"></td>';
+        html += '<td><input type="number" min="1" step="1" class="preview-input preview-input-qty" value="' + escHtml(String(qtyVal)) + '" ' +
+                'onchange="onRowEdit(' + idx + ', \'qty\', this.value)"></td>';
+    } else {
+        html += '<td class="preview-cell-display">' + escHtml(String(dateVal)) + '</td>';
+        html += '<td class="preview-cell-display preview-cell-qty-display">' + qtyDisp + '</td>';
+    }
+
+    html += '<td class="preview-existing">' + (r.existing_qty !== undefined ? r.existing_qty.toLocaleString() : '<span class="preview-dash">—</span>') + '</td>';
+    html += '<td>' + statusBadge(r) + '</td>';
+    html += '<td class="preview-actions">' + renderActions(r, idx) + '</td>';
+    html += '</tr>';
+    return html;
+}
+
+function renderActions(r, idx) {
+    if (r.editing) {
+        return '<button type="button" class="preview-row-btn preview-row-btn-save"   onclick="saveEdit(' + idx + ')">Save</button>' +
+               '<button type="button" class="preview-row-btn preview-row-btn-cancel" onclick="cancelEdit(' + idx + ')">Cancel</button>';
+    }
+    return '<button type="button" class="preview-row-btn preview-row-btn-edit" onclick="startEdit(' + idx + ')">Edit</button>';
+}
+
+function startEdit(idx) {
+    var r = previewRows[idx];
+    if (!r) return;
+    r._snapshotQty  = r.qty;
+    r._snapshotDate = r.date;
+    r.editing       = true;
+    renderRows();
+}
+
+function saveEdit(idx) {
+    var r = previewRows[idx];
+    if (!r) return;
+    r.editing = false;
+    delete r._snapshotQty;
+    delete r._snapshotDate;
+    renderRows();
+    refreshSummary();
+}
+
+function cancelEdit(idx) {
+    var r = previewRows[idx];
+    if (!r) return;
+    if (r._snapshotQty !== undefined)  r.qty  = r._snapshotQty;
+    if (r._snapshotDate !== undefined) r.date = r._snapshotDate;
+    r.edited = (r.qty !== r.originalQty || r.date !== r.originalDate);
+    reclassifyRow(r);
+    r.editing = false;
+    delete r._snapshotQty;
+    delete r._snapshotDate;
+    renderRows();
+    refreshSummary();
+}
+
+function statusBadge(r) {
+    var label = { new: 'New', overlap: 'Conflict', invalid: 'Invalid', noop: 'Unchanged' }[r.status] || r.status;
+    var html = '<span class="preview-badge preview-badge-' + r.status + '">' + label + '</span>';
+    if (r.status === 'invalid' && r.reason) {
+        html += '<div class="preview-row-reason" title="' + escHtml(r.reason) + '">' + escHtml(r.reason) + '</div>';
+    }
+    return html;
+}
+
+function onRowEdit(idx, field, value) {
+    var r = previewRows[idx];
+    if (!r) return;
+
+    if (field === 'qty')  r.qty  = value === '' ? null : Number(value);
+    if (field === 'date') r.date = value;
+
+    r.edited = (r.qty !== r.originalQty || r.date !== r.originalDate);
+    reclassifyRow(r);
+
+    // Update the visible cells in place — a full re-render would destroy the
+    // input the user is still focused on.
+    var tr = document.querySelector('#preview-tbody tr[data-idx="' + idx + '"]');
+    if (tr) {
+        tr.className = 'preview-row preview-row-' + r.status + (r.edited ? ' preview-row-edited' : '');
+        var statusTd = tr.children[5];
+        if (statusTd) statusTd.innerHTML = statusBadge(r);
+    }
+
+    refreshSummary();
+}
+
+function reclassifyRow(r) {
+    var qtyOk  = r.qty !== null && Number.isInteger(r.qty) && r.qty > 0;
+    var dateOk = /^\d{4}-\d{2}-\d{2}$/.test(String(r.date).trim()) && !isNaN(new Date(r.date).getTime());
+
+    if (!qtyOk || !dateOk) {
+        r.status = 'invalid';
+        r.reason = !qtyOk ? 'Quantity must be a positive whole number' : 'Date must be in YYYY-MM-DD format';
+        return;
+    }
+    delete r.reason;
+
+    if (r.originalStatus === 'invalid') { r.status = 'new'; return; }
+
+    if (r.date === r.originalDate && r.existing_qty !== undefined) {
+        r.status = (r.qty === r.existing_qty) ? 'noop' : 'overlap';
+        return;
+    }
+    if (r.originalStatus === 'overlap' || r.originalStatus === 'noop') {
+        r.status = 'new';
+        return;
+    }
+    r.status = r.originalStatus;
+}
+
+function refreshSummary() {
+    var card = document.querySelector('#preflight-container .preview-card');
+    if (!card) return;
+    var oldSummary = card.querySelector('.preview-summary');
+    if (oldSummary) {
+        var tmp = document.createElement('div');
+        tmp.innerHTML = renderSummary();
+        oldSummary.replaceWith(tmp.firstElementChild);
+    }
+
+    var s   = computePreviewCounts(previewRows);
+    var btn = document.getElementById('import-btn');
+    var willCommit = s.new + s.overlap + s.edited;
+    if (willCommit === 0) {
+        btn.innerHTML     = 'No changes to apply';
+        btn.disabled      = true;
+        btn.style.opacity = '0.55';
+    } else {
+        btn.innerHTML     = 'Apply changes <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+        btn.disabled      = false;
+        btn.style.opacity = '1';
+    }
+}
+
+function computePreviewCounts(rows) {
+    var s = { new: 0, overlap: 0, invalid: 0, noop: 0, edited: 0 };
+    rows.forEach(function (r) {
+        if (s[r.status] !== undefined) s[r.status]++;
+        if (r.edited) s.edited++;
+    });
+    return s;
 }
 
 async function doImport(mapping, replace) {
@@ -748,8 +1015,14 @@ async function doImport(mapping, replace) {
     btn.textContent = 'Importing…';
     btn.disabled    = true;
 
+    var payloadRows = previewRows.filter(function (r) {
+        if (r.status === 'noop'    && !r.edited) return false;
+        if (r.status === 'invalid' && !r.edited) return false;
+        return true;
+    });
+
     var formData = new FormData();
-    formData.append('mapping',  JSON.stringify(mapping));
+    formData.append('rows',     JSON.stringify(payloadRows));
     formData.append('csv_rows', colRowCount);
     formData.append('replace',  replace ? '1' : '0');
 

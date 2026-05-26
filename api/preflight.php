@@ -1,12 +1,19 @@
 <?php
 // api/preflight.php
-// Pre-import validation: scans the temp CSV with the confirmed column mapping and
-// returns a 3-bucket breakdown for the editor UI:
-//   - new      : valid rows that don't exist in the DB yet (green)
-//   - overlap  : valid rows whose (product, date) already exists with a different qty (yellow)
-//   - invalid  : rows that can't be accepted, with the reason (red)
-// Same-qty overlaps are silent no-ops — surfacing them as decisions would be noise.
-// Writes nothing to the DB.
+// Pre-import scan. Parses the temp CSV, classifies every aggregated (product, date)
+// pair as new / overlap / invalid / noop, and returns the full row list so the UI
+// can render an editable preview table. The user can tweak qty/date before commit;
+// import.php re-validates whatever rows the client sends back.
+//
+// Response shape:
+//   {
+//     date_format: {...},
+//     csv_rows:    total raw rows in the file,
+//     summary:     { new, overlap, invalid, noop, total_aggregated },
+//     rows:        [ { rowNum, product, date, qty, sku, category, subcategory,
+//                      cost, price, status, existing_qty?, reason?, raw_date?,
+//                      raw_qty?, agg_count }, ... ]
+//   }
 
 require_once __DIR__ . '/../config/bootstrap.php';
 require_once __DIR__ . '/import_helpers.php';
@@ -28,11 +35,16 @@ if (empty($mapping['date']) || empty($mapping['product']) || empty($mapping['qua
     exit;
 }
 
-$colDate    = $mapping['date'];
-$colProduct = $mapping['product'];
-$colQty     = $mapping['quantity'];
+$colDate        = $mapping['date'];
+$colProduct     = $mapping['product'];
+$colQty         = $mapping['quantity'];
+$colSku         = $mapping['sku']         ?? null;
+$colCategory    = $mapping['category']    ?? null;
+$colSubcategory = $mapping['subcategory'] ?? null;
+$colCost        = $mapping['cost']        ?? null;
+$colPrice       = $mapping['price']       ?? null;
 
-// ── Scan CSV ──────────────────────────────────────────────────────────────────
+// ── Read CSV ──────────────────────────────────────────────────────────────────
 $handle = fopen($_SESSION['temp_csv'], 'r');
 if (!$handle) {
     echo json_encode(['error' => 'Could not read the uploaded file.']);
@@ -40,7 +52,6 @@ if (!$handle) {
 }
 
 $headers = array_map('trim', fgetcsv($handle));
-
 foreach ([$colDate, $colProduct, $colQty] as $col) {
     if (!in_array($col, $headers)) {
         fclose($handle);
@@ -49,7 +60,7 @@ foreach ([$colDate, $colProduct, $colQty] as $col) {
     }
 }
 
-// Sniff the date format BEFORE rejecting anything — see api/import_helpers.php.
+// First pass: sniff date format from up to 50 sample values, then read rest.
 $dateColIdx   = array_search($colDate, $headers, true);
 $dateSamples  = [];
 $bufferedRows = [];
@@ -69,22 +80,38 @@ fclose($handle);
 $dateFormat = sniffDateFormat($dateSamples);
 $_SESSION['temp_csv_date_format'] = $dateFormat;
 
-// ── First pass: parse rows + classify by validity ─────────────────────────────
-// We collect valid rows by their (product_name, date) key so we can later
-// aggregate same-key CSV rows into a single record before comparing with the DB.
-$invalid        = []; // [['row', 'product', 'date', 'qty', 'reason'], ...]
-$validByPair    = []; // pairKey => ['product_name', 'date', 'qty', 'first_row']
-$rowNum         = 1;
+// ── Classify ──────────────────────────────────────────────────────────────────
+// Invalid rows: collected individually (we can't aggregate without a valid key).
+// Valid rows:   aggregated by "<product>|<date>" so preview matches what would
+//               actually be inserted (the importer aggregates the same way).
+$invalidRows = [];
+$validByPair = []; // pairKey => row data
+$rowNum      = 1;
+
+$pickField = function (array $r, ?string $col): ?string {
+    if (!$col) return null;
+    $v = trim((string) ($r[$col] ?? ''));
+    return $v === '' ? null : $v;
+};
+$pickNumeric = function (array $r, ?string $col): ?float {
+    if (!$col) return null;
+    $v = $r[$col] ?? '';
+    return is_numeric($v) ? (float) $v : null;
+};
 
 foreach ($bufferedRows as $row) {
     $rowNum++;
     if (count($row) !== count($headers)) {
-        $invalid[] = [
-            'row'     => $rowNum,
-            'product' => '',
-            'date'    => '',
-            'qty'     => '',
-            'reason'  => 'Row has wrong number of columns',
+        $invalidRows[] = [
+            'rowNum'    => $rowNum,
+            'agg_count' => 1,
+            'product'   => '',
+            'date'      => '',
+            'qty'       => null,
+            'raw_date'  => '',
+            'raw_qty'   => '',
+            'reason'    => 'Row has wrong number of columns',
+            'status'    => 'invalid',
         ];
         continue;
     }
@@ -108,12 +135,23 @@ foreach ($bufferedRows as $row) {
     }
 
     if ($reason) {
-        $invalid[] = [
-            'row'     => $rowNum,
-            'product' => $productName ?: '(empty)',
-            'date'    => $dateRaw    ?: '(empty)',
-            'qty'     => $qtyRaw     ?: '(empty)',
-            'reason'  => $reason,
+        $invalidRows[] = [
+            'rowNum'    => $rowNum,
+            'agg_count' => 1,
+            'product'   => $productName,
+            'date'      => $dateRaw,        // show raw so user sees what they typed
+            'qty'       => null,
+            'raw_date'  => $dateRaw,
+            'raw_qty'   => $qtyRaw,
+            'reason'    => $reason,
+            'status'    => 'invalid',
+            // Optional fields preserved so the user can edit & re-submit without
+            // losing sku/category/cost/price metadata that was valid on this row.
+            'sku'         => $pickField($r, $colSku),
+            'category'    => $pickField($r, $colCategory),
+            'subcategory' => $pickField($r, $colSubcategory),
+            'cost'        => $pickNumeric($r, $colCost),
+            'price'       => $pickNumeric($r, $colPrice),
         ];
         continue;
     }
@@ -121,87 +159,76 @@ foreach ($bufferedRows as $row) {
     $qty     = (int) $qtyRaw;
     $pairKey = $productName . '|' . $date;
 
-    // Aggregate same-key CSV rows so the preview reflects what would actually
-    // be inserted (one row per product/day).
     if (isset($validByPair[$pairKey])) {
-        $validByPair[$pairKey]['qty'] += $qty;
+        $validByPair[$pairKey]['qty']       += $qty;
+        $validByPair[$pairKey]['agg_count'] += 1;
     } else {
         $validByPair[$pairKey] = [
-            'product_name' => $productName,
-            'date'         => $date,
-            'qty'          => $qty,
-            'first_row'    => $rowNum,
+            'rowNum'      => $rowNum,
+            'agg_count'   => 1,
+            'product'     => $productName,
+            'date'        => $date,
+            'qty'         => $qty,
+            'sku'         => $pickField($r, $colSku),
+            'category'    => $pickField($r, $colCategory),
+            'subcategory' => $pickField($r, $colSubcategory),
+            'cost'        => $pickNumeric($r, $colCost),
+            'price'       => $pickNumeric($r, $colPrice),
         ];
     }
 }
 
-// ── Second pass: classify each valid pair as new / overlap-changed / no-op ────
+// ── Cross-check against existing DB rows ──────────────────────────────────────
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../queries/import.query.php';
 
-// Existing sales for this user, keyed by "<product_name>|<sale_date>" so we can
-// compare against the CSV's product names without needing a pre-existing
-// product_id lookup (new products simply don't match).
 $existing = getExistingSalesByName($pdo, $_SESSION['user_id']);
 
-$newRows      = [];
-$overlapRows  = [];
-$noopCount    = 0;
-$minDate      = null;
-$maxDate      = null;
+$newCount    = 0;
+$overlapCount = 0;
+$noopCount   = 0;
+$outRows     = [];
 
-foreach ($validByPair as $pairKey => $v) {
-    if ($minDate === null || $v['date'] < $minDate) $minDate = $v['date'];
-    if ($maxDate === null || $v['date'] > $maxDate) $maxDate = $v['date'];
-
-    $existingKey = $v['product_name'] . '|' . $v['date'];
+foreach ($validByPair as $key => $v) {
+    $existingKey = $v['product'] . '|' . $v['date'];
     if (!isset($existing[$existingKey])) {
-        $newRows[] = [
-            'row'     => $v['first_row'],
-            'product' => $v['product_name'],
-            'date'    => $v['date'],
-            'qty'     => $v['qty'],
-        ];
-        continue;
-    }
-
-    $existingQty = (int) $existing[$existingKey];
-    if ($existingQty === $v['qty']) {
+        $v['status'] = 'new';
+        $newCount++;
+    } elseif ((int) $existing[$existingKey] === $v['qty']) {
+        $v['status']       = 'noop';
+        $v['existing_qty'] = (int) $existing[$existingKey];
         $noopCount++;
-        continue;
+    } else {
+        $v['status']       = 'overlap';
+        $v['existing_qty'] = (int) $existing[$existingKey];
+        $overlapCount++;
     }
-
-    $overlapRows[] = [
-        'row'          => $v['first_row'],
-        'product'      => $v['product_name'],
-        'date'         => $v['date'],
-        'qty_new'      => $v['qty'],
-        'qty_existing' => $existingQty,
-    ];
+    $outRows[] = $v;
 }
 
-// Cap sample rows at 50 each so the UI table stays scannable.
-$sampleCap = 50;
+// Invalid rows go in as-is.
+foreach ($invalidRows as $r) {
+    $outRows[] = $r;
+}
+
+// Sort: invalid first (so user fixes them), then overlap, then new, then noop.
+$statusOrder = ['invalid' => 0, 'overlap' => 1, 'new' => 2, 'noop' => 3];
+usort($outRows, function ($a, $b) use ($statusOrder) {
+    $sa = $statusOrder[$a['status']] ?? 9;
+    $sb = $statusOrder[$b['status']] ?? 9;
+    if ($sa !== $sb) return $sa - $sb;
+    return $a['rowNum'] - $b['rowNum'];
+});
 
 echo json_encode([
     'date_format' => $dateFormat,
     'csv_rows'    => count($bufferedRows),
-    'date_range'  => ['from' => $minDate, 'to' => $maxDate],
-    'buckets' => [
-        'new' => [
-            'count'   => count($newRows),
-            'samples' => array_slice($newRows, 0, $sampleCap),
-        ],
-        'overlap' => [
-            'count'   => count($overlapRows),
-            'samples' => array_slice($overlapRows, 0, $sampleCap),
-        ],
-        'invalid' => [
-            'count'   => count($invalid),
-            'samples' => array_slice($invalid, 0, $sampleCap),
-        ],
-        'noop' => [
-            'count' => $noopCount,
-        ],
+    'summary'     => [
+        'new'              => $newCount,
+        'overlap'          => $overlapCount,
+        'invalid'          => count($invalidRows),
+        'noop'             => $noopCount,
+        'total_aggregated' => count($outRows),
     ],
+    'rows' => $outRows,
 ]);

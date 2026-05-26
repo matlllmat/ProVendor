@@ -1124,23 +1124,11 @@ async function wSubmitImport() {
             return;
         }
 
-        // Always show the preview so the user sees totals + breakdown before
-        // anything commits — no auto-commit branch, even for a "clean" upload.
+        // Always show the editable preview so the user can see + tweak every
+        // row before anything commits.
         wRenderPreviewCard(data);
         wPreflightDone = true;
-
-        var b          = data.buckets;
-        var hasAnything = b.new.count > 0 || b.overlap.count > 0;
-
-        if (!hasAnything) {
-            btn.innerHTML     = 'No changes to apply';
-            btn.disabled      = true;
-            btn.style.opacity = '0.55';
-        } else {
-            btn.innerHTML     = 'Apply changes <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
-            btn.disabled      = false;
-            btn.style.opacity = '1';
-        }
+        wRefreshSummary();  // sets the Apply button label/enabled state too
     } catch(e) {
         showMappingError('Network error during check. Please try again.');
         btn.innerHTML = IMPORT_BTN_HTML;
@@ -1148,102 +1136,408 @@ async function wSubmitImport() {
     }
 }
 
-// Renders the 3-color preview card. Header shows the totals at a glance;
-// each colored bucket below has its own expandable sample table.
+// ── Editable preview state ────────────────────────────────────────────────────
+// wPreviewRows holds the full row list returned by preflight, mutated in place
+// as the user edits qty/date. Each row carries its original values so we can
+// tell what's been touched (the yellow "edited" indicator).
+var wPreviewRows   = [];
+var wPreviewData   = null;
+var wPreviewFilter = 'all'; // all | new | overlap | invalid | noop
+var wPreviewPage   = 1;
+var W_PER_PAGE     = 50;
+var wSortColumn    = null;  // null = preflight's default order (invalid → overlap → new → noop)
+var wSortDir       = 'asc';
+
 function wRenderPreviewCard(data) {
-    var b = data.buckets;
+    wPreviewData = data;
+    wPreviewRows = data.rows.map(function (r) {
+        r.originalStatus = r.status;
+        r.originalQty    = r.qty;
+        r.originalDate   = r.date;
+        r.edited         = false;
+        return r;
+    });
+
     var html = '<div class="preview-card">';
     html += '<div class="preview-card-title">Preview of changes</div>';
+    html += wRenderSummary();
 
-    html += wRenderSummary(data);
+    html += '<div class="preview-toolbar">';
+    html += '<div class="preview-filter-chips" id="w-filter-chips">';
+    html += wFilterChip('all',     'All');
+    html += wFilterChip('new',     'New');
+    html += wFilterChip('overlap', 'Conflict');
+    html += wFilterChip('invalid', 'Invalid');
+    html += wFilterChip('noop',    'Unchanged');
+    html += '</div>';
+    html += '<label class="preview-replace-label">';
+    html += '<input type="checkbox" id="w-replace-overlap" class="preview-replace-check">';
+    html += '<span>Replace existing values for un-edited conflicts</span>';
+    html += '</label>';
+    html += '</div>';
 
-    html += wRenderBucket('new', 'Will be added',
-        b.new.count, b.new.samples,
-        ['Row', 'Product', 'Date', 'Qty'],
-        function(r) { return [r.row, r.product, r.date, r.qty]; });
+    html += '<div class="preview-table-wrap"><table class="preview-table">';
+    html += '<thead><tr>';
+    html += wSortableTh('row',      'Row');
+    html += wSortableTh('product',  'Product');
+    html += wSortableTh('date',     'Date');
+    html += wSortableTh('qty',      'Qty');
+    html += wSortableTh('existing', 'Existing');
+    html += wSortableTh('status',   'Status');
+    html += '<th>Actions</th>';
+    html += '</tr></thead>';
+    html += '<tbody id="w-preview-tbody"></tbody>';
+    html += '</table></div>';
 
-    html += wRenderBucket('overlap', 'Will conflict with existing data',
-        b.overlap.count, b.overlap.samples,
-        ['Row', 'Product', 'Date', 'Existing', 'New'],
-        function(r) { return [r.row, r.product, r.date, r.qty_existing, r.qty_new]; });
+    html += '<div class="preview-pagination" id="w-preview-pagination"></div>';
 
-    if (b.overlap.count > 0) {
-        html += '<label class="preview-replace-label">';
-        html += '<input type="checkbox" id="w-replace-overlap" class="preview-replace-check">';
-        html += '<span>Replace the existing values with the new ones</span>';
-        html += '</label>';
-        html += '<p class="preview-replace-help">Leave unchecked to keep the existing values and skip these rows.</p>';
-    }
-
-    html += wRenderBucket('invalid', 'Can\'t be accepted',
-        b.invalid.count, b.invalid.samples,
-        ['Row', 'Product', 'Date', 'Qty', 'Reason'],
-        function(r) { return [r.row, r.product, r.date, r.qty, r.reason]; });
-
-    if (b.noop.count > 0) {
-        html += '<p class="preview-noop">';
-        html += b.noop.count.toLocaleString() + ' row' + (b.noop.count !== 1 ? 's' : '') + ' already match what\'s in the database — no change needed.';
-        html += '</p>';
-    }
+    html += '<p class="preview-edit-help">Click <strong>Edit</strong> on any row to change its Qty or Date, then <strong>Save</strong>. Edited rows show a yellow indicator and are always applied on commit; un-edited conflicts respect the toggle above.</p>';
 
     html += '</div>';
+
     document.getElementById('w-preflight-container').innerHTML = html;
+    wRenderRows();
 }
 
-function wRenderBucket(kind, title, count, samples, columns, rowFn) {
-    var icon = wBucketIcon(kind);
-    var html = '<div class="preview-bucket preview-bucket-' + kind + '">';
-    html += '<div class="preview-bucket-head">';
-    html += icon;
-    html += '<span><strong>' + count.toLocaleString() + '</strong> ' + title + '</span>';
-    html += '</div>';
-
-    if (count > 0 && samples && samples.length) {
-        var shown = Math.min(samples.length, count);
-        html += '<details class="preview-bucket-samples">';
-        html += '<summary>View examples (' + shown + ' of ' + count.toLocaleString() + ')</summary>';
-        html += '<div class="preview-samples-wrap"><table class="preview-samples-table">';
-        html += '<thead><tr>';
-        columns.forEach(function(c) { html += '<th>' + c + '</th>'; });
-        html += '</tr></thead><tbody>';
-        samples.forEach(function(r) {
-            html += '<tr>';
-            rowFn(r).forEach(function(v) { html += '<td>' + escHtml(String(v)) + '</td>'; });
-            html += '</tr>';
-        });
-        html += '</tbody></table></div></details>';
-    }
-
-    html += '</div>';
-    return html;
-}
-
-function wRenderSummary(data) {
-    var b   = data.buckets;
-    var tot = (data.csv_rows || 0).toLocaleString();
-    var rows = [
-        { cls: 'preview-summary-total',   label: 'Total rows in file',          value: tot },
-        { cls: 'preview-summary-new',     label: 'Will be added',               value: b.new.count.toLocaleString() },
-    ];
-    if (b.overlap.count > 0) rows.push({ cls: 'preview-summary-overlap', label: 'Conflicts with existing data', value: b.overlap.count.toLocaleString() });
-    if (b.invalid.count > 0) rows.push({ cls: 'preview-summary-invalid', label: 'Can’t be accepted',       value: b.invalid.count.toLocaleString() });
-    if (b.noop && b.noop.count > 0) rows.push({ cls: 'preview-summary-noop', label: 'Already match (no change)', value: b.noop.count.toLocaleString() });
+function wRenderSummary() {
+    var s   = computePreviewCounts(wPreviewRows);
+    var tot = (wPreviewData.csv_rows || 0).toLocaleString();
 
     var html = '<div class="preview-summary">';
-    rows.forEach(function(r) {
-        html += '<div class="preview-summary-row ' + r.cls + '">';
-        html += '<span class="preview-summary-label">' + r.label + '</span>';
-        html += '<span class="preview-summary-value">' + r.value + '</span>';
-        html += '</div>';
-    });
+    html += wSummaryRow('preview-summary-total',   'Total rows in file', tot);
+    html += wSummaryRow('preview-summary-new',     'Will be added',      s.new.toLocaleString());
+    if (s.overlap > 0) html += wSummaryRow('preview-summary-overlap', 'Conflicts with existing data', s.overlap.toLocaleString());
+    if (s.invalid > 0) html += wSummaryRow('preview-summary-invalid', 'Can’t be accepted',       s.invalid.toLocaleString());
+    if (s.noop > 0)    html += wSummaryRow('preview-summary-noop',    'Already match (no change)', s.noop.toLocaleString());
+    if (s.edited > 0)  html += wSummaryRow('preview-summary-edited',  'Manually edited', s.edited.toLocaleString());
     html += '</div>';
     return html;
 }
 
-function wBucketIcon(kind) {
-    if (kind === 'new')     return '<svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
-    if (kind === 'overlap') return '<svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
-    return                        '<svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+function wSummaryRow(cls, label, value) {
+    return '<div class="preview-summary-row ' + cls + '">' +
+           '<span class="preview-summary-label">' + label + '</span>' +
+           '<span class="preview-summary-value">' + value + '</span></div>';
+}
+
+function wFilterChip(key, label) {
+    var active = wPreviewFilter === key ? ' preview-filter-chip-active' : '';
+    return '<button type="button" class="preview-filter-chip' + active + '" ' +
+           'data-filter="' + key + '" onclick="wSetFilter(\'' + key + '\')">' + label + '</button>';
+}
+
+function wSetFilter(key) {
+    wPreviewFilter = key;
+    wPreviewPage   = 1; // changing filter resets to page 1 since the row set shrinks/grows
+    document.querySelectorAll('#w-filter-chips .preview-filter-chip').forEach(function (el) {
+        el.classList.toggle('preview-filter-chip-active', el.dataset.filter === key);
+    });
+    wRenderRows();
+}
+
+function wGoToPage(p) {
+    wPreviewPage = p;
+    wRenderRows();
+}
+
+function wSortableTh(col, label) {
+    var active = wSortColumn === col;
+    var arrow  = active ? (wSortDir === 'asc' ? ' ▲' : ' ▼') : '';
+    var cls    = 'preview-th-sortable' + (active ? ' preview-th-sorted' : '');
+    return '<th class="' + cls + '" data-col="' + col + '" onclick="wSetSort(\'' + col + '\')">' + label +
+           '<span class="preview-sort-arrow">' + arrow + '</span></th>';
+}
+
+function wSetSort(col) {
+    if (wSortColumn === col) {
+        // Same column → toggle direction. Third click clears the sort entirely
+        // (back to preflight's default invalid-first ordering).
+        if (wSortDir === 'asc') {
+            wSortDir = 'desc';
+        } else {
+            wSortColumn = null;
+            wSortDir    = 'asc';
+        }
+    } else {
+        wSortColumn = col;
+        wSortDir    = 'asc';
+    }
+    wPreviewPage = 1;
+    wUpdateSortHeaders();
+    wRenderRows();
+}
+
+// Updates the arrow indicators on the existing thead instead of re-rendering
+// the whole card — that would wipe out any rows the user is currently editing.
+function wUpdateSortHeaders() {
+    document.querySelectorAll('#w-preflight-container .preview-th-sortable').forEach(function (th) {
+        var col   = th.dataset.col;
+        var arrow = th.querySelector('.preview-sort-arrow');
+        if (wSortColumn === col) {
+            th.classList.add('preview-th-sorted');
+            if (arrow) arrow.textContent = wSortDir === 'asc' ? ' ▲' : ' ▼';
+        } else {
+            th.classList.remove('preview-th-sorted');
+            if (arrow) arrow.textContent = '';
+        }
+    });
+}
+
+// Re-applies the active sort to wPreviewRows in place. Returns nothing.
+function wApplySort() {
+    if (!wSortColumn) {
+        // Restore preflight's default order: invalid → overlap → new → noop, then rowNum.
+        var defaultOrder = { invalid: 0, overlap: 1, new: 2, noop: 3 };
+        wPreviewRows.sort(function (a, b) {
+            var sa = defaultOrder[a.status] !== undefined ? defaultOrder[a.status] : 9;
+            var sb = defaultOrder[b.status] !== undefined ? defaultOrder[b.status] : 9;
+            if (sa !== sb) return sa - sb;
+            return a.rowNum - b.rowNum;
+        });
+        return;
+    }
+    var dir = wSortDir === 'asc' ? 1 : -1;
+    wPreviewRows.sort(function (a, b) { return wCompareRows(a, b, wSortColumn) * dir; });
+}
+
+function wCompareRows(a, b, col) {
+    if (col === 'row')      return a.rowNum - b.rowNum;
+    if (col === 'product')  return String(a.product || '').localeCompare(String(b.product || ''));
+    if (col === 'date')     return String(a.date || '').localeCompare(String(b.date || '')); // YYYY-MM-DD sorts lexicographically
+    if (col === 'qty') {
+        var aq = (a.qty === null || a.qty === undefined) ? -Infinity : a.qty;
+        var bq = (b.qty === null || b.qty === undefined) ? -Infinity : b.qty;
+        return aq - bq;
+    }
+    if (col === 'existing') {
+        var ae = a.existing_qty === undefined ? -Infinity : a.existing_qty;
+        var be = b.existing_qty === undefined ? -Infinity : b.existing_qty;
+        return ae - be;
+    }
+    if (col === 'status') {
+        var order = { invalid: 0, overlap: 1, new: 2, noop: 3 };
+        return (order[a.status] !== undefined ? order[a.status] : 9) -
+               (order[b.status] !== undefined ? order[b.status] : 9);
+    }
+    return 0;
+}
+
+function wRenderRows() {
+    var tbody = document.getElementById('w-preview-tbody');
+    if (!tbody) return;
+
+    wApplySort();
+
+    // Filtered set first, then paginate so the page indicator reflects what
+    // the user is actually navigating.
+    var filtered = [];
+    wPreviewRows.forEach(function (r, idx) {
+        if (wPreviewFilter === 'all' || r.status === wPreviewFilter) {
+            filtered.push({ row: r, idx: idx });
+        }
+    });
+
+    var totalPages = Math.max(1, Math.ceil(filtered.length / W_PER_PAGE));
+    if (wPreviewPage > totalPages) wPreviewPage = totalPages;
+    if (wPreviewPage < 1)          wPreviewPage = 1;
+
+    var start = (wPreviewPage - 1) * W_PER_PAGE;
+    var slice = filtered.slice(start, start + W_PER_PAGE);
+
+    var html = '';
+    slice.forEach(function (entry) { html += wRenderRow(entry.row, entry.idx); });
+    if (!html) html = '<tr><td colspan="7" class="preview-empty">No rows match this filter.</td></tr>';
+    tbody.innerHTML = html;
+
+    wRenderPagination(filtered.length, totalPages, start, slice.length);
+}
+
+function wRenderPagination(totalFiltered, totalPages, start, shown) {
+    var el = document.getElementById('w-preview-pagination');
+    if (!el) return;
+    if (totalFiltered === 0) { el.innerHTML = ''; return; }
+
+    var from = (start + 1).toLocaleString();
+    var to   = (start + shown).toLocaleString();
+    var tot  = totalFiltered.toLocaleString();
+
+    var html = '<div class="preview-pagination-info">Showing ' + from + '–' + to + ' of <strong>' + tot + '</strong></div>';
+    html += '<div class="preview-pagination-controls">';
+    html += '<button type="button" class="preview-page-btn" onclick="wGoToPage(1)"'                          + (wPreviewPage === 1          ? ' disabled' : '') + '>« First</button>';
+    html += '<button type="button" class="preview-page-btn" onclick="wGoToPage(' + (wPreviewPage - 1) + ')"' + (wPreviewPage === 1          ? ' disabled' : '') + '>← Prev</button>';
+    html += '<span class="preview-pagination-page">Page ' + wPreviewPage + ' of ' + totalPages + '</span>';
+    html += '<button type="button" class="preview-page-btn" onclick="wGoToPage(' + (wPreviewPage + 1) + ')"' + (wPreviewPage === totalPages ? ' disabled' : '') + '>Next →</button>';
+    html += '<button type="button" class="preview-page-btn" onclick="wGoToPage(' + totalPages       + ')"'  + (wPreviewPage === totalPages ? ' disabled' : '') + '>Last »</button>';
+    html += '</div>';
+    el.innerHTML = html;
+}
+
+function wRenderRow(r, idx) {
+    var rowClass = 'preview-row preview-row-' + r.status + (r.edited ? ' preview-row-edited' : '');
+    var qtyVal   = r.qty === null || r.qty === undefined ? (r.raw_qty || '') : r.qty;
+    var dateVal  = r.date || r.raw_date || '';
+    var qtyDisp  = typeof qtyVal === 'number' ? qtyVal.toLocaleString() : escHtml(String(qtyVal));
+
+    var html = '<tr class="' + rowClass + '" data-idx="' + idx + '">';
+    html += '<td class="preview-row-num">' + r.rowNum + (r.agg_count > 1 ? ' <span class="preview-agg">+' + (r.agg_count - 1) + '</span>' : '') + '</td>';
+    html += '<td class="preview-product" title="' + escHtml(r.product) + '">' + escHtml(r.product || '(empty)') + '</td>';
+
+    // Date + Qty cells render as plain text by default. Click Edit to swap in
+    // editable inputs — the gate stops accidental keystrokes from changing data.
+    if (r.editing) {
+        html += '<td><input type="text" class="preview-input preview-input-date" value="' + escHtml(String(dateVal)) + '" ' +
+                'placeholder="YYYY-MM-DD" onchange="wOnRowEdit(' + idx + ', \'date\', this.value)"></td>';
+        html += '<td><input type="number" min="1" step="1" class="preview-input preview-input-qty" value="' + escHtml(String(qtyVal)) + '" ' +
+                'onchange="wOnRowEdit(' + idx + ', \'qty\', this.value)"></td>';
+    } else {
+        html += '<td class="preview-cell-display">' + escHtml(String(dateVal)) + '</td>';
+        html += '<td class="preview-cell-display preview-cell-qty-display">' + qtyDisp + '</td>';
+    }
+
+    html += '<td class="preview-existing">' + (r.existing_qty !== undefined ? r.existing_qty.toLocaleString() : '<span class="preview-dash">—</span>') + '</td>';
+    html += '<td>' + wStatusBadge(r) + '</td>';
+    html += '<td class="preview-actions">' + wRenderActions(r, idx) + '</td>';
+    html += '</tr>';
+    return html;
+}
+
+function wRenderActions(r, idx) {
+    if (r.editing) {
+        return '<button type="button" class="preview-row-btn preview-row-btn-save"   onclick="wSaveEdit(' + idx + ')">Save</button>' +
+               '<button type="button" class="preview-row-btn preview-row-btn-cancel" onclick="wCancelEdit(' + idx + ')">Cancel</button>';
+    }
+    return '<button type="button" class="preview-row-btn preview-row-btn-edit" onclick="wStartEdit(' + idx + ')">Edit</button>';
+}
+
+function wStartEdit(idx) {
+    var r = wPreviewRows[idx];
+    if (!r) return;
+    // Snapshot the current state so Cancel can revert in-flight changes.
+    r._snapshotQty  = r.qty;
+    r._snapshotDate = r.date;
+    r.editing       = true;
+    wRenderRows();
+}
+
+function wSaveEdit(idx) {
+    var r = wPreviewRows[idx];
+    if (!r) return;
+    r.editing = false;
+    delete r._snapshotQty;
+    delete r._snapshotDate;
+    wRenderRows();
+    wRefreshSummary();
+}
+
+function wCancelEdit(idx) {
+    var r = wPreviewRows[idx];
+    if (!r) return;
+    if (r._snapshotQty !== undefined)  r.qty  = r._snapshotQty;
+    if (r._snapshotDate !== undefined) r.date = r._snapshotDate;
+    r.edited = (r.qty !== r.originalQty || r.date !== r.originalDate);
+    wReclassifyRow(r);
+    r.editing = false;
+    delete r._snapshotQty;
+    delete r._snapshotDate;
+    wRenderRows();
+    wRefreshSummary();
+}
+
+function wStatusBadge(r) {
+    var label = { new: 'New', overlap: 'Conflict', invalid: 'Invalid', noop: 'Unchanged' }[r.status] || r.status;
+    var html = '<span class="preview-badge preview-badge-' + r.status + '">' + label + '</span>';
+    if (r.status === 'invalid' && r.reason) {
+        html += '<div class="preview-row-reason" title="' + escHtml(r.reason) + '">' + escHtml(r.reason) + '</div>';
+    }
+    return html;
+}
+
+function wOnRowEdit(idx, field, value) {
+    var r = wPreviewRows[idx];
+    if (!r) return;
+
+    if (field === 'qty')  r.qty  = value === '' ? null : Number(value);
+    if (field === 'date') r.date = value;
+
+    r.edited = (r.qty !== r.originalQty || r.date !== r.originalDate);
+    wReclassifyRow(r);
+
+    // Update the visible cells in place rather than re-rendering the tbody —
+    // a full re-render mid-edit destroys the inputs and steals user focus.
+    var tr = document.querySelector('#w-preview-tbody tr[data-idx="' + idx + '"]');
+    if (tr) {
+        tr.className = 'preview-row preview-row-' + r.status + (r.edited ? ' preview-row-edited' : '');
+        var statusTd = tr.children[5];
+        if (statusTd) statusTd.innerHTML = wStatusBadge(r);
+    }
+
+    wRefreshSummary();
+}
+
+// Client-side reclassification — only does what we can without a DB roundtrip.
+// (Cross-row overlap detection against the existing DB is left to the server.)
+function wReclassifyRow(r) {
+    var qtyOk  = r.qty !== null && Number.isInteger(r.qty) && r.qty > 0;
+    var dateOk = /^\d{4}-\d{2}-\d{2}$/.test(String(r.date).trim()) && !isNaN(new Date(r.date).getTime());
+
+    if (!qtyOk || !dateOk) {
+        r.status = 'invalid';
+        r.reason = !qtyOk ? 'Quantity must be a positive whole number' : 'Date must be in YYYY-MM-DD format';
+        return;
+    }
+    delete r.reason;
+
+    // Fixed an originally-invalid row → optimistically "new" (server confirms on apply).
+    if (r.originalStatus === 'invalid') { r.status = 'new'; return; }
+
+    // Overlap & noop hinge on whether qty matches the existing DB value
+    // (only valid when date hasn't changed — otherwise we can't tell).
+    if (r.date === r.originalDate && r.existing_qty !== undefined) {
+        r.status = (r.qty === r.existing_qty) ? 'noop' : 'overlap';
+        return;
+    }
+
+    // Date changed for a previously-overlap/noop row — unknown overlap with the new
+    // date, so treat as "new" client-side; server will reclassify.
+    if (r.originalStatus === 'overlap' || r.originalStatus === 'noop') {
+        r.status = 'new';
+        return;
+    }
+
+    r.status = r.originalStatus;
+}
+
+function wRefreshSummary() {
+    var card = document.querySelector('#w-preflight-container .preview-card');
+    if (!card) return;
+    var oldSummary = card.querySelector('.preview-summary');
+    if (!oldSummary) return;
+    var tmp = document.createElement('div');
+    tmp.innerHTML = wRenderSummary();
+    oldSummary.replaceWith(tmp.firstElementChild);
+
+    // Apply button gets toggled too based on whether anything would actually commit.
+    var s   = computePreviewCounts(wPreviewRows);
+    var btn = document.getElementById('w-import-btn');
+    var willCommit = s.new + s.overlap + s.edited; // rough upper bound
+    if (willCommit === 0) {
+        btn.innerHTML     = 'No changes to apply';
+        btn.disabled      = true;
+        btn.style.opacity = '0.55';
+    } else {
+        btn.innerHTML     = 'Apply changes <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+        btn.disabled      = false;
+        btn.style.opacity = '1';
+    }
+}
+
+function computePreviewCounts(rows) {
+    var s = { new: 0, overlap: 0, invalid: 0, noop: 0, edited: 0 };
+    rows.forEach(function (r) {
+        if (s[r.status] !== undefined) s[r.status]++;
+        if (r.edited) s.edited++;
+    });
+    return s;
 }
 
 async function wDoImport(mapping, replace) {
@@ -1251,8 +1545,17 @@ async function wDoImport(mapping, replace) {
     btn.textContent = 'Importing…';
     btn.disabled    = true;
 
+    // Build the rows payload from the editor state. Skip rows that would be
+    // server-side no-ops (saves payload bytes) and rows still marked invalid
+    // and unedited (nothing we can do with them).
+    var payloadRows = wPreviewRows.filter(function (r) {
+        if (r.status === 'noop'    && !r.edited) return false;
+        if (r.status === 'invalid' && !r.edited) return false;
+        return true;
+    });
+
     var formData = new FormData();
-    formData.append('mapping',  JSON.stringify(mapping));
+    formData.append('rows',     JSON.stringify(payloadRows));
     formData.append('csv_rows', wRowCount);
     formData.append('replace',  replace ? '1' : '0');
 

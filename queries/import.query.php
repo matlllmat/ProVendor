@@ -65,6 +65,27 @@ function getExistingSalesPairs(PDO $pdo, int $userId): array
     return $pairs;
 }
 
+// Same shape as getExistingSalesByName but returns sale id + qty per pair so
+// import.php can issue UPDATEs in replace mode without a second lookup.
+function getExistingSalesWithIdsByName(PDO $pdo, int $userId): array
+{
+    $stmt = $pdo->prepare(
+        'SELECT s.id, p.name, s.sale_date, s.quantity_sold
+         FROM sales s
+         JOIN products p ON p.id = s.product_id
+         WHERE p.user_id = ?'
+    );
+    $stmt->execute([$userId]);
+    $out = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $out[$row['name'] . '|' . $row['sale_date']] = [
+            'id'  => (int) $row['id'],
+            'qty' => (int) $row['quantity_sold'],
+        ];
+    }
+    return $out;
+}
+
 // Returns map of "<product_name>|<sale_date>" → quantity_sold for the user's
 // current sales. Keyed by name (not product_id) so the preflight UI can compare
 // against new products that don't exist in the DB yet.

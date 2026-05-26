@@ -1182,8 +1182,324 @@ tr:hover .qty-edit-btn { opacity: 0.45; }
 .preview-summary-new .preview-summary-value     { color: #1A6933; }
 .preview-summary-overlap .preview-summary-value { color: #b94000; }
 .preview-summary-invalid .preview-summary-value { color: #c10b0b; }
+.preview-summary-edited .preview-summary-value  { color: #d97706; }
 .preview-summary-noop .preview-summary-label,
 .preview-summary-noop .preview-summary-value    { opacity: 0.5; font-style: italic; }
+
+/* ── Editable preview table ───────────────────────────────────────────────── */
+.preview-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.625rem;
+    flex-wrap: wrap;
+}
+
+.preview-filter-chips {
+    display: flex;
+    gap: 0.375rem;
+    flex-wrap: wrap;
+}
+
+.preview-filter-chip {
+    background: transparent;
+    border: 1px solid #D2C8AE;
+    border-radius: 999px;
+    padding: 0.3rem 0.75rem;
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: #261F0E;
+    opacity: 0.7;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.preview-filter-chip:hover { opacity: 1; }
+
+.preview-filter-chip-active {
+    background: #261F0E;
+    color: #F0E8D0;
+    border-color: #261F0E;
+    opacity: 1;
+}
+
+.preview-table-wrap {
+    overflow-x: auto;
+    border: 1px solid #D2C8AE;
+    border-radius: 0.5rem;
+    background: #fffdf6;
+    scrollbar-width: thin;
+    scrollbar-color: #D2C8AE transparent;
+}
+
+.preview-table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 720px;
+    font-size: 0.78rem;
+}
+
+.preview-table thead th {
+    position: sticky;
+    top: 0;
+    background: rgba(38,31,14,0.06);
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #261F0E;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid #D2C8AE;
+    z-index: 1;
+}
+
+/* Click-to-sort headers — non-sortable cells (Actions) skip these styles. */
+.preview-th-sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.12s;
+}
+
+.preview-th-sortable:hover { background: rgba(38,31,14,0.12); }
+
+.preview-th-sorted { color: #1A6933; background: rgba(26,105,51,0.08); }
+
+.preview-sort-arrow {
+    font-size: 0.72rem;
+    margin-left: 0.15rem;
+    color: #1A6933;
+}
+
+.preview-table tbody td {
+    padding: 0.35rem 0.75rem;
+    border-bottom: 1px solid rgba(210,200,174,0.45);
+    color: #261F0E;
+    vertical-align: middle;
+}
+
+.preview-row { border-left: 3px solid transparent; }
+.preview-row-new     { border-left-color: rgba(26,105,51,0.4); }
+.preview-row-overlap { border-left-color: rgba(255,87,34,0.5); }
+.preview-row-invalid { border-left-color: rgba(255,26,26,0.5); background: rgba(255,26,26,0.04); }
+.preview-row-noop    { opacity: 0.55; }
+
+/* Edited rows trump everything visually so the user can scan for what they touched. */
+.preview-row-edited            { border-left-color: #d97706 !important; background: rgba(217,119,6,0.06); }
+.preview-row-edited .preview-input { border-color: #d97706; }
+
+.preview-row-num {
+    font-variant-numeric: tabular-nums;
+    color: #261F0E;
+    opacity: 0.55;
+    white-space: nowrap;
+}
+
+.preview-agg {
+    display: inline-block;
+    margin-left: 0.25rem;
+    font-size: 0.65rem;
+    padding: 0.05rem 0.35rem;
+    background: rgba(38,31,14,0.1);
+    border-radius: 999px;
+    opacity: 0.8;
+}
+
+.preview-product {
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.preview-input {
+    width: 100%;
+    min-width: 70px;
+    box-sizing: border-box;
+    border: 1px solid #D2C8AE;
+    border-radius: 0.35rem;
+    padding: 0.25rem 0.45rem;
+    font-size: 0.78rem;
+    color: #261F0E;
+    background: #fff;
+    font-family: inherit;
+}
+
+.preview-input-date { min-width: 110px; }
+.preview-input-qty  { min-width: 70px; text-align: right; font-variant-numeric: tabular-nums; }
+
+.preview-input:focus {
+    outline: none;
+    border-color: #261F0E;
+    box-shadow: 0 0 0 2px rgba(38,31,14,0.1);
+}
+
+.preview-existing {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: #261F0E;
+    opacity: 0.7;
+    white-space: nowrap;
+}
+
+/* Read-only date/qty cells — visible by default; Edit swaps them for inputs. */
+.preview-cell-display {
+    font-size: 0.78rem;
+    color: #261F0E;
+    white-space: nowrap;
+}
+
+.preview-cell-qty-display {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Per-row action buttons (Edit / Save / Cancel). */
+.preview-actions {
+    white-space: nowrap;
+    text-align: right;
+}
+
+.preview-row-btn {
+    background: transparent;
+    border: 1px solid #D2C8AE;
+    border-radius: 0.35rem;
+    padding: 0.22rem 0.6rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #261F0E;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+    margin-left: 0.25rem;
+}
+
+.preview-row-btn:first-child { margin-left: 0; }
+
+.preview-row-btn-edit:hover {
+    background: #261F0E;
+    color: #F0E8D0;
+    border-color: #261F0E;
+}
+
+.preview-row-btn-save {
+    background: rgba(26,105,51,0.1);
+    color: #1A6933;
+    border-color: rgba(26,105,51,0.4);
+}
+
+.preview-row-btn-save:hover {
+    background: #1A6933;
+    color: #F0E8D0;
+    border-color: #1A6933;
+}
+
+.preview-row-btn-cancel:hover {
+    background: rgba(192,57,43,0.08);
+    color: #c0392b;
+    border-color: #c0392b;
+}
+
+.preview-dash { opacity: 0.35; }
+
+.preview-badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.preview-badge-new     { background: rgba(26,105,51,0.12);  color: #1A6933; }
+.preview-badge-overlap { background: rgba(255,87,34,0.14);  color: #b94000; }
+.preview-badge-invalid { background: rgba(255,26,26,0.12);  color: #c10b0b; }
+.preview-badge-noop    { background: rgba(38,31,14,0.08);   color: #261F0E; opacity: 0.5; }
+
+.preview-row-reason {
+    font-size: 0.68rem;
+    color: #c10b0b;
+    margin-top: 0.2rem;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.preview-empty {
+    text-align: center;
+    padding: 2rem;
+    opacity: 0.45;
+    font-style: italic;
+}
+
+.preview-edit-help {
+    font-size: 0.72rem;
+    color: #261F0E;
+    opacity: 0.55;
+    margin: 0.625rem 0 0;
+    line-height: 1.5;
+}
+
+/* ── Pagination controls (below the editable table) ───────────────────────── */
+.preview-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-top: 0.625rem;
+    flex-wrap: wrap;
+}
+
+.preview-pagination:empty { display: none; }
+
+.preview-pagination-info {
+    font-size: 0.74rem;
+    color: #261F0E;
+    opacity: 0.7;
+    font-variant-numeric: tabular-nums;
+}
+
+.preview-pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.preview-page-btn {
+    background: #F0E8D0;
+    border: 1px solid #D2C8AE;
+    border-radius: 0.4rem;
+    padding: 0.3rem 0.7rem;
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: #261F0E;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+}
+
+.preview-page-btn:hover:not(:disabled) {
+    background: #261F0E;
+    color: #F0E8D0;
+    border-color: #261F0E;
+}
+
+.preview-page-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.preview-pagination-page {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #261F0E;
+    padding: 0 0.5rem;
+    font-variant-numeric: tabular-nums;
+}
 
 .preview-bucket {
     margin-bottom: 0.75rem;

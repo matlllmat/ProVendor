@@ -423,25 +423,45 @@ var ChartModal = (function () {
                         '<p class="cm-metric-label">MAPE</p>' +
                         '<p class="cm-metric-value" id="cm-metric-mape">—</p>' +
                         '<p class="cm-metric-unit">average % error</p>' +
-                        '<p class="cm-metric-explain"><strong>Mean Absolute Percentage Error.</strong> The headline ' +
-                           'comparability number — easy to read across products. Becomes unreliable for low-volume ' +
-                           'items (zero-sale days inflate the average).</p>' +
+                        '<p class="cm-metric-explain">' +
+                            '<strong>Mean Absolute Percentage Error.</strong> How far off the forecast is on average, ' +
+                            'as a percentage of actual sales. <strong>Lower is better.</strong>' +
+                        '</p>' +
+                        '<ul class="cm-metric-scale">' +
+                            '<li><span class="cm-metric-tag cm-tag-good">under&nbsp;15%</span> excellent — trust the model</li>' +
+                            '<li><span class="cm-metric-tag cm-tag-ok">15&ndash;30%</span> typical for retail demand</li>' +
+                            '<li><span class="cm-metric-tag cm-tag-bad">over&nbsp;40%</span> model is struggling for this product</li>' +
+                        '</ul>' +
+                        '<p class="cm-metric-hint">Avoid for slow-moving items &mdash; a single zero-sale day inflates the average.</p>' +
                     '</div>' +
                     '<div class="cm-metric-card">' +
                         '<p class="cm-metric-label">MAE</p>' +
                         '<p class="cm-metric-value" id="cm-metric-mae">—</p>' +
                         '<p class="cm-metric-unit">units/day off</p>' +
-                        '<p class="cm-metric-explain"><strong>Mean Absolute Error.</strong> Average units the forecast ' +
-                           'missed by, in the same scale as the data. The most direct &ldquo;how wrong is it&rdquo; ' +
-                           'measure — trust this when MAPE looks suspicious.</p>' +
+                        '<p class="cm-metric-explain">' +
+                            '<strong>Mean Absolute Error.</strong> Average number of units the forecast missed by, in ' +
+                            'the same scale as your sales. <strong>Compare it to your typical daily volume</strong> &mdash; ' +
+                            'the same MAE means different things at different scales.' +
+                        '</p>' +
+                        '<ul class="cm-metric-scale">' +
+                            '<li><span class="cm-metric-tag cm-tag-good">MAE&nbsp;5 on 50/day</span> ~10% miss — good</li>' +
+                            '<li><span class="cm-metric-tag cm-tag-bad">MAE&nbsp;5 on 8/day</span> ~60% miss — bad</li>' +
+                        '</ul>' +
+                        '<p class="cm-metric-hint">More trustworthy than MAPE on low-volume products with lots of zero-sale days.</p>' +
                     '</div>' +
                     '<div class="cm-metric-card">' +
                         '<p class="cm-metric-label">RMSE</p>' +
                         '<p class="cm-metric-value" id="cm-metric-rmse">—</p>' +
                         '<p class="cm-metric-unit">units/day off</p>' +
-                        '<p class="cm-metric-explain"><strong>Root Mean Square Error.</strong> Same units as MAE but ' +
-                           'penalizes large misses much more. When RMSE is noticeably bigger than MAE, the model ' +
-                           'has occasional big blow-ups, not just steady small misses.</p>' +
+                        '<p class="cm-metric-explain">' +
+                            '<strong>Root Mean Square Error.</strong> Same units as MAE, but it <strong>punishes ' +
+                            'big single-day misses harder</strong>. Always read it next to MAE.' +
+                        '</p>' +
+                        '<ul class="cm-metric-scale">' +
+                            '<li><span class="cm-metric-tag cm-tag-good">RMSE&nbsp;≈&nbsp;MAE</span> errors are small &amp; consistent</li>' +
+                            '<li><span class="cm-metric-tag cm-tag-bad">RMSE&nbsp;»&nbsp;MAE</span> occasional huge misses — model has blind spots</li>' +
+                        '</ul>' +
+                        '<p class="cm-metric-hint">A big gap usually means the model is missing an event or sudden trend shift.</p>' +
                     '</div>' +
                 '</div>' +
                 '<p id="cm-metrics-footer" class="cm-metrics-footer"></p>' +
@@ -1269,14 +1289,22 @@ var ChartModal = (function () {
         if (rho != null && rho !== 0 && inflation != null && inflation !== 1) {
             var pctWider = Math.round((inflation - 1) * 100);
             noteHtml =
-                '<strong>Variance correction applied.</strong> Backtest residuals for this product show ' +
-                'lag-1 autocorrelation ρ = ' + rho.toFixed(2) + ', so σ was widened by ~' + pctWider +
-                '% to account for day-to-day demand clustering (events, weekends).';
+                '<strong>Extra safety buffer applied (+' + pctWider + '%).</strong> ' +
+                'The standard Newsvendor formula assumes each day&rsquo;s demand is independent of the next. ' +
+                'But when we backtested this product&rsquo;s forecasts, we noticed busy days come in <em>streaks</em> ' +
+                '— typical for products driven by paydays, weekends, or events ' +
+                '(lag-1 autocorrelation ρ = ' + rho.toFixed(2) + '). ' +
+                'Independent-day math would understate how badly a run of mismatched days could line up, so we widened ' +
+                'the uncertainty (σ) by <strong>' + pctWider + '%</strong> before computing your order. ' +
+                '<strong>The recommended quantity already includes this buffer</strong> — you don&rsquo;t need to add anything on top.';
         } else {
             noteHtml =
-                '<strong>Independence assumption.</strong> Total uncertainty here treats each day as ' +
-                'independent. Real demand often clusters around events and weekends, so this may ' +
-                'slightly underestimate risk for highly eventful products.';
+                '<strong>No extra buffer needed — daily independence assumption.</strong> ' +
+                'The Newsvendor formula assumes each day&rsquo;s demand is independent of the days around it. ' +
+                'For this product, the backtest residuals didn&rsquo;t show meaningful day-to-day clustering, so no ' +
+                'safety buffer was added on top of the standard math. ' +
+                '<em>Caveat:</em> if you know this product spikes hard around predictable events (paydays, weekends, holidays) ' +
+                'and busy days tend to come in runs, real-world stockout risk could be slightly higher than what the recommendation reflects.';
         }
 
         body.innerHTML =
