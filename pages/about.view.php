@@ -123,9 +123,9 @@ require_once __DIR__ . '/../includes/header.php';
                 <article class="flex flex-col items-center text-center group">
                     <div class="w-36 h-36 rounded-2xl mb-5 overflow-hidden border border-[#F0E8D0]/10 flex items-center justify-center relative"
                          style="background:rgba(240,232,208,0.06)">
-                        <svg class="w-16 h-16 text-[#D2C8AE]/20" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
-                        </svg>
+
+                        <img src="../images/sapanta.jpeg" class="w-full h-full object-cover" alt="Sapanta" />
+
                         <div class="absolute inset-x-0 bottom-0 py-1.5 text-center" style="background:rgba(38,31,14,0.6)">
                             <span class="text-[#D2C8AE]/50 text-[9px] uppercase tracking-widest">Photo</span>
                         </div>
@@ -139,14 +139,14 @@ require_once __DIR__ . '/../includes/header.php';
                 <article class="flex flex-col items-center text-center group">
                     <div class="w-36 h-36 rounded-2xl mb-5 overflow-hidden border border-[#F0E8D0]/10 flex items-center justify-center relative"
                          style="background:rgba(240,232,208,0.06)">
-                        <svg class="w-16 h-16 text-[#D2C8AE]/20" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
-                        </svg>
+
+                        <img src="../images/michael.jpg" class="w-full h-full object-cover" alt="Delos Santos" />
+
                         <div class="absolute inset-x-0 bottom-0 py-1.5 text-center" style="background:rgba(38,31,14,0.6)">
                             <span class="text-[#D2C8AE]/50 text-[9px] uppercase tracking-widest">Photo</span>
                         </div>
                     </div>
-                    <p class="text-[#F0E8D0] font-semibold text-sm mb-0.5">Ken Delos Santos</p>
+                    <p class="text-[#F0E8D0] font-semibold text-sm mb-0.5">Michael John Delos Santos</p>
                     <p class="text-[#1A6933] text-[10px] font-semibold uppercase tracking-widest mb-2">BSIT</p>
                     <p class="text-[#D2C8AE]/50 text-xs leading-relaxed">Short description or contribution to the project goes here.</p>
                 </article>
@@ -155,9 +155,9 @@ require_once __DIR__ . '/../includes/header.php';
                 <article class="flex flex-col items-center text-center group">
                     <div class="w-36 h-36 rounded-2xl mb-5 overflow-hidden border border-[#F0E8D0]/10 flex items-center justify-center relative"
                          style="background:rgba(240,232,208,0.06)">
-                        <svg class="w-16 h-16 text-[#D2C8AE]/20" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
-                        </svg>
+
+                        <img src="../images/ver.png" class="w-full h-full object-cover" alt="Davis" />
+
                         <div class="absolute inset-x-0 bottom-0 py-1.5 text-center" style="background:rgba(38,31,14,0.6)">
                             <span class="text-[#D2C8AE]/50 text-[9px] uppercase tracking-widest">Photo</span>
                         </div>
@@ -171,9 +171,9 @@ require_once __DIR__ . '/../includes/header.php';
                 <article class="flex flex-col items-center text-center group">
                     <div class="w-36 h-36 rounded-2xl mb-5 overflow-hidden border border-[#F0E8D0]/10 flex items-center justify-center relative"
                          style="background:rgba(240,232,208,0.06)">
-                        <svg class="w-16 h-16 text-[#D2C8AE]/20" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
-                        </svg>
+
+                        <img src="../images/johnlorenz.jpg" class="w-full h-full object-cover" alt="Rolloque" />
+
                         <div class="absolute inset-x-0 bottom-0 py-1.5 text-center" style="background:rgba(38,31,14,0.6)">
                             <span class="text-[#D2C8AE]/50 text-[9px] uppercase tracking-widest">Photo</span>
                         </div>
