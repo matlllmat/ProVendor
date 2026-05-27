@@ -78,6 +78,16 @@ while (($row = fgetcsv($handle)) !== false) {
 fclose($handle);
 
 $dateFormat = sniffDateFormat($dateSamples);
+
+// OVERRIDE WITH USER CHOICE IF PROVIDED
+$userFormat = $_POST['date_format'] ?? 'auto';
+if ($userFormat !== 'auto' && $userFormat !== '') {
+    $dateFormat = [
+        'format' => $userFormat,
+        'ambiguous' => false
+    ];
+}
+
 $_SESSION['temp_csv_date_format'] = $dateFormat;
 
 // ── Classify ──────────────────────────────────────────────────────────────────

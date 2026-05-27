@@ -338,6 +338,21 @@ require_once __DIR__ . '/../includes/header.php';
                         <span class="text-xs px-2.5 py-0.5 rounded-full font-semibold" style="background:rgba(38,31,14,0.08); color:#261F0E; border:1px solid rgba(38,31,14,0.18)">Quantity</span>
                         <span class="text-[10px] text-[#261F0E] ml-1" style="opacity:0.38">— unassigned columns are ignored</span>
                     </div>
+                    
+                    <div class="mb-5 flex items-center gap-3 p-3.5 rounded-xl border border-[#D2C8AE]" style="background:rgba(38,31,14,0.03);">
+                        <label class="text-[11px] font-bold text-[#261F0E] uppercase tracking-wider" style="opacity:0.8" for="w-date-format-select">Date Format:</label>
+                        <select id="w-date-format-select" class="text-sm font-semibold border-2 border-[#D2C8AE] rounded-lg px-3 py-1.5 bg-white focus:border-[#261F0E] hover:border-[#261F0E] outline-none transition-colors cursor-pointer shadow-sm" style="color:#261F0E;" onchange="wClearPreflight(); wSaveState();">
+                            <option value="auto">Auto-detect</option>
+                            <option value="Y-m-d">YYYY-MM-DD (e.g. 2024-01-31)</option>
+                            <option value="d/m/Y">DD/MM/YYYY (e.g. 31/01/2024)</option>
+                            <option value="m/d/Y">MM/DD/YYYY (e.g. 01/31/2024)</option>
+                            <option value="d-m-Y">DD-MM-YYYY (e.g. 31-01-2024)</option>
+                            <option value="m-d-Y">MM-DD-YYYY (e.g. 01-31-2024)</option>
+                            <option value="Y/m/d">YYYY/MM/DD (e.g. 2024/01/31)</option>
+                            <option value="j/n/y">D/M/YY (e.g. 31/1/24)</option>
+                            <option value="n/j/y">M/D/YY (e.g. 1/31/24)</option>
+                        </select>
+                    </div>
 
                     <div class="col-table-wrap">
                         <div id="w-col-table-inner"></div>
@@ -781,6 +796,10 @@ function wForceClose() {
     document.getElementById('wizard-panel').classList.add('hidden');
     document.getElementById('w-drop-text').textContent = 'Drop your CSV here, or click to browse';
     document.getElementById('w-csv-file').value = '';
+    
+    var dfSel = document.getElementById('w-date-format-select');
+    if (dfSel) dfSel.value = 'auto';
+
     var btn = document.getElementById('w-upload-btn');
     btn.disabled      = true;
     btn.style.opacity = '0.3';
@@ -903,6 +922,7 @@ function wSaveState() {
             rowCount:    wRowCount,
             assignments: wAssignments,
             fileName:    document.getElementById('w-file-name').textContent,
+            dateFormat:  document.getElementById('w-date-format-select').value,
         }));
     } catch(e) {}
 }
@@ -923,6 +943,11 @@ function wRestoreState() {
         wSample      = state.sample      || [];
         wRowCount    = state.rowCount    || 0;
         wAssignments = state.assignments || {};
+
+        if (state.dateFormat) {
+            var dfSel = document.getElementById('w-date-format-select');
+            if (dfSel) dfSel.value = state.dateFormat;
+        }
 
         buildColumnTable();
         document.getElementById('w-file-name').textContent         = state.fileName || '';
@@ -955,6 +980,11 @@ function wPopulateMappingUI(data) {
     var rowWord = wRowCount.toLocaleString() + ' row' + (wRowCount !== 1 ? 's' : '');
     document.getElementById('w-file-name').textContent         = colWord + ' · ' + rowWord + ' total';
     document.getElementById('w-granularity-badge').textContent = wSample.length + ' sample rows shown';
+    
+    var detectedFormat = data.date_format && data.date_format.format ? data.date_format.format : '';
+    var autoText = 'Auto-detect' + (detectedFormat ? ' (' + detectedFormat + ')' : '');
+    document.querySelector('#w-date-format-select option[value="auto"]').textContent = autoText;
+
     wSaveState();
 }
 
@@ -1112,6 +1142,7 @@ async function wSubmitImport() {
 
     var formData = new FormData();
     formData.append('mapping', JSON.stringify(mapping));
+    formData.append('date_format', document.getElementById('w-date-format-select').value);
 
     try {
         var res  = await fetch('<?php echo BASE_URL; ?>/api/preflight.php', { method: 'POST', body: formData });

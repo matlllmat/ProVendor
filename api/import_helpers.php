@@ -61,11 +61,18 @@ function normalizeDateStrict(string $raw, ?string $format): ?string
     $raw = trim($raw);
     if ($raw === '') return null;
 
-    // 1. Try the column's detected format first.
+    // 1. Try the column's explicitly chosen/detected format first.
     if ($format) {
         $dt = DateTime::createFromFormat('!' . $format, $raw);
-        if ($dt && $dt->format($format) === $raw) {
-            return $dt->format('Y-m-d');
+        if ($dt) {
+            $errors = DateTime::getLastErrors();
+            // Accept the date as long as PHP didn't flag trailing characters or syntax warnings
+            if (!$errors || ($errors['warning_count'] == 0 && $errors['error_count'] == 0)) {
+                // Prevent 2-digit years getting parsed as literal year 0024 by 4-digit 'Y' formats
+                if ((int)$dt->format('Y') > 1000) {
+                    return $dt->format('Y-m-d');
+                }
+            }
         }
     }
 

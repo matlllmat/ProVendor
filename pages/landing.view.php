@@ -248,6 +248,21 @@ require_once __DIR__ . '/../includes/header.php';
                     <span class="text-[10px] text-[#261F0E] ml-1" style="opacity:0.38">— unassigned columns are ignored</span>
                 </div>
 
+                <div class="mb-5 flex items-center gap-3 p-3.5 rounded-xl border border-[#D2C8AE]" style="background:rgba(38,31,14,0.03);">
+                    <label class="text-[11px] font-bold text-[#261F0E] uppercase tracking-wider" style="opacity:0.8" for="date-format-select">Date Format:</label>
+                    <select id="date-format-select" class="text-sm font-semibold border-2 border-[#D2C8AE] rounded-lg px-3 py-1.5 bg-white focus:border-[#261F0E] hover:border-[#261F0E] outline-none transition-colors cursor-pointer shadow-sm" style="color:#261F0E;" onchange="clearPreflight()">
+                        <option value="auto">Auto-detect</option>
+                        <option value="Y-m-d">YYYY-MM-DD (e.g. 2024-01-31)</option>
+                        <option value="d/m/Y">DD/MM/YYYY (e.g. 31/01/2024)</option>
+                        <option value="m/d/Y">MM/DD/YYYY (e.g. 01/31/2024)</option>
+                        <option value="d-m-Y">DD-MM-YYYY (e.g. 31-01-2024)</option>
+                        <option value="m-d-Y">MM-DD-YYYY (e.g. 01-31-2024)</option>
+                        <option value="Y/m/d">YYYY/MM/DD (e.g. 2024/01/31)</option>
+                        <option value="j/n/y">D/M/YY (e.g. 31/1/24)</option>
+                        <option value="n/j/y">M/D/YY (e.g. 1/31/24)</option>
+                    </select>
+                </div>
+                
                 <!-- Column assignment table -->
                 <div class="col-table-wrap">
                     <div id="col-table-inner"></div>
@@ -453,6 +468,10 @@ function populateMappingUI(data) {
     var rowWord = colRowCount.toLocaleString() + ' row' + (colRowCount !== 1 ? 's' : '');
     document.getElementById('file-name-display').textContent = colWord + ' · ' + rowWord + ' total';
     document.getElementById('granularity-badge').textContent = colSample.length + ' sample rows shown';
+
+    var detectedFormat = data.date_format && data.date_format.format ? data.date_format.format : '';
+    var autoText = 'Auto-detect' + (detectedFormat ? ' (' + detectedFormat + ')' : '');
+    document.querySelector('#date-format-select option[value="auto"]').textContent = autoText;
 }
 
 function buildColumnTable() {
@@ -609,6 +628,7 @@ async function submitImport() {
 
     var formData = new FormData();
     formData.append('mapping', JSON.stringify(mapping));
+    formData.append('date_format', document.getElementById('date-format-select').value);
 
     try {
         var res  = await fetch('<?php echo BASE_URL; ?>/api/preflight.php', { method: 'POST', body: formData });

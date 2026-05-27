@@ -172,7 +172,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <div class="w-36 h-36 rounded-2xl mb-5 overflow-hidden border border-[#F0E8D0]/10 flex items-center justify-center relative"
                          style="background:rgba(240,232,208,0.06)">
 
-                        <img src="../images/johnlorenz.jpg" class="w-full h-full object-cover" alt="Rolloque" />
+                        <img src="../images/rolloque.jpg" class="w-full h-full object-cover" alt="Rolloque" />
 
                         <div class="absolute inset-x-0 bottom-0 py-1.5 text-center" style="background:rgba(38,31,14,0.6)">
                             <span class="text-[#D2C8AE]/50 text-[9px] uppercase tracking-widest">Photo</span>
