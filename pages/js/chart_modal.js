@@ -206,7 +206,7 @@ var ChartModal = (function () {
 
     // ── modal DOM (created once, reused) ──────────────────────────────────────
     var _MODAL_HTML =
-        '<div id="cm-modal" class="fixed inset-0 z-[1000] flex items-center justify-center hidden" role="dialog" aria-modal="true">' +
+        '<div id="cm-modal" class="fixed inset-0 z-[1200] flex items-center justify-center hidden" role="dialog" aria-modal="true">' +
             '<div id="cm-backdrop" class="absolute inset-0" style="background:rgba(38,31,14,0.55)"></div>' +
             '<div class="cm-card">' +
                 '<div class="cm-header">' +
@@ -394,9 +394,9 @@ var ChartModal = (function () {
                     '<div class="cm-nv-section">' +
                         '<button id="cm-nv-toggle" class="cm-nv-header">' +
                             '<span class="cm-nv-title">Newsvendor Model — How this was calculated</span>' +
-                            '<svg id="cm-nv-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform 0.2s;flex-shrink:0"><polyline points="6 9 12 15 18 9"/></svg>' +
+                            '<svg id="cm-nv-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform 0.2s;flex-shrink:0;transform:rotate(-90deg)"><polyline points="6 9 12 15 18 9"/></svg>' +
                         '</button>' +
-                        '<div id="cm-nv-body" class="cm-nv-body"></div>' +
+                        '<div id="cm-nv-body" class="cm-nv-body" style="display:none"></div>' +
                     '</div>' +
                 '</div>' +
             '</div>' +
@@ -405,13 +405,17 @@ var ChartModal = (function () {
             // by /forecast/product/evaluate. Populated by _loadAccuracyChip()
             // (same fetch as the header chip). Hidden until data arrives.
             '<div id="cm-metrics-panel" class="cm-metrics-panel" style="display:none">' +
-                '<div class="cm-metrics-header">' +
-                    '<p class="cm-metrics-eyebrow">Forecast Accuracy</p>' +
-                    '<h3 class="cm-metrics-title">How well does this model predict for this product?</h3>' +
+                '<button id="cm-metrics-toggle" class="cm-metrics-toggle">' +
+                    '<div style="min-width:0">' +
+                        '<p class="cm-metrics-eyebrow">Forecast Accuracy</p>' +
+                        '<h3 class="cm-metrics-title">How well does this model predict for this product?</h3>' +
+                    '</div>' +
+                    '<svg id="cm-metrics-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform 0.2s;flex-shrink:0;transform:rotate(-90deg)"><polyline points="6 9 12 15 18 9"/></svg>' +
+                '</button>' +
+                '<div id="cm-metrics-content" class="cm-metrics-content" style="display:none">' +
                     '<p class="cm-metrics-sub">Three standard error metrics, computed on a held-out window of the most recent sales. ' +
                        'These tell different stories — read all three together rather than picking one.</p>' +
-                '</div>' +
-                '<div class="cm-metrics-grid">' +
+                    '<div class="cm-metrics-grid">' +
                     '<div class="cm-metric-card">' +
                         '<p class="cm-metric-label">MAPE</p>' +
                         '<p class="cm-metric-value" id="cm-metric-mape">—</p>' +
@@ -457,7 +461,8 @@ var ChartModal = (function () {
                         '<p class="cm-metric-hint">A big gap usually means the model is missing an event or sudden trend shift.</p>' +
                     '</div>' +
                 '</div>' +
-                '<p id="cm-metrics-footer" class="cm-metrics-footer"></p>' +
+                    '<p id="cm-metrics-footer" class="cm-metrics-footer"></p>' +
+                '</div>' +
             '</div>' +
 
             actionRow;
@@ -499,6 +504,9 @@ var ChartModal = (function () {
         // Wire newsvendor toggle once results panel exists (it's there but hidden)
         var nvToggle = document.getElementById('cm-nv-toggle');
         if (nvToggle) nvToggle.addEventListener('click', _toggleNv);
+
+        var metricsToggle = document.getElementById('cm-metrics-toggle');
+        if (metricsToggle) metricsToggle.addEventListener('click', _toggleMetrics);
 
         var saveBtn  = document.getElementById('cm-save-btn');
         var againBtn = document.getElementById('cm-run-again-btn');
@@ -614,7 +622,8 @@ var ChartModal = (function () {
         _st.eventsOn     = false;
         _st.fcStart      = null;
         _st.disabledIds  = cfg.disabledEventIds || new Set();
-        _st.nvOpen       = true;
+        _st.nvOpen       = false;
+        _st.metricsOpen  = false;
         _st.view         = 'daily';
         _st.cfg          = cfg;
         _st.meta         = null;
@@ -697,6 +706,7 @@ var ChartModal = (function () {
     var _inlineContainer = null;
 
     function renderIn(container, cfg) {
+        _ensureModal(); // ensures #cm-accuracy-chip exists so _loadAccuracyChip can populate the metrics panel
         _inlineContainer = container;
         _render(container, cfg);
     }
@@ -1140,8 +1150,17 @@ var ChartModal = (function () {
         _st.nvOpen = !_st.nvOpen;
         var body = document.getElementById('cm-nv-body');
         var chev = document.getElementById('cm-nv-chev');
-        if (body) body.style.display      = _st.nvOpen ? '' : 'none';
-        if (chev) chev.style.transform    = _st.nvOpen ? 'rotate(0deg)' : 'rotate(-90deg)';
+        if (body) body.style.display   = _st.nvOpen ? '' : 'none';
+        if (chev) chev.style.transform = _st.nvOpen ? 'rotate(0deg)' : 'rotate(-90deg)';
+    }
+
+    // ── accuracy metrics toggle ───────────────────────────────────────────────
+    function _toggleMetrics() {
+        _st.metricsOpen = !_st.metricsOpen;
+        var content = document.getElementById('cm-metrics-content');
+        var chev    = document.getElementById('cm-metrics-chev');
+        if (content) content.style.display = _st.metricsOpen ? '' : 'none';
+        if (chev)    chev.style.transform  = _st.metricsOpen ? 'rotate(0deg)' : 'rotate(-90deg)';
     }
 
     // ── forecast reasoning panel ─────────────────────────────────────────────
@@ -1265,36 +1284,75 @@ var ChartModal = (function () {
         function row(lbl, val) {
             return '<div class="cm-nv-row"><span class="cm-nv-label">' + lbl + '</span><span class="cm-nv-val">' + val + '</span></div>';
         }
-        var low = m.total_std != null ? Math.max(0, Math.round(tot - 1.96 * m.total_std)) : null;
-        var hi  = m.total_std != null ? Math.round(tot + 1.96 * m.total_std) : null;
 
-        // Disclosure block — explains the AR(1) correction status and the
-        // residual independence assumption. Two cases:
-        //   1. rho ≠ 0 → backtest detected day-to-day correlation; we widened σ.
-        //   2. rho = 0 → no backtest yet (or zero observed); σ assumes
-        //      independence and we say so plainly.
-        var rho        = m.rho_used;
-        var inflation  = m.std_inflation_factor;
-        var noteHtml;
-        if (rho != null && rho !== 0 && inflation != null && inflation !== 1) {
-            var pctWider = Math.round((inflation - 1) * 100);
-            noteHtml =
-                '<strong>Extra safety buffer applied (+' + pctWider + '%).</strong> ' +
-                'The standard Newsvendor formula assumes each day&rsquo;s demand is independent of the next. ' +
-                'But when we backtested this product&rsquo;s forecasts, we noticed busy days come in <em>streaks</em> ' +
-                '— typical for products driven by paydays, weekends, or events ' +
-                '(lag-1 autocorrelation ρ = ' + rho.toFixed(2) + '). ' +
-                'Independent-day math would understate how badly a run of mismatched days could line up, so we widened ' +
-                'the uncertainty (σ) by <strong>' + pctWider + '%</strong> before computing your order. ' +
-                '<strong>The recommended quantity already includes this buffer</strong> — you don&rsquo;t need to add anything on top.';
+        var rho       = m.rho_used;
+        var inflation = m.std_inflation_factor;
+        var hasBuffer = rho != null && rho !== 0
+                     && inflation != null && inflation > 1
+                     && m.total_std != null;
+
+        // Bottom section differs depending on whether AR(1) correction was applied.
+        var stdSection;
+
+        if (hasBuffer) {
+            // Derive what the standard (uncorrected) result would have been.
+            // q* = μ + z·σ  →  z = (optimal_total − μ) / corrected_std
+            // uncorrected_q = μ + z · original_std = μ + (optimal_total − μ) / inflation
+            var pctWider         = Math.round((inflation - 1) * 100);
+            var correctedStd     = m.total_std;
+            var originalStd      = correctedStd / inflation;
+            var uncorrOptimal    = Math.round(tot + ((m.optimal_total || 0) - tot) / inflation);
+            var uncorrRestock    = Math.max(0, uncorrOptimal - (m.current_stock || 0));
+
+            var stdLow  = Math.max(0, Math.round(tot - 1.96 * originalStd));
+            var stdHi   = Math.round(tot + 1.96 * originalStd);
+            var bufLow  = Math.max(0, Math.round(tot - 1.96 * correctedStd));
+            var bufHi   = Math.round(tot + 1.96 * correctedStd);
+
+            stdSection =
+                '<div class="cm-nv-comparison">'
+              + '<div class="cm-nv-cmp-title">Order quantity — standard vs. safety-buffered σ</div>'
+
+              + '<div class="cm-nv-cmp-row">'
+              +   '<div class="cm-nv-cmp-cell cm-nv-cmp-label-cell"><span class="cm-nv-cmp-tag">Standard</span></div>'
+              +   '<div class="cm-nv-cmp-cell">σ = ±' + Math.round(originalStd) + ' units<br><span class="cm-nv-cmp-range">' + stdLow + '–' + stdHi + ' range (95%)</span></div>'
+              +   '<div class="cm-nv-cmp-cell cm-nv-cmp-arrow">→</div>'
+              +   '<div class="cm-nv-cmp-cell cm-nv-cmp-result">'
+              +     uncorrOptimal.toLocaleString() + ' total'
+              +     '&nbsp;&nbsp;<span class="cm-nv-cmp-restock">+' + uncorrRestock.toLocaleString() + ' to order</span>'
+              +   '</div>'
+              + '</div>'
+
+              + '<div class="cm-nv-cmp-row cm-nv-cmp-used-row">'
+              +   '<div class="cm-nv-cmp-cell cm-nv-cmp-label-cell"><span class="cm-nv-cmp-tag cm-nv-cmp-tag-used">+' + pctWider + '% buffer</span></div>'
+              +   '<div class="cm-nv-cmp-cell">σ = ±' + Math.round(correctedStd) + ' units<br><span class="cm-nv-cmp-range">' + bufLow + '–' + bufHi + ' range (95%)</span></div>'
+              +   '<div class="cm-nv-cmp-cell cm-nv-cmp-arrow">→</div>'
+              +   '<div class="cm-nv-cmp-cell cm-nv-cmp-result">'
+              +     '<strong>' + (m.optimal_total || 0).toLocaleString() + ' total'
+              +     '&nbsp;&nbsp;+' + (m.restock_qty || 0).toLocaleString() + ' to order</strong>'
+              +     '&nbsp;<span class="cm-nv-cmp-used-badge">used ✓</span>'
+              +   '</div>'
+              + '</div>'
+
+              + '<p class="cm-nv-cmp-why">'
+              +   'Residual ρ = ' + rho.toFixed(2) + ' — busy days come in streaks for this product, '
+              +   'so σ was widened by ' + pctWider + '% to guard against back-to-back demand mismatches. '
+              +   'The buffered order is the one recommended.'
+              + '</p>'
+              + '</div>';
         } else {
-            noteHtml =
-                '<strong>No extra buffer needed — daily independence assumption.</strong> ' +
-                'The Newsvendor formula assumes each day&rsquo;s demand is independent of the days around it. ' +
-                'For this product, the backtest residuals didn&rsquo;t show meaningful day-to-day clustering, so no ' +
-                'safety buffer was added on top of the standard math. ' +
-                '<em>Caveat:</em> if you know this product spikes hard around predictable events (paydays, weekends, holidays) ' +
-                'and busy days tend to come in runs, real-world stockout risk could be slightly higher than what the recommendation reflects.';
+            var low = m.total_std != null ? Math.max(0, Math.round(tot - 1.96 * m.total_std)) : null;
+            var hi  = m.total_std != null ? Math.round(tot + 1.96 * m.total_std) : null;
+
+            stdSection =
+                (low != null ? row('Demand range (95%)', low + ' – ' + hi + ' units &nbsp;·&nbsp; avg ' + Math.round(tot) + ' units &nbsp;·&nbsp; σ = ' + Math.round(m.total_std) + ' units') : '')
+              + row('Optimal supply', m.optimal_total + ' units total &nbsp;·&nbsp; ' + (m.current_stock || 0) + ' on hand + <strong>' + m.restock_qty + ' to order</strong>')
+              + '<div class="cm-nv-note">'
+              +   '<strong>No extra buffer — daily independence assumed.</strong> '
+              +   'Backtesting didn\'t detect meaningful day-to-day demand clustering for this product, so σ was not widened. '
+              +   '<em>Caveat:</em> if this product spikes around predictable events and busy days tend to run in streaks, '
+              +   'real-world stockout risk could be slightly higher than shown.'
+              + '</div>';
         }
 
         body.innerHTML =
@@ -1302,9 +1360,7 @@ var ChartModal = (function () {
             + row('Critical ratio',   '<strong>' + cr + '%</strong> — ' + strategy)
             + row('Under-stock cost', '₱' + mg.toFixed(2) + ' per unit — profit lost when you run out of stock')
             + row('Over-stock cost',  '₱' + c.toFixed(2)  + ' per unit — money tied up in unsold inventory')
-            + (low != null ? row('Demand range (95%)', low + ' – ' + hi + ' units &nbsp;·&nbsp; avg ' + Math.round(tot) + ' units &nbsp;·&nbsp; σ = ' + Math.round(m.total_std) + ' units') : '')
-            + row('Optimal supply',   m.optimal_total + ' units total &nbsp;·&nbsp; ' + (m.current_stock || 0) + ' on hand + <strong>' + m.restock_qty + ' to order</strong>')
-            + '<div class="cm-nv-note">' + noteHtml + '</div>';
+            + stdSection;
     }
 
     function _destroyCharts() {

@@ -59,7 +59,12 @@ foreach ($historical as &$row) {
 unset($row);
 
 $forecastData = array_map(function ($row) {
-    return ['date' => $row['date'], 'predicted' => (float) $row['predicted']];
+    $r = ['date' => $row['date'], 'predicted' => (float) $row['predicted']];
+    if (!empty($row['components'])) {
+        $decoded = json_decode($row['components'], true);
+        if (is_array($decoded)) $r['components'] = $decoded;
+    }
+    return $r;
 }, $forecastRows);
 
 echo json_encode([

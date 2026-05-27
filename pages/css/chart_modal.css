@@ -1043,6 +1043,105 @@
 }
 .cm-nv-note strong { font-weight: 700; opacity: 1; }
 
+/* ── Newsvendor σ comparison block (shown when AR(1) buffer was applied) ── */
+.cm-nv-comparison {
+    margin: 0.4rem 0.75rem 0.6rem;
+    border: 1px solid rgba(210,200,174,0.7);
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.cm-nv-cmp-title {
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #261F0E;
+    opacity: 0.38;
+    padding: 0.4rem 0.9rem;
+    border-bottom: 1px solid rgba(210,200,174,0.6);
+}
+
+.cm-nv-cmp-row {
+    display: grid;
+    grid-template-columns: 8.5rem 1fr 1.2rem 1fr;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.9rem;
+    border-bottom: 1px solid rgba(210,200,174,0.4);
+}
+.cm-nv-cmp-row:last-of-type { border-bottom: none; }
+
+.cm-nv-cmp-used-row { background: rgba(38,31,14,0.025); }
+
+.cm-nv-cmp-cell {
+    font-size: 0.77rem;
+    color: #261F0E;
+    line-height: 1.45;
+}
+
+.cm-nv-cmp-label-cell { display: flex; align-items: center; }
+
+.cm-nv-cmp-tag {
+    display: inline-block;
+    font-size: 0.67rem;
+    font-weight: 700;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    background: rgba(38,31,14,0.08);
+    color: #261F0E;
+    white-space: nowrap;
+}
+
+.cm-nv-cmp-tag-used {
+    background: rgba(255,20,147,0.1);
+    color: #d4006e;
+}
+
+.cm-nv-cmp-range {
+    display: block;
+    font-size: 0.64rem;
+    color: #261F0E;
+    opacity: 0.45;
+    margin-top: 0.1rem;
+}
+
+.cm-nv-cmp-arrow {
+    font-size: 0.8rem;
+    color: #261F0E;
+    opacity: 0.25;
+    text-align: center;
+}
+
+.cm-nv-cmp-result { font-size: 0.77rem; color: #261F0E; }
+
+.cm-nv-cmp-restock {
+    font-size: 0.7rem;
+    color: #261F0E;
+    opacity: 0.5;
+}
+
+.cm-nv-cmp-used-badge {
+    display: inline-block;
+    font-size: 0.62rem;
+    font-weight: 700;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    background: rgba(26,105,51,0.12);
+    color: #1A6933;
+    white-space: nowrap;
+}
+
+.cm-nv-cmp-why {
+    font-size: 0.71rem;
+    line-height: 1.5;
+    color: #261F0E;
+    opacity: 0.55;
+    padding: 0.5rem 0.9rem;
+    margin: 0;
+    border-top: 1px solid rgba(210,200,174,0.5);
+}
+
 /* ── Header forecast-accuracy chip ── */
 .cm-accuracy-chip {
     display: inline-flex;
@@ -1090,13 +1189,35 @@
 ════════════════════════════════════════════ */
 .cm-metrics-panel {
     margin: 1.25rem 1.5rem 0.5rem;
-    padding: 1.4rem 1.5rem 1.25rem;
     background: rgba(38,31,14,0.025);
     border: 1px solid #D2C8AE;
     border-radius: 0.85rem;
+    overflow: hidden;
 }
 
-.cm-metrics-header { margin-bottom: 1.1rem; }
+/* Clickable toggle header — mirrors .cm-nv-header style */
+.cm-metrics-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 1rem 1.25rem;
+    background: transparent;
+    border: none;
+    color: #261F0E;
+    cursor: pointer;
+    font-family: 'Lora', serif;
+    text-align: left;
+    transition: background 0.15s;
+}
+.cm-metrics-toggle:hover { background: rgba(38,31,14,0.04); }
+
+/* Collapsible content area */
+.cm-metrics-content {
+    padding: 0 1.5rem 1.25rem;
+    border-top: 1px solid #D2C8AE;
+}
 
 .cm-metrics-eyebrow {
     font-size: 0.66rem;

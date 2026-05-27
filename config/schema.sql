@@ -120,15 +120,21 @@ CREATE TABLE IF NOT EXISTS `forecasts` (
     -- std_inflation_factor: how much σ was widened (1.0 = no correction).
     `rho_used`              DECIMAL(6,4)  DEFAULT NULL,
     `std_inflation_factor`  DECIMAL(6,4)  DEFAULT NULL,
+    -- Per-day Prophet component breakdown (trend, weekly, yearly, events).
+    -- Populated at save time from the Flask response; used by the "Why this
+    -- forecast?" panel in the Reports page detail modal.
+    `components`            JSON          DEFAULT NULL,
     `generated_at`          TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     CONSTRAINT `fk_forecasts_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- For existing databases, add the AR(1) bookkeeping columns:
+-- For existing databases, run migrations in order:
 --   ALTER TABLE `forecasts`
 --     ADD COLUMN `rho_used`             DECIMAL(6,4) DEFAULT NULL,
 --     ADD COLUMN `std_inflation_factor` DECIMAL(6,4) DEFAULT NULL;
+--   ALTER TABLE `forecasts`
+--     ADD COLUMN `components` JSON DEFAULT NULL;
 
 CREATE TABLE IF NOT EXISTS `seasonal_events` (
     `id`          INT          NOT NULL AUTO_INCREMENT,

@@ -231,15 +231,18 @@ function saveForecastRows(
              (product_id, forecast_date, predicted_demand, restock_qty,
               cost_price, selling_price, current_stock, total_std,
               optimal_total, est_profit, rho_used, std_inflation_factor,
-              generated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+              components, generated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
     foreach ($forecastRows as $row) {
+        $components = isset($row['components']) && is_array($row['components'])
+            ? json_encode($row['components'])
+            : null;
         $stmt->execute([
             $productId, $row['date'], $row['predicted'], $restockQty,
             $costPrice, $sellingPrice, $currentStock, $totalStd,
             $optimalTotal, $estProfit, $rhoUsed, $stdInflationFactor,
-            $generatedAt,
+            $components, $generatedAt,
         ]);
     }
 }

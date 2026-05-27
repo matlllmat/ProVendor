@@ -20,6 +20,13 @@ $userName = $_rUser ? $_rUser['name'] : 'Store Owner';
 
 $sessions = getForecastSessions($pdo, $_SESSION['user_id']);
 
+// Split sessions into three time groups based on how today relates to the forecast window.
+// date_from/date_to come from MIN/MAX of forecast_date rows in the session.
+$today           = date('Y-m-d');
+$sessionsCurrent = array_values(array_filter($sessions, fn($s) => $s['date_from'] <= $today && $s['date_to'] >= $today));
+$sessionsFuture  = array_values(array_filter($sessions, fn($s) => $s['date_from'] > $today));
+$sessionsPast    = array_values(array_filter($sessions, fn($s) => $s['date_to'] < $today));
+
 // Catalogue-level accuracy snapshot — volume-weighted MAPE/MAE/RMSE across
 // all evaluated products. This is the number to cite for "system accuracy."
 $catalogueAccuracy   = getCatalogueAccuracy($pdo, $_SESSION['user_id']);

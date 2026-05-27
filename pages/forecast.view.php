@@ -1332,7 +1332,7 @@ function saveForecast() {
             }
             ChartModal.setSaveBtnState(false, 'Saved ✓');
             ChartModal.showSaveMsg('success',
-                'Forecast saved. <a href="<?php echo BASE_URL; ?>/pages/reports.view.php" style="font-weight:600;text-decoration:underline">View in Reports →</a>'
+                'Forecast saved. <a href="<?php echo BASE_URL; ?>/pages/reports.view.php#forecasts" style="font-weight:600;text-decoration:underline">View in Reports →</a>'
             );
         })
         .catch(function () {
@@ -1451,7 +1451,7 @@ function saveForecast() {
 <div id="batch-chart-modal" class="fixed inset-0 z-[1100] flex items-center justify-center hidden"
      role="dialog" aria-modal="true">
 
-    <div class="absolute inset-0" style="background:rgba(38,31,14,0.55)" onclick="BatchForecast.closeChartModal()"></div>
+    <div class="absolute inset-0" style="background:rgba(38,31,14,0.55)" onclick="BatchForecast.confirmCloseChartModal()"></div>
 
     <div class="bcm-card">
 
@@ -1460,7 +1460,7 @@ function saveForecast() {
                 <p class="bcm-eyebrow">Batch Forecast</p>
                 <h2 id="bcm-title" class="bcm-title">—</h2>
             </div>
-            <button type="button" class="batch-modal-close-btn" onclick="BatchForecast.closeChartModal()" title="Close">
+            <button type="button" class="batch-modal-close-btn" onclick="BatchForecast.confirmCloseChartModal()" title="Close">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -1475,8 +1475,13 @@ function saveForecast() {
         <div id="bcm-chart-area" class="bcm-chart-area"></div>
 
         <div class="bcm-footer">
-            <button type="button" class="batch-ghost-btn" onclick="BatchForecast.closeChartModal()">Close</button>
-            <button type="button" class="batch-primary-btn" onclick="BatchForecast.openNvModal()">Generate Newsvendor for All →</button>
+            <button type="button" class="batch-ghost-btn" onclick="BatchForecast.confirmCloseChartModal()">Close</button>
+            <div style="display:flex;gap:0.6rem;align-items:center">
+                <button type="button" class="batch-ghost-btn" id="bcm-save-all-btn"
+                        style="display:none" onclick="BatchForecast.openSaveModal()">Save Forecasts</button>
+                <button type="button" class="batch-primary-btn" id="bcm-nv-btn"
+                        onclick="BatchForecast.openNvModal()">Generate Newsvendor →</button>
+            </div>
         </div>
 
     </div>
@@ -1519,10 +1524,46 @@ function saveForecast() {
     </div>
 </div>
 
+<!-- ════════════════════════════════════════════
+     BATCH SAVE MODAL — select which forecasts to save
+════════════════════════════════════════════ -->
+<div id="batch-save-modal" class="fixed inset-0 z-[1300] flex items-center justify-center hidden"
+     role="dialog" aria-modal="true">
+
+    <div class="absolute inset-0" style="background:rgba(38,31,14,0.55)" onclick="BatchForecast.closeSaveModal()"></div>
+
+    <div class="bsv-card">
+
+        <div class="bsv-header">
+            <div style="min-width:0">
+                <p class="bsv-eyebrow">Batch Forecast</p>
+                <h2 class="bsv-title">Save Forecasts</h2>
+            </div>
+            <button type="button" class="batch-modal-close-btn" onclick="BatchForecast.closeSaveModal()" title="Close">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+
+        <div id="bsv-error" class="batch-run-error" style="display:none"></div>
+
+        <div id="bsv-body" class="bsv-body"></div>
+
+        <div class="bsv-footer">
+            <button type="button" class="batch-ghost-btn" onclick="BatchForecast.closeSaveModal()">Cancel</button>
+            <button type="button" class="batch-primary-btn" id="bsv-save-btn"
+                    onclick="BatchForecast.confirmSaveSelected()">Save Selected →</button>
+        </div>
+
+    </div>
+</div>
+
 <script>
 const BATCH_BASE_URL = '<?php echo BASE_URL; ?>';
 </script>
-<script src="<?php echo BASE_URL; ?>/pages/js/batch_forecast.js"></script>
+<script src="<?php echo BASE_URL; ?>/pages/js/batch_forecast.js?v=<?php echo filemtime(__DIR__ . '/js/batch_forecast.js'); ?>"></script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 </body>

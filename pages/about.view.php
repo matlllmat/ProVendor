@@ -125,14 +125,10 @@ require_once __DIR__ . '/../includes/header.php';
                          style="background:rgba(240,232,208,0.06)">
 
                         <img src="../images/sapanta.jpeg" class="w-full h-full object-cover" alt="Sapanta" />
-
-                        <div class="absolute inset-x-0 bottom-0 py-1.5 text-center" style="background:rgba(38,31,14,0.6)">
-                            <span class="text-[#D2C8AE]/50 text-[9px] uppercase tracking-widest">Photo</span>
-                        </div>
                     </div>
                     <p class="text-[#F0E8D0] font-semibold text-sm mb-0.5">John Martin Sapanta</p>
                     <p class="text-[#1A6933] text-[10px] font-semibold uppercase tracking-widest mb-2">BSIT</p>
-                    <p class="text-[#D2C8AE]/50 text-xs leading-relaxed">Short description or contribution to the project goes here.</p>
+                    <p class="text-[#D2C8AE]/50 text-xs leading-relaxed">Full-stack developer and quality assurer — built the system end-to-end and made sure every feature works as intended before it ships.</p>
                 </article>
 
                 <!-- Member 2 -->
@@ -141,14 +137,10 @@ require_once __DIR__ . '/../includes/header.php';
                          style="background:rgba(240,232,208,0.06)">
 
                         <img src="../images/michael.jpg" class="w-full h-full object-cover" alt="Delos Santos" />
-
-                        <div class="absolute inset-x-0 bottom-0 py-1.5 text-center" style="background:rgba(38,31,14,0.6)">
-                            <span class="text-[#D2C8AE]/50 text-[9px] uppercase tracking-widest">Photo</span>
-                        </div>
                     </div>
                     <p class="text-[#F0E8D0] font-semibold text-sm mb-0.5">Michael John Delos Santos</p>
                     <p class="text-[#1A6933] text-[10px] font-semibold uppercase tracking-widest mb-2">BSIT</p>
-                    <p class="text-[#D2C8AE]/50 text-xs leading-relaxed">Short description or contribution to the project goes here.</p>
+                    <p class="text-[#D2C8AE]/50 text-xs leading-relaxed">Team lead and project manager — kept the group aligned, delegated tasks, and drove the project from planning to completion.</p>
                 </article>
 
                 <!-- Member 3 -->
@@ -157,14 +149,10 @@ require_once __DIR__ . '/../includes/header.php';
                          style="background:rgba(240,232,208,0.06)">
 
                         <img src="../images/ver.png" class="w-full h-full object-cover" alt="Davis" />
-
-                        <div class="absolute inset-x-0 bottom-0 py-1.5 text-center" style="background:rgba(38,31,14,0.6)">
-                            <span class="text-[#D2C8AE]/50 text-[9px] uppercase tracking-widest">Photo</span>
-                        </div>
                     </div>
                     <p class="text-[#F0E8D0] font-semibold text-sm mb-0.5">John Denver Davis</p>
                     <p class="text-[#1A6933] text-[10px] font-semibold uppercase tracking-widest mb-2">BSIT</p>
-                    <p class="text-[#D2C8AE]/50 text-xs leading-relaxed">Short description or contribution to the project goes here.</p>
+                    <p class="text-[#D2C8AE]/50 text-xs leading-relaxed">Presentation designer and documentation writer — produced the slide decks and written reports that communicated the project to panels and evaluators.</p>
                 </article>
 
                 <!-- Member 4 -->
@@ -173,14 +161,10 @@ require_once __DIR__ . '/../includes/header.php';
                          style="background:rgba(240,232,208,0.06)">
 
                         <img src="../images/rolloque.jpg" class="w-full h-full object-cover" alt="Rolloque" />
-
-                        <div class="absolute inset-x-0 bottom-0 py-1.5 text-center" style="background:rgba(38,31,14,0.6)">
-                            <span class="text-[#D2C8AE]/50 text-[9px] uppercase tracking-widest">Photo</span>
-                        </div>
                     </div>
                     <p class="text-[#F0E8D0] font-semibold text-sm mb-0.5">John Lorenz Rolloque</p>
                     <p class="text-[#1A6933] text-[10px] font-semibold uppercase tracking-widest mb-2">BSIT</p>
-                    <p class="text-[#D2C8AE]/50 text-xs leading-relaxed">Short description or contribution to the project goes here.</p>
+                    <p class="text-[#D2C8AE]/50 text-xs leading-relaxed">Hosted the team's working sessions, led LaTeX write-ups on Overleaf, and provided numerical and research support throughout the study.</p>
                 </article>
 
             </div>

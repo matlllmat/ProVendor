@@ -10,8 +10,8 @@
 //   fc-modal submitted → runForecast() delegates to BatchForecast.runProphet()
 //   runProphet → batch Prophet API → opens batch-chart-modal with product tabs
 //   batch-chart-modal → ChartModal.renderIn() per tab → "Generate Newsvendor for All →"
-//   batch-nv-modal → table of products with inputs → confirm → batch Newsvendor API
-//   results shown inline → auto-saved to DB
+//   batch-nv-modal → table of products with inputs → confirm → per-product run_optimize.php
+//   results shown on chart tabs → "Save All Forecasts" button triggers manual save
 
 var BatchForecast = (function () {
 
@@ -25,7 +25,11 @@ var BatchForecast = (function () {
     // Ordered list of selected product IDs (matches product-list display order).
     var _selectedIds = [];
 
-    // Results from the last batch Prophet run: [{ product_id, product_name, success, forecast, historical }]
+    // Results from the last batch Prophet run.
+    // Each entry: { product_id, product_name, success, forecast, historical,
+    //               optResult?, optInputs? }
+    // optResult: raw JSON from run_optimize.php
+    // optInputs: { cost_price, selling_price, current_stock }
     var _prophetResults = [];
 
     // Currently active tab index in the chart modal.
@@ -231,6 +235,14 @@ var BatchForecast = (function () {
                 + (failed > 0 ? ' (' + failed + ' failed)' : '');
         }
 
+        // Reset save-all button state for a fresh batch run
+        var saveAllBtn = document.getElementById('bcm-save-all-btn');
+        if (saveAllBtn) {
+            saveAllBtn.style.display = 'none';
+            saveAllBtn.disabled      = false;
+            saveAllBtn.textContent   = 'Save All Forecasts';
+        }
+
         _buildTabs(successes);
         _renderTab(0);
 
@@ -277,6 +289,24 @@ var BatchForecast = (function () {
         ChartModal.destroyIn();
 
         var p = _products[String(result.product_id)] || {};
+
+        // Build meta from stored optimization result, if available.
+        var meta = null;
+        if (result.optResult && result.optInputs) {
+            meta = {
+                total_predicted:      result.optResult.total_predicted,
+                restock_qty:          result.optResult.restock_qty,
+                current_stock:        result.optInputs.current_stock,
+                cost_price:           result.optInputs.cost_price,
+                selling_price:        result.optInputs.selling_price,
+                total_std:            result.optResult.total_std,
+                optimal_total:        result.optResult.optimal_total,
+                est_profit:           result.optResult.est_profit,
+                rho_used:             result.optResult.rho_used             != null ? result.optResult.rho_used             : undefined,
+                std_inflation_factor: result.optResult.std_inflation_factor != null ? result.optResult.std_inflation_factor : undefined,
+            };
+        }
+
         ChartModal.renderIn(chartArea, {
             label:               'Demand Forecast',
             title:               result.product_name,
@@ -289,8 +319,22 @@ var BatchForecast = (function () {
             productSellingPrice: p.db_price != null ? p.db_price : null,
             disabledEventIds:    new Set(),
             onRunAgain:          null,
-            onGenerateRestock:   null, // hides the per-product Newsvendor section
-            onSave:              null,
+            onGenerateRestock:   null,
+            meta:                meta,
+            onSave:              meta ? function () { _saveProduct(result, meta); } : null,
+        });
+    }
+
+    function confirmCloseChartModal() {
+        var hasResults = _prophetResults.some(function (r) { return r.success; });
+        if (!hasResults) { closeChartModal(); return; }
+
+        showConfirm({
+            title:        'Close forecast results?',
+            message:      'Your forecast results have not been saved. Closing will discard all data from this session.',
+            confirmText:  'Close anyway',
+            confirmStyle: 'danger',
+            onConfirm:    function () { closeChartModal(); },
         });
     }
 
@@ -339,30 +383,37 @@ var BatchForecast = (function () {
             var dbCost  = p.db_cost  != null ? p.db_cost.toFixed(2)  : '';
             var dbPrice = p.db_price != null ? p.db_price.toFixed(2) : '';
 
+            // Pre-fill with previously entered inputs if this product was already run.
+            var prevCost  = r.optInputs ? r.optInputs.cost_price.toFixed(2)    : dbCost;
+            var prevPrice = r.optInputs ? r.optInputs.selling_price.toFixed(2) : dbPrice;
+            var prevStock = r.optInputs ? r.optInputs.current_stock             : 0;
+
             html += '<tr class="bnv-row" data-pid="' + r.product_id + '">'
                 + '<td class="bnv-td bnv-td-name">' + _esc(r.product_name) + '</td>'
                 + '<td class="bnv-td">'
                     + '<div class="bnv-input-wrap"><span class="bnv-input-affix">₱</span>'
                     + '<input type="number" class="bnv-input bnv-cost" min="0" step="0.01" placeholder="0.00"'
-                    + (dbCost ? ' value="' + dbCost + '"' : '') + '>'
+                    + (prevCost ? ' value="' + prevCost + '"' : '') + '>'
                     + '</div>'
                     + (dbCost ? '<p class="bnv-hint">From profile</p>' : '')
                 + '</td>'
                 + '<td class="bnv-td">'
                     + '<div class="bnv-input-wrap"><span class="bnv-input-affix">₱</span>'
                     + '<input type="number" class="bnv-input bnv-price" min="0" step="0.01" placeholder="0.00"'
-                    + (dbPrice ? ' value="' + dbPrice + '"' : '') + '>'
+                    + (prevPrice ? ' value="' + prevPrice + '"' : '') + '>'
                     + '</div>'
                     + (dbPrice ? '<p class="bnv-hint">From profile</p>' : '')
                 + '</td>'
                 + '<td class="bnv-td">'
                     + '<div class="bnv-input-wrap">'
-                    + '<input type="number" class="bnv-input bnv-stock" min="0" step="1" placeholder="0" value="0">'
+                    + '<input type="number" class="bnv-input bnv-stock" min="0" step="1" placeholder="0" value="' + prevStock + '">'
                     + '<span class="bnv-input-affix bnv-input-affix-right">units</span>'
                     + '</div>'
                 + '</td>'
                 + '<td class="bnv-td" id="bnv-status-' + r.product_id + '">'
-                    + '<span class="bnv-status-pending">—</span>'
+                    + (r.optResult
+                        ? '<span class="bnv-status-ok">Ready ✓</span>'
+                        : '<span class="bnv-status-pending">—</span>')
                 + '</td>'
                 + '</tr>';
         });
@@ -390,7 +441,7 @@ var BatchForecast = (function () {
         });
 
         var msg = 'Generating Newsvendor restock insights for ' + n + ' product' + (n === 1 ? '' : 's') + '. '
-            + 'Results will be saved to Reports automatically.';
+            + 'Results will appear on the chart — save manually when ready.';
         if (missing > 0) {
             msg += '\n\n' + missing + ' product' + (missing === 1 ? ' is' : 's are')
                 + ' missing valid cost / selling price and will be skipped.';
@@ -405,10 +456,15 @@ var BatchForecast = (function () {
         });
     }
 
+    // Runs run_optimize.php per product sequentially. Does NOT save to DB.
+    // Stores optResult / optInputs on each _prophetResults entry.
     function _runNewsvendor() {
         var successes = _prophetResults.filter(function (r) { return r.success; });
 
-        var productsPayload = [];
+        var genBtn = document.getElementById('bnv-gen-btn');
+        if (genBtn) { genBtn.disabled = true; genBtn.textContent = 'Generating…'; }
+
+        var toRun = [];
         successes.forEach(function (r) {
             var row = document.querySelector('#bnv-body .bnv-row[data-pid="' + r.product_id + '"]');
             if (!row) return;
@@ -416,41 +472,80 @@ var BatchForecast = (function () {
             var price = parseFloat(row.querySelector('.bnv-price').value) || 0;
             var stock = parseInt(row.querySelector('.bnv-stock').value, 10) || 0;
 
+            var statusEl = document.getElementById('bnv-status-' + r.product_id);
             if (cost > 0 && price > 0 && price > cost) {
-                productsPayload.push({
-                    id:            r.product_id,
-                    cost_price:    cost,
-                    selling_price: price,
-                    current_stock: stock,
-                    forecast:      r.forecast,
-                });
-                var statusEl = document.getElementById('bnv-status-' + r.product_id);
-                if (statusEl) statusEl.innerHTML = '<span class="bnv-status-running">Running…</span>';
+                toRun.push({ result: r, cost: cost, price: price, stock: stock });
+                if (statusEl) statusEl.innerHTML = '<span class="bnv-status-running">Queued…</span>';
             } else {
-                var statusEl = document.getElementById('bnv-status-' + r.product_id);
                 if (statusEl) statusEl.innerHTML = '<span class="bnv-status-skip">Skipped — missing price</span>';
             }
         });
 
-        var genBtn = document.getElementById('bnv-gen-btn');
-        if (genBtn) { genBtn.disabled = true; genBtn.textContent = 'Generating…'; }
-
-        if (!productsPayload.length) {
+        if (!toRun.length) {
             _showNvError('No products with valid prices to generate.');
             return;
         }
 
-        fetch(BATCH_BASE_URL + '/api/run_batch_newsvendor.php', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ products: productsPayload }),
-        })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-            if (data.error) { _showNvError(data.error); return; }
-            _showNvResults(data.results || []);
-        })
-        .catch(function () { _showNvError('Network error. Please try again.'); });
+        var chain = Promise.resolve();
+        toRun.forEach(function (item) {
+            chain = chain.then(function () {
+                var statusEl = document.getElementById('bnv-status-' + item.result.product_id);
+                if (statusEl) statusEl.innerHTML = '<span class="bnv-status-running">Running…</span>';
+
+                var fd = new FormData();
+                fd.append('forecast',      JSON.stringify(item.result.forecast));
+                fd.append('cost_price',    item.cost);
+                fd.append('selling_price', item.price);
+                fd.append('current_stock', item.stock);
+                fd.append('product_id',    item.result.product_id);
+
+                return fetch(BATCH_BASE_URL + '/api/run_optimize.php', {
+                    method: 'POST',
+                    body:   fd,
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (optData) {
+                    if (optData.error) {
+                        if (statusEl) statusEl.innerHTML = '<span class="bnv-status-err">Failed: ' + _esc(optData.error) + '</span>';
+                        return;
+                    }
+
+                    // Store on the matching _prophetResults entry so _renderTab can read it.
+                    var global = _prophetResults.find(function (r) { return r.product_id === item.result.product_id; });
+                    if (global) {
+                        global.optResult = optData;
+                        global.optInputs = { cost_price: item.cost, selling_price: item.price, current_stock: item.stock };
+                    }
+
+                    if (statusEl) {
+                        statusEl.innerHTML =
+                              '<span class="bnv-status-ok">Ready ✓</span>'
+                            + '<span class="bnv-result-detail">'
+                            + 'Order: <strong>' + Number(optData.restock_qty).toLocaleString() + ' units</strong>'
+                            + ' &nbsp;·&nbsp; ₱' + Number(optData.est_profit).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' profit'
+                            + '</span>';
+                    }
+                })
+                .catch(function () {
+                    if (statusEl) statusEl.innerHTML = '<span class="bnv-status-err">Network error</span>';
+                });
+            });
+        });
+
+        chain.then(function () { _onNvDone(); });
+    }
+
+    // Called after all per-product optimizations finish.
+    function _onNvDone() {
+        var genBtn = document.getElementById('bnv-gen-btn');
+        if (genBtn) { genBtn.disabled = false; genBtn.textContent = 'Regenerate →'; }
+
+        // Re-render the active chart tab so NV results appear immediately.
+        _renderTab(_activeTabIdx);
+        _showSaveAllBtn();
+
+        // Close the NV modal after a short pause so the user sees the final statuses.
+        setTimeout(function () { closeNvModal(); }, 1400);
     }
 
     function _showNvError(msg) {
@@ -460,23 +555,153 @@ var BatchForecast = (function () {
         if (genBtn) { genBtn.disabled = false; genBtn.textContent = 'Generate All →'; }
     }
 
-    function _showNvResults(results) {
-        var genBtn = document.getElementById('bnv-gen-btn');
-        if (genBtn) { genBtn.disabled = true; genBtn.textContent = 'Done ✓'; }
+    // ── Per-product save ──────────────────────────────────────────────────────
 
-        results.forEach(function (r) {
-            var statusEl = document.getElementById('bnv-status-' + r.product_id);
-            if (!statusEl) return;
+    function _saveProduct(result, meta) {
+        var fd = new FormData();
+        fd.append('product_id',    result.product_id);
+        fd.append('forecast_data', JSON.stringify(result.forecast));
+        fd.append('restock_qty',   meta.restock_qty);
+        fd.append('cost_price',    meta.cost_price);
+        fd.append('selling_price', meta.selling_price);
+        fd.append('current_stock', meta.current_stock);
+        fd.append('total_std',     meta.total_std);
+        fd.append('optimal_total', meta.optimal_total);
+        fd.append('est_profit',    meta.est_profit);
+        if (meta.rho_used             != null) fd.append('rho_used',             meta.rho_used);
+        if (meta.std_inflation_factor != null) fd.append('std_inflation_factor', meta.std_inflation_factor);
 
-            if (r.success) {
-                statusEl.innerHTML =
-                      '<span class="bnv-status-ok">Saved ✓</span>'
-                    + '<span class="bnv-result-detail">'
-                    + 'Order: <strong>' + Number(r.restock_qty).toLocaleString() + ' units</strong>'
-                    + ' &nbsp;·&nbsp; ₱' + Number(r.est_profit).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' profit'
-                    + '</span>';
+        return fetch(BATCH_BASE_URL + '/api/save_forecast.php', {
+            method: 'POST',
+            body:   fd,
+        }).then(function (r) { return r.json(); });
+    }
+
+    // ── Reveal the "Save Forecasts" button in the chart modal footer ─────────
+
+    function _showSaveAllBtn() {
+        var btn = document.getElementById('bcm-save-all-btn');
+        if (btn) btn.style.display = '';
+    }
+
+    // ── Save modal ────────────────────────────────────────────────────────────
+
+    function openSaveModal() {
+        var toSave = _prophetResults.filter(function (r) { return r.success && r.optResult && r.optInputs; });
+        if (!toSave.length) return;
+
+        var modal = document.getElementById('batch-save-modal');
+        if (!modal) return;
+
+        _buildSaveList(toSave);
+
+        var errEl = document.getElementById('bsv-error');
+        if (errEl) errEl.style.display = 'none';
+
+        var saveBtn = document.getElementById('bsv-save-btn');
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save Selected →'; }
+
+        modal.classList.remove('hidden');
+    }
+
+    function _buildSaveList(toSave) {
+        var body = document.getElementById('bsv-body');
+        if (!body) return;
+
+        var html = '<label class="bsv-select-all-row">'
+            + '<input type="checkbox" id="bsv-check-all" class="bsv-check" checked>'
+            + '<span class="bsv-select-all-label">Select All</span>'
+            + '</label>';
+
+        toSave.forEach(function (r) {
+            var detail = 'Order: <strong>' + Number(r.optResult.restock_qty).toLocaleString() + ' units</strong>'
+                + ' &nbsp;·&nbsp; ₱' + Number(r.optResult.est_profit).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' profit';
+            html += '<label class="bsv-row">'
+                + '<input type="checkbox" class="bsv-check bsv-product-check" value="' + r.product_id + '" checked>'
+                + '<div class="bsv-row-info">'
+                + '<span class="bsv-name">' + _esc(r.product_name) + '</span>'
+                + '<span class="bsv-detail">' + detail + '</span>'
+                + '</div>'
+                + '</label>';
+        });
+
+        body.innerHTML = html;
+
+        var checkAll = document.getElementById('bsv-check-all');
+        var productChecks = body.querySelectorAll('.bsv-product-check');
+
+        if (checkAll) {
+            checkAll.addEventListener('change', function () {
+                productChecks.forEach(function (chk) { chk.checked = checkAll.checked; });
+            });
+        }
+
+        productChecks.forEach(function (chk) {
+            chk.addEventListener('change', function () {
+                var total   = productChecks.length;
+                var checked = body.querySelectorAll('.bsv-product-check:checked').length;
+                if (checkAll) checkAll.checked = total === checked;
+            });
+        });
+    }
+
+    function closeSaveModal() {
+        var modal = document.getElementById('batch-save-modal');
+        if (modal) modal.classList.add('hidden');
+    }
+
+    function confirmSaveSelected() {
+        var body = document.getElementById('bsv-body');
+        if (!body) return;
+
+        var selected = [];
+        body.querySelectorAll('.bsv-product-check:checked').forEach(function (chk) {
+            selected.push(parseInt(chk.value, 10));
+        });
+
+        var errEl = document.getElementById('bsv-error');
+        if (!selected.length) {
+            if (errEl) { errEl.textContent = 'Select at least one product to save.'; errEl.style.display = ''; }
+            return;
+        }
+        if (errEl) errEl.style.display = 'none';
+
+        var saveBtn = document.getElementById('bsv-save-btn');
+        if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
+
+        var toSave = _prophetResults.filter(function (r) {
+            return r.success && r.optResult && r.optInputs && selected.indexOf(r.product_id) !== -1;
+        });
+
+        var errors = 0;
+        var chain  = Promise.resolve();
+
+        toSave.forEach(function (result) {
+            chain = chain.then(function () {
+                var meta = {
+                    total_predicted:      result.optResult.total_predicted,
+                    restock_qty:          result.optResult.restock_qty,
+                    current_stock:        result.optInputs.current_stock,
+                    cost_price:           result.optInputs.cost_price,
+                    selling_price:        result.optInputs.selling_price,
+                    total_std:            result.optResult.total_std,
+                    optimal_total:        result.optResult.optimal_total,
+                    est_profit:           result.optResult.est_profit,
+                    rho_used:             result.optResult.rho_used,
+                    std_inflation_factor: result.optResult.std_inflation_factor,
+                };
+                return _saveProduct(result, meta)
+                    .then(function (data) { if (data.error) errors++; })
+                    .catch(function () { errors++; });
+            });
+        });
+
+        chain.then(function () {
+            if (errors === 0) {
+                closeSaveModal();
             } else {
-                statusEl.innerHTML = '<span class="bnv-status-err">Failed: ' + _esc(r.error || 'Unknown error') + '</span>';
+                if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Retry (' + errors + ' failed)'; }
+                if (errEl)   { errEl.textContent = errors + ' product' + (errors === 1 ? '' : 's') + ' failed to save. Retry or check your connection.'; errEl.style.display = ''; }
             }
         });
     }
@@ -520,10 +745,14 @@ var BatchForecast = (function () {
         selectedCount:        selectedCount,
         openFcModal:          openFcModal,
         runProphet:           runProphet,
+        confirmCloseChartModal: confirmCloseChartModal,
         closeChartModal:      closeChartModal,
         openNvModal:          openNvModal,
         closeNvModal:         closeNvModal,
         confirmRunNewsvendor: confirmRunNewsvendor,
+        openSaveModal:        openSaveModal,
+        closeSaveModal:       closeSaveModal,
+        confirmSaveSelected:  confirmSaveSelected,
     };
 
 }());
