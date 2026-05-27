@@ -839,31 +839,12 @@
 .cm-rs-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .cm-rs-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 
-/* Locked variant: same shape as a normal input, green tint + lock icon */
-.cm-rs-input-wrap-locked {
-    background: rgba(26,105,51,0.06);
-    border-color: rgba(26,105,51,0.3);
-}
-.cm-rs-input-wrap-locked .cm-rs-input {
-    color: #1A6933;
-    font-weight: 600;
-    cursor: default;
-}
-.cm-rs-input-wrap-locked .cm-rs-input-affix {
-    background: rgba(26,105,51,0.04);
-    color: #1A6933;
-    opacity: 0.65;
-}
-
-.cm-rs-lock-icon {
-    display: flex;
-    align-items: center;
-    padding: 0 0.55rem;
-    color: #1A6933;
-    opacity: 0.7;
-    flex-shrink: 0;
-    border-left: 1px solid rgba(38,31,14,0.1);
-    align-self: stretch;
+/* Hint shown below pre-filled fields that have a DB default */
+.cm-rs-hint {
+    margin: 0.25rem 0 0;
+    font-size: 0.7rem;
+    color: #261F0E;
+    opacity: 0.45;
 }
 
 /* ── Chart action buttons ── */

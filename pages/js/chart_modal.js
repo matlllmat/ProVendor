@@ -249,36 +249,29 @@ var ChartModal = (function () {
 
     // ── restock form HTML (auto-fills locked fields when product has prices) ─
     function _restockFormHTML(cfg) {
-        var hasCost  = cfg.productCostPrice    != null && cfg.productCostPrice    > 0;
-        var hasPrice = cfg.productSellingPrice != null && cfg.productSellingPrice > 0;
+        var dbCost  = cfg.productCostPrice    != null && cfg.productCostPrice    > 0 ? cfg.productCostPrice    : null;
+        var dbPrice = cfg.productSellingPrice != null && cfg.productSellingPrice > 0 ? cfg.productSellingPrice : null;
 
-        function lockedField(label, value) {
-            return '<div class="cm-rs-field">' +
-                '<label class="cm-rs-label">' + label + '</label>' +
-                '<div class="cm-rs-input-wrap cm-rs-input-wrap-locked" title="Auto-filled from your product profile">' +
-                    '<span class="cm-rs-input-affix">₱</span>' +
-                    '<input type="text" class="cm-rs-input" value="' + value.toFixed(2) + '" readonly>' +
-                    '<span class="cm-rs-lock-icon">' +
-                        '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-                            '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>' +
-                            '<path d="M7 11V7a5 5 0 0 1 10 0v4"/>' +
-                        '</svg>' +
-                    '</span>' +
-                '</div>' +
-            '</div>';
-        }
-        function priceInput(id, label) {
+        // Always renders an editable input. When the product has a price in the DB,
+        // the DB value is pre-filled as the default — the user can override it for
+        // this forecast run without affecting the stored record.
+        function priceInput(id, label, defaultValue) {
+            var valAttr = defaultValue != null ? ' value="' + defaultValue.toFixed(2) + '"' : '';
+            var hint    = defaultValue != null
+                ? '<p class="cm-rs-hint">Default from product profile — edit to override for this run</p>'
+                : '';
             return '<div class="cm-rs-field">' +
                 '<label class="cm-rs-label" for="' + id + '">' + label + '</label>' +
                 '<div class="cm-rs-input-wrap">' +
                     '<span class="cm-rs-input-affix">₱</span>' +
-                    '<input type="number" id="' + id + '" class="cm-rs-input" min="0" step="0.01" placeholder="0.00">' +
+                    '<input type="number" id="' + id + '" class="cm-rs-input" min="0" step="0.01" placeholder="0.00"' + valAttr + '>' +
                 '</div>' +
+                hint +
             '</div>';
         }
 
-        var costField  = hasCost  ? lockedField('Cost Price',    cfg.productCostPrice)    : priceInput('cm-rs-cost',  'Cost Price');
-        var priceField = hasPrice ? lockedField('Selling Price', cfg.productSellingPrice) : priceInput('cm-rs-price', 'Selling Price');
+        var costField  = priceInput('cm-rs-cost',  'Cost Price',    dbCost);
+        var priceField = priceInput('cm-rs-price', 'Selling Price', dbPrice);
         var stockField =
             '<div class="cm-rs-field">' +
                 '<label class="cm-rs-label" for="cm-rs-stock">Current Stock on Hand</label>' +
@@ -515,17 +508,14 @@ var ChartModal = (function () {
 
     // ── restock form submission ───────────────────────────────────────────────
     function _submitRestock(cfg) {
-        var hasCost  = cfg.productCostPrice    != null && cfg.productCostPrice    > 0;
-        var hasPrice = cfg.productSellingPrice != null && cfg.productSellingPrice > 0;
-
         var costInput  = document.getElementById('cm-rs-cost');
         var priceInput = document.getElementById('cm-rs-price');
         var stockInput = document.getElementById('cm-rs-stock');
         var errEl      = document.getElementById('cm-restock-error');
         var btn        = document.getElementById('cm-restock-btn');
 
-        var cost  = hasCost  ? cfg.productCostPrice    : (costInput  ? parseFloat(costInput.value)  || 0 : 0);
-        var price = hasPrice ? cfg.productSellingPrice : (priceInput ? parseFloat(priceInput.value) || 0 : 0);
+        var cost  = costInput  ? parseFloat(costInput.value)  || 0 : 0;
+        var price = priceInput ? parseFloat(priceInput.value) || 0 : 0;
         var stock = stockInput ? parseInt(stockInput.value, 10) || 0 : 0;
 
         function showErr(msg) {

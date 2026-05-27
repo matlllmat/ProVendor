@@ -142,6 +142,14 @@ require_once __DIR__ . '/../includes/header.php';
     <!-- ── Product List ───────────────────────────────────────────────────── -->
     <div id="product-section">
 
+        <!-- Batch selection toolbar — hidden by default, shown when batch mode is active -->
+        <div id="batch-toolbar" class="batch-toolbar" style="display:none">
+            <button type="button" class="batch-cancel-btn" onclick="BatchForecast.exitMode()">✕ Cancel</button>
+            <button type="button" class="batch-select-all-btn" onclick="BatchForecast.selectAllVisible()">Select All visible</button>
+            <span id="batch-selection-count" class="batch-selection-count">0 selected</span>
+            <button type="button" id="batch-next-btn" class="batch-next-btn" onclick="BatchForecast.openFcModal()" disabled>Next →</button>
+        </div>
+
         <form method="GET" action="<?php echo BASE_URL; ?>/pages/forecast.view.php">
             <div class="search-bar">
                 <input type="text" name="search" class="search-input"
@@ -151,6 +159,8 @@ require_once __DIR__ . '/../includes/header.php';
                 <?php if ($search): ?>
                 <a href="<?php echo BASE_URL; ?>/pages/forecast.view.php" class="search-clear-btn">Clear</a>
                 <?php endif; ?>
+                <button type="button" id="batch-trigger-btn" class="batch-trigger-btn"
+                        onclick="BatchForecast.enterMode()">Batch Forecast</button>
             </div>
         </form>
 
@@ -167,6 +177,9 @@ require_once __DIR__ . '/../includes/header.php';
                         data-category="<?php echo htmlspecialchars($product['category'] ?? ''); ?>"
                         data-cost-price="<?php echo $product['cost_price']    !== null ? htmlspecialchars((string) $product['cost_price'])    : ''; ?>"
                         data-selling-price="<?php echo $product['selling_price'] !== null ? htmlspecialchars((string) $product['selling_price']) : ''; ?>">
+
+                    <!-- Checkbox visible only in batch selection mode (toggled via CSS) -->
+                    <span class="batch-row-check" id="bchk-<?php echo $product['id']; ?>"></span>
 
                     <div class="product-row-info">
                         <span class="product-row-name"><?php echo htmlspecialchars($product['name']); ?></span>
@@ -250,6 +263,7 @@ let fcOptimizeResult = null;
 let fcCurrentStock   = 0;
 let fcCostPrice      = 0;
 let fcSellingPrice   = 0;
+var fcBatchMode      = false;
 
 function loadDisabledEvents() {
     const saved = localStorage.getItem('pv_disabled_events');
@@ -995,8 +1009,15 @@ function piSet(pid, partial) {
 }
 
 function openForecastModal() {
-    if (!activeProductId) return;
-    document.getElementById('fc-modal-title').textContent = productDisplayLabel();
+    if (!activeProductId && !fcBatchMode) return;
+
+    if (fcBatchMode) {
+        var n = BatchForecast.selectedCount();
+        document.getElementById('fc-modal-title').textContent =
+            'Batch Forecast — ' + n + ' product' + (n === 1 ? '' : 's');
+    } else {
+        document.getElementById('fc-modal-title').textContent = productDisplayLabel();
+    }
 
     // Reset the reference toggle to "today" on every open.
     forecastReferenceDate = 'today';
@@ -1004,29 +1025,32 @@ function openForecastModal() {
         b.classList.toggle('fc-preset-pill-on', b.dataset.ref === 'today');
     });
 
-    // Capture any saved dates BEFORE applying the preset — applyForecastPreset
-    // writes its own values to storage, which would otherwise clobber the
-    // user's previously typed dates.
-    const saved = piGet(activeProductId);
-
-    // Default to "Next Month" — fills the inputs and sets `min` correctly.
+    // Default to "Next Month".
+    // applyForecastPreset handles batch mode by substituting yesterday as lastDate.
     applyForecastPreset('month');
 
-    // If the user had previously typed dates for this product, override the
-    // preset defaults and re-persist (the preset call just overwrote storage).
-    if (saved.fromDate || saved.toDate) {
-        const fromEl = document.getElementById('fc-from-date');
-        const toEl   = document.getElementById('fc-to-date');
-        if (saved.fromDate && fromEl) fromEl.value = saved.fromDate;
-        if (saved.toDate   && toEl)   toEl.value   = saved.toDate;
-        piSet(activeProductId, {
-            fromDate: saved.fromDate || (fromEl ? fromEl.value : ''),
-            toDate:   saved.toDate   || (toEl   ? toEl.value   : ''),
-        });
-        // Clear preset pill — values are user-chosen, not preset-derived.
-        document.querySelectorAll('#fc-preset-pills .fc-preset-pill').forEach(function(b) {
-            b.classList.remove('fc-preset-pill-on');
-        });
+    if (!fcBatchMode) {
+        // Capture any saved dates BEFORE applying the preset — applyForecastPreset
+        // writes its own values to storage, which would otherwise clobber the
+        // user's previously typed dates.
+        const saved = piGet(activeProductId);
+
+        // If the user had previously typed dates for this product, override the
+        // preset defaults and re-persist (the preset call just overwrote storage).
+        if (saved.fromDate || saved.toDate) {
+            const fromEl = document.getElementById('fc-from-date');
+            const toEl   = document.getElementById('fc-to-date');
+            if (saved.fromDate && fromEl) fromEl.value = saved.fromDate;
+            if (saved.toDate   && toEl)   toEl.value   = saved.toDate;
+            piSet(activeProductId, {
+                fromDate: saved.fromDate || (fromEl ? fromEl.value : ''),
+                toDate:   saved.toDate   || (toEl   ? toEl.value   : ''),
+            });
+            // Clear preset pill — values are user-chosen, not preset-derived.
+            document.querySelectorAll('#fc-preset-pills .fc-preset-pill').forEach(function(b) {
+                b.classList.remove('fc-preset-pill-on');
+            });
+        }
     }
 
     document.getElementById('fc-range-warning').style.display = 'none';
@@ -1047,7 +1071,9 @@ function openForecastModal() {
 let forecastReferenceDate = 'today'; // 'today' | 'last'
 
 function applyForecastPreset(preset) {
-    const lastDate = fullHistorical.length ? fullHistorical[fullHistorical.length - 1].date : null;
+    const lastDate = fullHistorical.length
+        ? fullHistorical[fullHistorical.length - 1].date
+        : (fcBatchMode ? new Date(Date.now() - 86400000).toISOString().slice(0, 10) : null);
     if (!lastDate) return;
 
     // Format using LOCAL components — toISOString() converts to UTC, which in
@@ -1161,6 +1187,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function closeForecastModal() {
+    fcBatchMode = false;
     document.getElementById('fc-modal').classList.add('hidden');
     document.body.style.overflow = '';
 }
@@ -1178,11 +1205,20 @@ function runForecast() {
 
     if (!fromDate || !toDate) { errEl.textContent = 'Please select both a start and end date.'; errEl.style.display = ''; return; }
     if (fromDate >= toDate)   { errEl.textContent = 'End date must be after start date.';       errEl.style.display = ''; return; }
-    const lastDate = fullHistorical.length ? fullHistorical[fullHistorical.length - 1].date : null;
-    if (lastDate && fromDate <= lastDate) { errEl.textContent = 'Start date must be after your last sale date (' + lastDate + ').'; errEl.style.display = ''; return; }
+
+    if (!fcBatchMode) {
+        const lastDate = fullHistorical.length ? fullHistorical[fullHistorical.length - 1].date : null;
+        if (lastDate && fromDate <= lastDate) { errEl.textContent = 'Start date must be after your last sale date (' + lastDate + ').'; errEl.style.display = ''; return; }
+    }
 
     errEl.style.display = 'none';
     setFcPanel('loading');
+
+    // In batch mode, delegate to the batch Prophet runner and bail out.
+    if (fcBatchMode) {
+        BatchForecast.runProphet(fromDate, toDate);
+        return;
+    }
 
     const forecastBody = new FormData();
     forecastBody.append('product_id', activeProductId);
@@ -1407,6 +1443,87 @@ function saveForecast() {
 </div>
 
 <?php require_once __DIR__ . '/../includes/confirm_modal.php'; ?>
+
+<!-- ════════════════════════════════════════════
+     BATCH CHART MODAL
+     Product tab strip + ChartModal.renderIn() area + Newsvendor footer.
+════════════════════════════════════════════ -->
+<div id="batch-chart-modal" class="fixed inset-0 z-[1100] flex items-center justify-center hidden"
+     role="dialog" aria-modal="true">
+
+    <div class="absolute inset-0" style="background:rgba(38,31,14,0.55)" onclick="BatchForecast.closeChartModal()"></div>
+
+    <div class="bcm-card">
+
+        <div class="bcm-header">
+            <div style="min-width:0">
+                <p class="bcm-eyebrow">Batch Forecast</p>
+                <h2 id="bcm-title" class="bcm-title">—</h2>
+            </div>
+            <button type="button" class="batch-modal-close-btn" onclick="BatchForecast.closeChartModal()" title="Close">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Product tab strip — one tab per successfully forecast product -->
+        <div id="bcm-tabs" class="bcm-tabs"></div>
+
+        <!-- Chart area: ChartModal.renderIn() target -->
+        <div id="bcm-chart-area" class="bcm-chart-area"></div>
+
+        <div class="bcm-footer">
+            <button type="button" class="batch-ghost-btn" onclick="BatchForecast.closeChartModal()">Close</button>
+            <button type="button" class="batch-primary-btn" onclick="BatchForecast.openNvModal()">Generate Newsvendor for All →</button>
+        </div>
+
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     BATCH NEWSVENDOR MODAL
+     Fast-generate Newsvendor for all forecast products.
+════════════════════════════════════════════ -->
+<div id="batch-nv-modal" class="fixed inset-0 z-[1200] flex items-center justify-center hidden"
+     role="dialog" aria-modal="true">
+
+    <div class="absolute inset-0" style="background:rgba(38,31,14,0.55)"></div>
+
+    <div class="bnv-card">
+
+        <div class="bnv-header">
+            <div style="min-width:0">
+                <p class="bnv-eyebrow">Newsvendor — Fast Generate</p>
+                <h2 class="bnv-title">Set prices &amp; stock, then generate restock for all</h2>
+            </div>
+            <button type="button" class="batch-modal-close-btn" onclick="BatchForecast.closeNvModal()" title="Close">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+
+        <div id="bnv-error" class="batch-run-error" style="display:none"></div>
+
+        <div id="bnv-body" class="bnv-body"></div>
+
+        <div class="bnv-footer">
+            <button type="button" class="batch-ghost-btn" onclick="BatchForecast.closeNvModal()">Close</button>
+            <button type="button" class="batch-primary-btn" id="bnv-gen-btn"
+                    onclick="BatchForecast.confirmRunNewsvendor()">Generate All →</button>
+        </div>
+
+    </div>
+</div>
+
+<script>
+const BATCH_BASE_URL = '<?php echo BASE_URL; ?>';
+</script>
+<script src="<?php echo BASE_URL; ?>/pages/js/batch_forecast.js"></script>
+
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 </body>
 </html>
