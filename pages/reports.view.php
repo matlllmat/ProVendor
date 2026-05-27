@@ -425,17 +425,17 @@ function renderSessionRow(array $s): void { ?>
 </div>
 
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<script src="<?php echo BASE_URL; ?>/assets/js/vendor/chart.min.js"></script>
+<script src="<?php echo BASE_URL; ?>/assets/js/vendor/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script src="<?php echo BASE_URL; ?>/assets/js/vendor/hammer.min.js"></script>
+<script src="<?php echo BASE_URL; ?>/assets/js/vendor/chartjs-plugin-zoom.min.js"></script>
+<script src="<?php echo BASE_URL; ?>/assets/js/vendor/chartjs-plugin-annotation.min.js"></script>
 <script>
 const CHART_EVENTS = <?php echo json_encode($chartEvents); ?>;
 const EVENT_COLOR  = '#FF5722';
 </script>
-<script src="<?php echo BASE_URL; ?>/pages/js/chart.shared.js"></script>
-<script src="<?php echo BASE_URL; ?>/pages/js/chart_modal.js"></script>
+<script src="<?php echo BASE_URL; ?>/pages/js/chart.shared.js?v=<?php echo filemtime(__DIR__ . '/js/chart.shared.js'); ?>"></script>
+<script src="<?php echo BASE_URL; ?>/pages/js/chart_modal.js?v=<?php echo filemtime(__DIR__ . '/js/chart_modal.js'); ?>"></script>
 <script>
 const spinStyle = document.createElement('style');
 spinStyle.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';

@@ -11,12 +11,12 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
     <script src="<?php echo BASE_URL; ?>/assets/js/tailwind.js"></script>
-    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/global_css/app.css">
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/global_css/app.css?v=<?php echo filemtime(__DIR__ . '/../assets/global_css/app.css'); ?>">
     <?php if (!empty($pageCss)): ?>
-    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/pages/css/<?php echo htmlspecialchars($pageCss); ?>">
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/pages/css/<?php echo htmlspecialchars($pageCss); ?>?v=<?php echo filemtime(__DIR__ . '/../pages/css/' . $pageCss); ?>">
     <?php endif; ?>
     <?php if (!empty($extraCss)): ?>
-    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/pages/css/<?php echo htmlspecialchars($extraCss); ?>">
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/pages/css/<?php echo htmlspecialchars($extraCss); ?>?v=<?php echo filemtime(__DIR__ . '/../pages/css/' . $extraCss); ?>">
     <?php endif; ?>
     <script src="<?php echo BASE_URL; ?>/assets/global_js/csrf.js"></script>
 </head>
