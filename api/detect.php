@@ -59,6 +59,12 @@ if (!$headers) {
 
 $headers = array_map('trim', $headers);
 
+// Strip UTF-8 BOM from the first header — Excel and some export tools prepend
+// \xEF\xBB\xBF which makes the first column unrecognizable to auto-detection.
+if (!empty($headers[0]) && str_starts_with($headers[0], "\xEF\xBB\xBF")) {
+    $headers[0] = substr($headers[0], 3);
+}
+
 // Read up to 20 sample rows for type detection
 $sampleRows = [];
 $allDates   = [];

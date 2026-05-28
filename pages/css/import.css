@@ -1126,6 +1126,28 @@ tr:hover .qty-edit-btn { opacity: 0.45; }
     margin-bottom: 1.5rem;
 }
 
+/* ── Date recovery notice (shown inside the preview card when rows bypassed
+      the selected format and were parsed via the unambiguous fallback) ── */
+.recovery-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+    background: rgba(38,31,14,0.04);
+    border: 1px solid rgba(38,31,14,0.14);
+    border-radius: 0.625rem;
+    padding: 0.7rem 0.875rem;
+    margin-bottom: 0.875rem;
+    font-size: 0.78rem;
+    color: #261F0E;
+    line-height: 1.5;
+}
+
+.recovery-notice svg {
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+    opacity: 0.45;
+}
+
 /* ── Preview card (3-color preflight) ─────────────────────────────────────── */
 .preview-card {
     background: rgba(38,31,14,0.025);

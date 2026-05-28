@@ -56,10 +56,15 @@ function sniffDateFormat(array $samples): array
 // We deliberately do NOT recover ambiguous numeric formats like "03-15-2024" inside
 // a DD/MM column — there's no way to know if that's US-style MM-DD or a typo, and
 // silently guessing is exactly the corruption strict parsing is meant to prevent.
-function normalizeDateStrict(string $raw, ?string $format): ?string
+// $usedFallback is set to true when the selected/detected format failed and the
+// recovery path was used instead. Callers that want to report this to the user
+// (e.g. preflight) pass a variable by reference; import.php ignores it.
+function normalizeDateStrict(string $raw, ?string $format, bool &$usedFallback = false): ?string
 {
     $raw = trim($raw);
     if ($raw === '') return null;
+
+    $usedFallback = false;
 
     // 1. Try the column's explicitly chosen/detected format first.
     if ($format) {
@@ -77,6 +82,7 @@ function normalizeDateStrict(string $raw, ?string $format): ?string
     }
 
     // 2. Recovery — only formats that can't be misinterpreted.
+    $usedFallback = true;
     return recoverUnambiguousDate($raw);
 }
 

@@ -809,6 +809,7 @@ function wForceClose() {
     wRowCount    = 0;
     wAssignments = {};
     wCurrentStep = 1;
+    wDroppedFile = null;
     wGoToStep(1);
     wClearState();
 }
@@ -849,10 +850,17 @@ function wHandleDrop(e) {
     e.preventDefault();
     wHandleDragLeave();
     var file = e.dataTransfer.files[0];
-    if (file && file.name.toLowerCase().endsWith('.csv')) wSetFile(file.name);
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+        document.getElementById('w-drop-text').textContent = 'Only .csv files are accepted';
+        return;
+    }
+    wDroppedFile = file;
+    wSetFile(file.name);
 }
 
 function wHandleFileSelect(e) {
+    wDroppedFile = null;
     var file = e.target.files[0];
     if (file) wSetFile(file.name);
 }
@@ -866,7 +874,7 @@ function wSetFile(name) {
 }
 
 async function wDetectColumns() {
-    var file = document.getElementById('w-csv-file').files[0];
+    var file = wDroppedFile || document.getElementById('w-csv-file').files[0];
     if (!file) return;
 
     var btn = document.getElementById('w-upload-btn');
@@ -910,6 +918,7 @@ var wRowCount    = 0;
 var wAssignments = {};
 var wPending     = null;
 var wCurrentStep = 1;
+var wDroppedFile = null; // holds File from drag-and-drop (file input can't receive dragged files)
 
 var WZ_KEY = 'pv_import_wizard';
 
@@ -1192,6 +1201,14 @@ function wRenderPreviewCard(data) {
     var html = '<div class="preview-card">';
     html += '<div class="preview-card-title">Preview of changes</div>';
     html += wRenderSummary();
+
+    if (data.recovered_count > 0) {
+        var rc = data.recovered_count;
+        html += '<div class="recovery-notice">';
+        html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+        html += '<span><strong>' + rc.toLocaleString() + ' row' + (rc !== 1 ? 's' : '') + '</strong> ignored the selected date format and were parsed automatically — their structure was unambiguous (e.g. ISO&nbsp;YYYY-MM-DD, or a day value above&nbsp;12). If any dates look wrong in the table, adjust the <strong>Date Format</strong> selector above and re-run.</span>';
+        html += '</div>';
+    }
 
     html += '<div class="preview-toolbar">';
     html += '<div class="preview-filter-chips" id="w-filter-chips">';

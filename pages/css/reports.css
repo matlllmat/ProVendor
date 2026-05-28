@@ -136,7 +136,33 @@
     box-shadow: 0 2px 8px rgba(38,31,14,0.04);
 }
 
-.breakdown-head { margin-bottom: 1rem; }
+.breakdown-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.bk-refresh-all-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-shrink: 0;
+    margin-top: 0.2rem;
+    padding: 0.38rem 0.8rem;
+    background: transparent;
+    border: 1px solid rgba(38,31,14,0.18);
+    border-radius: 0.4rem;
+    color: #261F0E;
+    font-size: 0.70rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.13s, border-color 0.13s;
+}
+.bk-refresh-all-btn:hover  { background: rgba(38,31,14,0.05); border-color: rgba(38,31,14,0.30); }
+.bk-refresh-all-btn:disabled { cursor: progress; opacity: 0.5; }
 
 .breakdown-eyebrow {
     font-size: 0.62rem;
@@ -330,6 +356,20 @@
     white-space: nowrap;
     flex-shrink: 0;
 }
+
+.session-accuracy {
+    font-size: 0.60rem;
+    font-weight: 700;
+    padding: 0.16rem 0.5rem;
+    border-radius: 999px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    border: 1px solid transparent;
+}
+.session-accuracy-good { color: #1A6933; background: rgba(26,105,51,0.10); border-color: rgba(26,105,51,0.25); }
+.session-accuracy-okay { color: #FF5722; background: rgba(255,87,34,0.09); border-color: rgba(255,87,34,0.25); }
+.session-accuracy-low  { color: #FF1A1A; background: rgba(255,26,26,0.09); border-color: rgba(255,26,26,0.25); }
+.session-accuracy-note { color: rgba(38,31,14,0.4); background: rgba(38,31,14,0.05); border-color: rgba(38,31,14,0.12); }
 
 .session-meta-line {
     display: flex;
@@ -718,6 +758,23 @@
 .selection-clear-btn:hover {
     background: rgba(240,232,208,0.18);
     color: #F0E8D0;
+}
+
+.selection-delete-btn {
+    background: rgba(220,60,50,0.22);
+    border: 1px solid rgba(220,60,50,0.35);
+    border-radius: 999px;
+    padding: 0.28rem 0.75rem;
+    font-size: 0.70rem;
+    font-weight: 600;
+    font-family: 'Lora', serif;
+    color: #f6a09a;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+}
+.selection-delete-btn:hover {
+    background: rgba(220,60,50,0.38);
+    color: #ffd0cd;
 }
 
 .selection-generate-btn {

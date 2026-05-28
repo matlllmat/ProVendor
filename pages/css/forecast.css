@@ -1930,3 +1930,13 @@
     color: #261F0E;
     opacity: 0.5;
 }
+
+.bsv-row-saved { opacity: 0.55; cursor: default; }
+.bsv-row-saved:hover { background: transparent; }
+.bsv-row-saved .bsv-check { accent-color: #1A6933; cursor: default; }
+
+.bsv-detail-saved {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #1A6933;
+}

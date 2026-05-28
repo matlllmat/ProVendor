@@ -1478,7 +1478,7 @@ function saveForecast() {
             <button type="button" class="batch-ghost-btn" onclick="BatchForecast.confirmCloseChartModal()">Close</button>
             <div style="display:flex;gap:0.6rem;align-items:center">
                 <button type="button" class="batch-ghost-btn" id="bcm-save-all-btn"
-                        style="display:none" onclick="BatchForecast.openSaveModal()">Save Forecasts</button>
+                        style="display:none" onclick="BatchForecast.openSaveModal()">Save Forecast</button>
                 <button type="button" class="batch-primary-btn" id="bcm-nv-btn"
                         onclick="BatchForecast.openNvModal()">Generate Newsvendor →</button>
             </div>

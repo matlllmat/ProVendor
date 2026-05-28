@@ -373,12 +373,17 @@ function handleDrop(e) {
     e.preventDefault();
     handleDragLeave(e);
     const file = e.dataTransfer.files[0];
-    if (file && file.name.toLowerCase().endsWith('.csv')) {
-        setFileSelected(file.name);
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+        document.getElementById('drop-text').textContent = 'Only .csv files are accepted';
+        return;
     }
+    droppedFile = file;
+    setFileSelected(file.name);
 }
 
 function handleFileSelect(e) {
+    droppedFile = null;
     const file = e.target.files[0];
     if (file) setFileSelected(file.name);
 }
@@ -395,7 +400,7 @@ function setFileSelected(name) {
 
 // ── Detect columns (Step 2 → Step 3) ─────────────────────────────────────────
 async function detectColumns() {
-    const file = document.getElementById('csv-file').files[0];
+    const file = droppedFile || document.getElementById('csv-file').files[0];
     if (!file) return;
 
     const btn = document.getElementById('upload-btn');
@@ -444,6 +449,7 @@ var colSample      = [];
 var colRowCount    = 0;
 var colAssignments = {};
 var colPending     = null;
+var droppedFile    = null; // holds File from drag-and-drop (file input can't receive dragged files)
 
 var IMPORT_BTN_HTML = 'Confirm &amp; Import Data <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
 
@@ -675,6 +681,14 @@ function renderPreviewCard(data) {
     var html = '<div class="preview-card">';
     html += '<div class="preview-card-title">Preview of changes</div>';
     html += renderSummary();
+
+    if (data.recovered_count > 0) {
+        var rc = data.recovered_count;
+        html += '<div class="recovery-notice">';
+        html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+        html += '<span><strong>' + rc.toLocaleString() + ' row' + (rc !== 1 ? 's' : '') + '</strong> ignored the selected date format and were parsed automatically — their structure was unambiguous (e.g. ISO&nbsp;YYYY-MM-DD, or a day value above&nbsp;12). If any dates look wrong in the table, adjust the <strong>Date Format</strong> selector above and re-run.</span>';
+        html += '</div>';
+    }
 
     html += '<div class="preview-toolbar">';
     html += '<div class="preview-filter-chips" id="filter-chips">';

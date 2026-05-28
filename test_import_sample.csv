@@ -1,0 +1,28 @@
+date,product,quantity,sku,category,subcategory,cost,price
+2024-01-15,Bottled Water 500ml,50,BW-001,Beverages,Water,8.00,15.00
+2024-01-16,Brown Rice 5kg,30,BR-001,Groceries,Staples,120.00,180.00
+2024-01-17,Cooking Oil 1L,25,CO-001,Groceries,Oils,45.00,75.00
+2024-02-29,Leap Year Chocolate Bar,20,LY-001,Snacks,Chocolate,30.00,55.00
+2024-06-01 14:30:00,Date With Timestamp,12,TS-001,Test,Format,,
+June 15 2024,Named Month Date,8,NM-001,Test,Format,,
+25/06/2024,Unambiguous Day Over 12,35,,Test,Format,,
+03/05/2024,Ambiguous Date Product,18,,Test,Format,,
+2024-07-01,Summer Promo Item,100,SP-001,Seasonal,Summer,50.00,90.00
+2024-07-01,Summer Promo Item,50,SP-001,Seasonal,Summer,50.00,90.00
+2024-08-01,energy drink original,60,ED-001,Beverages,Energy,22.00,40.00
+2024-08-02,ENERGY DRINK ORIGINAL,45,ED-001,Beverages,Energy,22.00,40.00
+2024-09-01,Qty As Decimal Point Zero,5.0,,,,,
+2024-09-02,Qty As Scientific Notation,1e3,,,,,
+2024-09-03,Qty At Max Limit,999999,,,,,
+2024-09-04,Qty At Minimum One,1,,,,,
+2024-09-05,Category Over Fifty Chars Test,10,,Category Over Fifty Characters Long For Testing P5X,,,
+,Missing Date Product,10,,,,,
+2024-10-01,,15,,,,,
+2024-10-02,Missing Quantity Product,,,,,,
+2024-10-03,Zero Quantity Product,0,,,,,
+2024-10-04,Negative Quantity Product,-5,,,,,
+2024-10-05,Decimal Quantity Product,2.5,,,,,
+2024-10-06,Over Max Quantity Product,1000000,,,,,
+not-a-real-date,Bad Date Format Product,10,,,,,
+2023-02-29,Non Leap Year Feb 29 Product,8,,,,,
+2024-10-07,Product Name That Is Intentionally Over One Hundred Characters For Testing Boundary Validation Edge Case,5,,,,,

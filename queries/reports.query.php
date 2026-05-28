@@ -12,6 +12,8 @@ function getForecastSessions(PDO $pdo, int $userId): array
              p.name          AS product_name,
              p.category,
              p.sku,
+             p.accuracy_pct,
+             p.accuracy_mape,
              MIN(f.forecast_date)               AS date_from,
              MAX(f.forecast_date)               AS date_to,
              ROUND(SUM(f.predicted_demand), 0)  AS total_predicted,

@@ -91,28 +91,6 @@ if ($hasProphet) {
 
     <?php if ($hasProphet): ?>
 
-    <!-- ── Top-3 most-impacted (Prophet) ──────────────────────────────────── -->
-    <?php $top3 = array_slice($prophetCache, 0, 3); if (!empty($top3)): ?>
-    <div class="top-impact-callout">
-        <p class="top-impact-label">Most impacted products</p>
-        <div class="top-impact-items">
-            <?php foreach ($top3 as $tp):
-                $tPct  = (float) $tp['impact_pct'];
-                $tDir  = $tPct >= 0 ? 'positive' : 'negative';
-                $tArrow = $tPct >= 0 ? '↑' : '↓';
-                $tSign  = $tPct >= 0 ? '+' : '';
-            ?>
-            <a class="top-impact-item top-impact-<?php echo $tDir; ?>"
-               href="<?php echo BASE_URL; ?>/pages/forecast.view.php?product_id=<?php echo $tp['product_id']; ?>&event_id=<?php echo $eventId; ?>">
-                <span class="top-impact-name"><?php echo htmlspecialchars($tp['product_name']); ?></span>
-                <span class="top-impact-pct">
-                    <?php echo $tArrow . ' ' . $tSign . number_format($tPct, 1); ?>%
-                </span>
-            </a>
-            <?php endforeach; ?>
-        </div>
-    </div>
-    <?php endif; ?>
 
     <!-- ── Forecast Model Analysis card ───────────────────────────────────── -->
     <div class="prophet-card">
@@ -220,7 +198,8 @@ if ($hasProphet) {
                 $pMean  = (float) $pc['mean_daily_sales'];
                 $pCoefSign = $pCoef >= 0 ? '+' : '';
             ?>
-            <div class="prophet-product-row">
+            <a class="prophet-product-row"
+               href="<?php echo BASE_URL; ?>/pages/forecast.view.php?product_id=<?php echo $pc['product_id']; ?>">
                 <div>
                     <div class="prophet-product-name"><?php echo htmlspecialchars($pc['product_name']); ?></div>
                     <?php if ($pc['category']): ?>
@@ -250,7 +229,7 @@ if ($hasProphet) {
                         </div>
                     </div>
                 </div>
-            </div>
+            </a>
             <?php endforeach; ?>
         </div>
 

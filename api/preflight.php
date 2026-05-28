@@ -52,6 +52,9 @@ if (!$handle) {
 }
 
 $headers = array_map('trim', fgetcsv($handle));
+if (!empty($headers[0]) && str_starts_with($headers[0], "\xEF\xBB\xBF")) {
+    $headers[0] = substr($headers[0], 3);
+}
 foreach ([$colDate, $colProduct, $colQty] as $col) {
     if (!in_array($col, $headers)) {
         fclose($handle);
@@ -94,9 +97,10 @@ $_SESSION['temp_csv_date_format'] = $dateFormat;
 // Invalid rows: collected individually (we can't aggregate without a valid key).
 // Valid rows:   aggregated by "<product>|<date>" so preview matches what would
 //               actually be inserted (the importer aggregates the same way).
-$invalidRows = [];
-$validByPair = []; // pairKey => row data
-$rowNum      = 1;
+$invalidRows    = [];
+$validByPair    = []; // pairKey => row data
+$recoveredCount = 0;  // valid rows whose date was parsed via the fallback, not the chosen format
+$rowNum         = 1;
 
 $pickField = function (array $r, ?string $col): ?string {
     if (!$col) return null;
@@ -132,16 +136,19 @@ foreach ($bufferedRows as $row) {
     $qtyRaw      = trim($r[$colQty]     ?? '');
 
     $reason = null;
-    if ($productName === '')      $reason = 'Missing product name';
-    elseif ($dateRaw === '')      $reason = 'Missing date';
-    elseif ($qtyRaw === '')       $reason = 'Missing quantity';
+    if ($productName === '')           $reason = 'Missing product name';
+    elseif (mb_strlen($productName) > 100) $reason = 'Product name exceeds 100 characters';
+    elseif ($dateRaw === '')           $reason = 'Missing date';
+    elseif ($qtyRaw === '')            $reason = 'Missing quantity';
 
-    $date = $reason ? null : normalizeDateStrict($dateRaw, $dateFormat['format']);
+    $usedFallback = false;
+    $date = $reason ? null : normalizeDateStrict($dateRaw, $dateFormat['format'], $usedFallback);
+    if (!$reason && $usedFallback && $date !== null) $recoveredCount++;
     if (!$reason && $date === null) {
         $reason = 'Unrecognized date format: "' . mb_substr($dateRaw, 0, 30) . '"';
     }
-    if (!$reason && (!is_numeric($qtyRaw) || (float) $qtyRaw <= 0 || (float) $qtyRaw != (int) $qtyRaw)) {
-        $reason = 'Quantity must be a whole number greater than 0 (got "' . mb_substr($qtyRaw, 0, 20) . '")';
+    if (!$reason && (!is_numeric($qtyRaw) || (float) $qtyRaw <= 0 || (float) $qtyRaw != (int) $qtyRaw || (int) $qtyRaw > 999999)) {
+        $reason = 'Quantity must be a whole number between 1 and 999,999 (got "' . mb_substr($qtyRaw, 0, 20) . '")';
     }
 
     if ($reason) {
@@ -167,7 +174,7 @@ foreach ($bufferedRows as $row) {
     }
 
     $qty     = (int) $qtyRaw;
-    $pairKey = $productName . '|' . $date;
+    $pairKey = mb_strtolower($productName) . '|' . $date;
 
     if (isset($validByPair[$pairKey])) {
         $validByPair[$pairKey]['qty']       += $qty;
@@ -200,7 +207,7 @@ $noopCount   = 0;
 $outRows     = [];
 
 foreach ($validByPair as $key => $v) {
-    $existingKey = $v['product'] . '|' . $v['date'];
+    $existingKey = mb_strtolower($v['product']) . '|' . $v['date'];
     if (!isset($existing[$existingKey])) {
         $v['status'] = 'new';
         $newCount++;
@@ -231,9 +238,10 @@ usort($outRows, function ($a, $b) use ($statusOrder) {
 });
 
 echo json_encode([
-    'date_format' => $dateFormat,
-    'csv_rows'    => count($bufferedRows),
-    'summary'     => [
+    'date_format'     => $dateFormat,
+    'csv_rows'        => count($bufferedRows),
+    'recovered_count' => $recoveredCount,
+    'summary'         => [
         'new'              => $newCount,
         'overlap'          => $overlapCount,
         'invalid'          => count($invalidRows),

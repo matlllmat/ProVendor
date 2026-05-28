@@ -39,6 +39,20 @@ function renderSessionRow(array $s): void { ?>
                 <?php echo htmlspecialchars($s['category']); ?>
             </span>
             <?php endif; ?>
+            <?php
+                $accPct = $s['accuracy_pct'] ?? null;
+                if ($accPct !== null):
+                    $accPct   = (float) $accPct;
+                    $accTone  = $accPct >= 80 ? 'good' : ($accPct >= 60 ? 'okay' : 'low');
+                    $accLabel = number_format($accPct, 1) . '%';
+                else:
+                    $accTone  = 'note';
+                    $accLabel = 'Untested';
+                endif;
+            ?>
+            <span class="session-accuracy session-accuracy-<?php echo $accTone; ?>">
+                <?php echo $accLabel; ?>
+            </span>
         </div>
         <div class="session-meta-line">
             <span class="session-date-range">
@@ -207,6 +221,16 @@ function renderSessionRow(array $s): void { ?>
                         Hit <span class="breakdown-refresh-glyph">&#x21BB;</span> on any row to re-run that product&rsquo;s backtest.
                     </p>
                 </div>
+                <button type="button" id="bk-refresh-all-btn" class="bk-refresh-all-btn"
+                        onclick="bkRefreshAll()">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 4 23 10 17 10"/>
+                        <polyline points="1 20 1 14 7 14"/>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                    </svg>
+                    Refresh All
+                </button>
             </div>
 
             <div class="breakdown-table-wrap">
@@ -379,6 +403,7 @@ function renderSessionRow(array $s): void { ?>
 <div id="selection-toolbar" class="selection-toolbar" style="display:none">
     <span id="selection-count" class="selection-count">0 selected</span>
     <button type="button" class="selection-clear-btn" onclick="deselectAll()">Clear</button>
+    <button type="button" class="selection-delete-btn" onclick="deleteSelected()">Delete Selected</button>
     <button type="button" class="selection-generate-btn" onclick="generateSummary()">
         Generate Summary &rarr;
     </button>
@@ -510,6 +535,70 @@ function deselectAll() {
         row.classList.remove('session-selected');
     });
     document.getElementById('selection-toolbar').style.display = 'none';
+}
+
+function deleteSelected() {
+    var checked = document.querySelectorAll('.session-checkbox:checked');
+    if (checked.length === 0) return;
+
+    var items = Array.from(checked).map(function(cb) {
+        var row = cb.closest('.session-row');
+        return {
+            row:         row,
+            productId:   row.dataset.productId,
+            generatedAt: row.dataset.generatedAt,
+            productName: row.dataset.productName,
+        };
+    });
+
+    var count = items.length;
+    var names = items.slice(0, 3).map(function(it) { return '“' + it.productName + '”'; }).join(', ');
+    var more  = count > 3 ? ' and ' + (count - 3) + ' more' : '';
+
+    showConfirm({
+        title:        'Delete ' + count + ' demand plan' + (count !== 1 ? 's' : '') + '?',
+        message:      names + more + ' will be permanently removed. This cannot be undone.',
+        confirmText:  'Delete All',
+        confirmStyle: 'danger',
+        onConfirm:    function() { _bulkDeleteItems(items); },
+    });
+}
+
+function _bulkDeleteItems(items) {
+    var chain = Promise.resolve();
+    items.forEach(function(item) {
+        chain = chain.then(function() {
+            return _deleteSessionRow(item.row, item.productId, item.generatedAt);
+        });
+    });
+    chain.then(function() {
+        onRowCheckChange();
+        if (document.querySelectorAll('#tab-forecasts .session-row').length === 0) {
+            document.getElementById('tab-forecasts').innerHTML =
+                '<div class="session-list"><div class="session-empty">' +
+                '<p class="session-empty-title">No saved forecasts yet</p>' +
+                '<p class="session-empty-sub">Go to the Forecast page, select a product, and run a forecast.</p>' +
+                '</div></div>';
+        }
+    });
+}
+
+function _deleteSessionRow(row, productId, generatedAt) {
+    var body = new FormData();
+    body.append('product_id',   productId);
+    body.append('generated_at', generatedAt);
+
+    return fetch('<?php echo BASE_URL; ?>/api/delete_forecast.php', { method: 'POST', body: body })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) return;
+            var group = row ? row.closest('.session-group') : null;
+            if (row) row.remove();
+            if (group && group.querySelectorAll('.session-row').length === 0) {
+                group.style.display = 'none';
+            }
+        })
+        .catch(function() {});
 }
 
 // ── Generate Summary ──────────────────────────────────────────────────────────
@@ -743,7 +832,7 @@ document.addEventListener('keydown', function(e) {
 // ── Per-product accuracy refresh (breakdown table) ────────────────────────────
 function bkRefreshRow(btn, productId) {
     var row = btn.closest('.bk-row');
-    if (!row || btn.disabled) return;
+    if (!row || btn.disabled) return Promise.resolve();
     btn.disabled = true;
     btn.classList.add('bk-refresh-loading');
 
@@ -751,7 +840,7 @@ function bkRefreshRow(btn, productId) {
     body.append('product_id', productId);
     body.append('refresh',    '1');
 
-    fetch('<?php echo BASE_URL; ?>/api/run_product_accuracy.php', { method: 'POST', body: body })
+    return fetch('<?php echo BASE_URL; ?>/api/run_product_accuracy.php', { method: 'POST', body: body })
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (data.error) {
@@ -779,6 +868,33 @@ function bkRefreshRow(btn, productId) {
             btn.disabled = false;
             btn.classList.remove('bk-refresh-loading');
         });
+}
+
+function bkRefreshAll() {
+    var buttons = Array.from(document.querySelectorAll('.bk-row .bk-refresh:not([disabled])'));
+    if (!buttons.length) return;
+
+    var allBtn = document.getElementById('bk-refresh-all-btn');
+    if (allBtn) { allBtn.disabled = true; allBtn.textContent = 'Refreshing…'; }
+
+    var chain = Promise.resolve();
+    buttons.forEach(function(btn) {
+        chain = chain.then(function() {
+            var row = btn.closest('.bk-row');
+            if (!row) return;
+            return bkRefreshRow(btn, parseInt(row.dataset.productId, 10));
+        });
+    });
+    chain.then(function() {
+        if (allBtn) {
+            allBtn.disabled    = false;
+            allBtn.innerHTML   =
+                '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' +
+                '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>' +
+                '<path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>' +
+                '</svg> Refresh All';
+        }
+    });
 }
 
 function bkSetStatus(row, tone, label) {

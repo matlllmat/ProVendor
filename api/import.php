@@ -57,8 +57,9 @@ try {
         $qtyRaw      = $r['qty'] ?? '';
 
         $reason = null;
-        if ($productName === '') $reason = 'Missing product name';
-        elseif ($dateRaw === '') $reason = 'Missing date';
+        if ($productName === '')               $reason = 'Missing product name';
+        elseif (mb_strlen($productName) > 100) $reason = 'Product name exceeds 100 characters';
+        elseif ($dateRaw === '')               $reason = 'Missing date';
         elseif ($qtyRaw === '' || $qtyRaw === null) $reason = 'Missing quantity';
 
         $date = $reason ? null : normalizeDateStrict($dateRaw, $dateFormat);
@@ -66,8 +67,8 @@ try {
             $reason = 'Unrecognized date format: "' . mb_substr($dateRaw, 0, 30) . '"';
         }
 
-        if (!$reason && (!is_numeric($qtyRaw) || (float) $qtyRaw <= 0 || (float) $qtyRaw != (int) $qtyRaw)) {
-            $reason = 'Quantity must be a whole number greater than 0';
+        if (!$reason && (!is_numeric($qtyRaw) || (float) $qtyRaw <= 0 || (float) $qtyRaw != (int) $qtyRaw || (int) $qtyRaw > 999999)) {
+            $reason = 'Quantity must be a whole number between 1 and 999,999';
         }
 
         if ($reason) {
@@ -156,8 +157,8 @@ try {
         }
         $pid = $productCache[$r['product']];
 
-        // Existing-pair check uses product NAME (consistent with preflight).
-        $existKey = $r['product'] . '|' . $r['date'];
+        // Existing-pair check uses lowercase name (consistent with preflight + DB collation).
+        $existKey = mb_strtolower($r['product']) . '|' . $r['date'];
         if (isset($existingByName[$existKey])) {
             $existQty = (int) $existingByName[$existKey]['qty'];
             $saleId   = (int) $existingByName[$existKey]['id'];

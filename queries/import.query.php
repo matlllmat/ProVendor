@@ -78,7 +78,7 @@ function getExistingSalesWithIdsByName(PDO $pdo, int $userId): array
     $stmt->execute([$userId]);
     $out = [];
     foreach ($stmt->fetchAll() as $row) {
-        $out[$row['name'] . '|' . $row['sale_date']] = [
+        $out[mb_strtolower($row['name']) . '|' . $row['sale_date']] = [
             'id'  => (int) $row['id'],
             'qty' => (int) $row['quantity_sold'],
         ];
@@ -100,7 +100,7 @@ function getExistingSalesByName(PDO $pdo, int $userId): array
     $stmt->execute([$userId]);
     $out = [];
     foreach ($stmt->fetchAll() as $row) {
-        $out[$row['name'] . '|' . $row['sale_date']] = (int) $row['quantity_sold'];
+        $out[mb_strtolower($row['name']) . '|' . $row['sale_date']] = (int) $row['quantity_sold'];
     }
     return $out;
 }

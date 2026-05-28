@@ -32,6 +32,10 @@ var BatchForecast = (function () {
     // optInputs: { cost_price, selling_price, current_stock }
     var _prophetResults = [];
 
+    // Tracks which product IDs have been successfully saved in this batch session.
+    // Reset each time a new batch is opened so stale state never carries over.
+    var _savedProductIds = {};
+
     // Currently active tab index in the chart modal.
     var _activeTabIdx = 0;
 
@@ -167,12 +171,25 @@ var BatchForecast = (function () {
         if (row) row.classList.toggle('batch-selected', checked);
     }
 
+    function _allVisibleSelected() {
+        var anyVisible = false;
+        var allSelected = true;
+        document.querySelectorAll('.product-row[data-product-id]').forEach(function(row) {
+            if (row.style.display === 'none') return;
+            anyVisible = true;
+            if (_selectedIds.indexOf(String(row.dataset.productId)) === -1) allSelected = false;
+        });
+        return anyVisible && allSelected;
+    }
+
     function _updateToolbar() {
         var count   = _selectedIds.length;
         var countEl = document.getElementById('batch-selection-count');
         var nextBtn = document.getElementById('batch-next-btn');
+        var selBtn  = document.querySelector('.batch-select-all-btn');
         if (countEl) countEl.textContent = count + ' selected';
         if (nextBtn) nextBtn.disabled    = count === 0;
+        if (selBtn)  selBtn.textContent  = _allVisibleSelected() ? 'Unselect All visible' : 'Select All visible';
     }
 
     function selectedCount() {
@@ -235,12 +252,13 @@ var BatchForecast = (function () {
                 + (failed > 0 ? ' (' + failed + ' failed)' : '');
         }
 
-        // Reset save-all button state for a fresh batch run
+        // Reset save-all button state and saved-ID tracking for a fresh batch run
+        _savedProductIds = {};
         var saveAllBtn = document.getElementById('bcm-save-all-btn');
         if (saveAllBtn) {
             saveAllBtn.style.display = 'none';
             saveAllBtn.disabled      = false;
-            saveAllBtn.textContent   = 'Save All Forecasts';
+            saveAllBtn.textContent   = 'Save Forecast';
         }
 
         _buildTabs(successes);
@@ -321,7 +339,21 @@ var BatchForecast = (function () {
             onRunAgain:          null,
             onGenerateRestock:   null,
             meta:                meta,
-            onSave:              meta ? function () { _saveProduct(result, meta); } : null,
+            onSave:              meta ? function () {
+                _saveProduct(result, meta).then(function (data) {
+                    if (data && !data.error) {
+                        _savedProductIds[result.product_id] = true;
+                        var btn = document.getElementById('cm-save-btn');
+                        if (btn) {
+                            btn.disabled         = true;
+                            btn.textContent      = 'Saved ✓';
+                            btn.style.opacity    = '1';
+                            btn.style.cursor     = 'default';
+                            btn.style.color      = '#1A6933';
+                        }
+                    }
+                });
+            } : null,
         });
     }
 
@@ -343,6 +375,7 @@ var BatchForecast = (function () {
         var modal = document.getElementById('batch-chart-modal');
         if (modal) modal.classList.add('hidden');
         document.body.style.overflow = '';
+        exitMode();
     }
 
     // ── Batch newsvendor modal ────────────────────────────────────────────────
@@ -614,21 +647,33 @@ var BatchForecast = (function () {
             + '</label>';
 
         toSave.forEach(function (r) {
-            var detail = 'Order: <strong>' + Number(r.optResult.restock_qty).toLocaleString() + ' units</strong>'
-                + ' &nbsp;·&nbsp; ₱' + Number(r.optResult.est_profit).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' profit';
-            html += '<label class="bsv-row">'
-                + '<input type="checkbox" class="bsv-check bsv-product-check" value="' + r.product_id + '" checked>'
-                + '<div class="bsv-row-info">'
-                + '<span class="bsv-name">' + _esc(r.product_name) + '</span>'
-                + '<span class="bsv-detail">' + detail + '</span>'
-                + '</div>'
-                + '</label>';
+            var alreadySaved = !!_savedProductIds[r.product_id];
+            if (alreadySaved) {
+                html += '<label class="bsv-row bsv-row-saved">'
+                    + '<input type="checkbox" class="bsv-check bsv-product-check" value="' + r.product_id + '" checked disabled>'
+                    + '<div class="bsv-row-info">'
+                    + '<span class="bsv-name">' + _esc(r.product_name) + '</span>'
+                    + '<span class="bsv-detail-saved">Saved ✓</span>'
+                    + '</div>'
+                    + '</label>';
+            } else {
+                var detail = 'Order: <strong>' + Number(r.optResult.restock_qty).toLocaleString() + ' units</strong>'
+                    + ' &nbsp;·&nbsp; ₱' + Number(r.optResult.est_profit).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' profit';
+                html += '<label class="bsv-row">'
+                    + '<input type="checkbox" class="bsv-check bsv-product-check" value="' + r.product_id + '" checked>'
+                    + '<div class="bsv-row-info">'
+                    + '<span class="bsv-name">' + _esc(r.product_name) + '</span>'
+                    + '<span class="bsv-detail">' + detail + '</span>'
+                    + '</div>'
+                    + '</label>';
+            }
         });
 
         body.innerHTML = html;
 
         var checkAll = document.getElementById('bsv-check-all');
-        var productChecks = body.querySelectorAll('.bsv-product-check');
+        // Only count/toggle non-disabled (not-yet-saved) checkboxes.
+        var productChecks = body.querySelectorAll('.bsv-product-check:not([disabled])');
 
         if (checkAll) {
             checkAll.addEventListener('change', function () {
@@ -639,7 +684,7 @@ var BatchForecast = (function () {
         productChecks.forEach(function (chk) {
             chk.addEventListener('change', function () {
                 var total   = productChecks.length;
-                var checked = body.querySelectorAll('.bsv-product-check:checked').length;
+                var checked = body.querySelectorAll('.bsv-product-check:not([disabled]):checked').length;
                 if (checkAll) checkAll.checked = total === checked;
             });
         });
@@ -691,7 +736,10 @@ var BatchForecast = (function () {
                     std_inflation_factor: result.optResult.std_inflation_factor,
                 };
                 return _saveProduct(result, meta)
-                    .then(function (data) { if (data.error) errors++; })
+                    .then(function (data) {
+                        if (data.error) errors++;
+                        else _savedProductIds[result.product_id] = true;
+                    })
                     .catch(function () { errors++; });
             });
         });
@@ -700,6 +748,9 @@ var BatchForecast = (function () {
             if (errors === 0) {
                 closeSaveModal();
             } else {
+                // Rebuild list so already-saved items show "Saved ✓" even on partial failure.
+                var toSaveAll = _prophetResults.filter(function (r) { return r.success && r.optResult && r.optInputs; });
+                _buildSaveList(toSaveAll);
                 if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Retry (' + errors + ' failed)'; }
                 if (errEl)   { errEl.textContent = errors + ' product' + (errors === 1 ? '' : 's') + ' failed to save. Retry or check your connection.'; errEl.style.display = ''; }
             }
