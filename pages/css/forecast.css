@@ -125,33 +125,56 @@
 }
 
 /* ── Category tab filter ── */
-.category-tabs {
+/* ── Category dropdown (replaces the old wrapping pill row) ── */
+.category-select-wrap {
     display: flex;
-    gap: 0.375rem;
-    flex-wrap: wrap;
-    margin-bottom: 1.25rem;
+    align-items: center;
+    gap: 0.55rem;
 }
 
-.category-tab {
-    padding: 0.3rem 0.875rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    border-radius: 999px;
-    border: 1px solid #D2C8AE;
-    background: transparent;
+.category-select-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
     color: #261F0E;
     opacity: 0.5;
-    cursor: pointer;
-    transition: all 0.15s;
+    white-space: nowrap;
 }
 
-.category-tab:hover  { opacity: 0.8; }
+.category-select-control {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
 
-.category-tab.active {
-    background: #261F0E;
-    color: #F0E8D0;
-    border-color: #261F0E;
-    opacity: 1;
+.category-select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    font-family: 'Lora', serif;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #261F0E;
+    background: rgba(38,31,14,0.05);
+    border: 1px solid #D2C8AE;
+    border-radius: 999px;
+    padding: 0.4rem 2.1rem 0.4rem 0.95rem;   /* right room for the chevron */
+    cursor: pointer;
+    min-width: 11rem;
+    max-width: 18rem;
+    text-overflow: ellipsis;
+    transition: border-color 0.15s, background 0.15s;
+}
+.category-select:hover  { border-color: rgba(38,31,14,0.4); }
+.category-select:focus  { outline: none; border-color: #261F0E; background: rgba(38,31,14,0.08); }
+
+.category-select-chevron {
+    position: absolute;
+    right: 0.75rem;
+    pointer-events: none;   /* clicks fall through to the select */
+    color: #261F0E;
+    opacity: 0.5;
 }
 
 /* ── Product list container ── */
@@ -171,7 +194,7 @@
 */
 .product-row {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr auto auto;
     align-items: center;
     gap: 1rem;
     width: 100%;
@@ -247,6 +270,52 @@
     line-height: 1;
 }
 
+/* Middle column: saved forecast summary (demand + restock recommendation). */
+.product-row-forecast {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.15rem;
+    flex-shrink: 0;
+    text-align: right;
+    line-height: 1.2;
+}
+
+.prf-demand {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #261F0E;
+    white-space: nowrap;
+}
+
+.prf-unit {
+    font-size: 0.62rem;
+    font-weight: 400;
+    opacity: 0.45;
+}
+
+.prf-order {
+    font-size: 0.67rem;
+    font-weight: 600;
+    color: #1A6933;
+    white-space: nowrap;
+}
+
+.prf-no-order {
+    font-size: 0.64rem;
+    color: #261F0E;
+    opacity: 0.4;
+    white-space: nowrap;
+}
+
+.prf-empty {
+    font-size: 0.68rem;
+    color: #261F0E;
+    opacity: 0.3;
+    font-style: italic;
+    white-space: nowrap;
+}
+
 /* Right column: category and subcategory badges */
 .product-row-badges {
     display: flex;
@@ -291,18 +360,135 @@
     font-size: 0.875rem;
 }
 
+/* ── View toggle (list ⇆ cards), right-aligned above the product list ── */
+.product-list-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+
+.view-toggle {
+    display: inline-flex;
+    gap: 0.15rem;
+    padding: 0.2rem;
+    background: #F0E8D0;
+    border: 1px solid #D2C8AE;
+    border-radius: 999px;
+}
+
+.view-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.85rem;
+    border: none;
+    border-radius: 999px;
+    background: transparent;
+    color: #261F0E;
+    font-family: 'Lora', serif;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    opacity: 0.55;
+    transition: background 0.15s, color 0.15s, opacity 0.15s;
+}
+
+.view-toggle-btn:hover { opacity: 0.85; }
+
+.view-toggle-btn.active {
+    background: #261F0E;
+    color: #F0E8D0;
+    opacity: 1;
+}
+
+.view-toggle-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+/* ── Card (grid) view: same .product-row buttons, laid out as boxes ── */
+.product-list.as-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+    gap: 0.85rem;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    overflow: visible;         /* let card hover-lift + shadow show */
+}
+
+.as-cards .product-row {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.55rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid #D2C8AE;
+    border-left: 1px solid #D2C8AE;   /* reset the list's 3px accent bar */
+    border-radius: 0.85rem;
+    box-shadow: 0 2px 10px rgba(38,31,14,0.05);
+    transition: border-color 0.14s, background 0.14s, box-shadow 0.14s, transform 0.14s;
+}
+
+/* Reset the list's "last row has no bottom border" rule for cards */
+.as-cards .product-row:last-child { border-bottom: 1px solid #D2C8AE; }
+
+.as-cards .product-row:hover {
+    border-color: #1A6933;
+    background: rgba(210,200,174,0.35);
+    box-shadow: 0 4px 16px rgba(38,31,14,0.1);
+    transform: translateY(-2px);
+}
+
+.as-cards .product-row.active {
+    border-color: #261F0E;
+    background: rgba(38,31,14,0.055);
+}
+
+/* Card: let long names wrap to two lines instead of truncating */
+.as-cards .product-row-name {
+    white-space: normal;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+/* Card: forecast summary reads left-to-right, divided from the name */
+.as-cards .product-row-forecast {
+    align-items: flex-start;
+    text-align: left;
+    width: 100%;
+    padding-top: 0.55rem;
+    border-top: 1px dashed rgba(38,31,14,0.14);
+}
+
+/* Card: badges wrap and pin to the bottom so cards in a row stay aligned */
+.as-cards .product-row-badges {
+    flex-wrap: wrap;
+    margin-top: auto;
+    padding-top: 0.15rem;
+}
+
+/* Empty / no-match states span the full grid width */
+.as-cards .product-empty,
+.as-cards #product-list-empty-filter {
+    grid-column: 1 / -1;
+}
+
 /* ── Filters row: categories on the left, view switcher on the right ── */
 .chart-filters-row {
     display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
     margin-top: 1rem;
     margin-bottom: 1.25rem;
+    min-width: 0;                 /* let the year-selector shrink + scroll */
 }
-.chart-filters-row .category-tabs { margin-bottom: 0; }
-.chart-filters-row .view-tabs     { margin-bottom: 0; }
+.chart-filters-row .view-tabs              { margin-bottom: 0; }
+.chart-filters-row .year-selector          { margin-bottom: 0; }
+.chart-filters-row .chart-selected-product { margin-left: auto; }  /* chip → right in product mode */
 
 /* ── View tabs (Daily / Weekly / Monthly / Yearly) ── */
 .view-tabs {
@@ -337,32 +523,31 @@
     opacity: 1;
 }
 
-/* ── Year pills + selected-product row (balanced layout) ── */
-.year-product-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
-    margin-bottom: 0.875rem;
-}
-.year-product-row .year-selector          { margin-bottom: 0; }
-.year-product-row .chart-selected-product { margin-bottom: 0; margin-left: auto; }
-
-/* ── Year overlay selector ── */
+/* ── Date filter: year pills, inline with the view tabs ──
+   Sits beside Daily/Weekly/Monthly/Yearly and scrolls horizontally when a
+   dataset spans many years, so the pills never wrap or stretch the card. */
 .year-selector {
     display: flex;
     gap: 0.375rem;
-    flex-wrap: wrap;
-    margin-bottom: 0.875rem;
-    min-height: 0;
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin-bottom: 0;
+    padding-bottom: 3px;          /* breathing room for the scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(38,31,14,0.25) transparent;
 }
+.year-selector::-webkit-scrollbar { height: 6px; }
+.year-selector::-webkit-scrollbar-thumb { background: rgba(38,31,14,0.2); border-radius: 999px; }
+.year-selector::-webkit-scrollbar-track { background: transparent; }
 
 .year-pill {
     padding: 0.28rem 0.875rem;
     font-size: 0.75rem;
     font-weight: 600;
     border-radius: 999px;
+    flex-shrink: 0;               /* keep full width; scroll instead of squishing */
     border: 1.5px solid var(--yc, #D2C8AE);
     background: transparent;
     color: var(--yc, #261F0E);
@@ -1313,630 +1498,92 @@
     margin-bottom: 0.6rem;
 }
 
-/* ══════════════════════════════════════════════════════
-   BATCH FORECAST
-══════════════════════════════════════════════════════ */
-
-/* ── Selection mode: body class toggled by BatchForecast.enterMode() ── */
-
-.batch-select-mode #batch-trigger-btn { display: none; }
-
-.batch-row-check {
-    display: none;
-    width: 16px;
-    height: 16px;
-    border: 1.5px solid rgba(38,31,14,0.25);
-    border-radius: 4px;
-    flex-shrink: 0;
-    margin-right: 0.5rem;
-    align-self: center;
-    transition: background 0.12s, border-color 0.12s;
-}
-.batch-select-mode .batch-row-check {
-    display: flex;
+/* ======================================================
+   PER-PRODUCT FORECAST RANGE + INLINE FORECAST VIEW
+====================================================== */
+.product-range {
+    /* display toggled to flex in product mode via JS */
     align-items: center;
-    justify-content: center;
-}
-.batch-row-check.checked {
-    background: #261F0E;
-    border-color: #261F0E;
-}
-.batch-row-check.checked::after {
-    content: '';
-    display: block;
-    width: 5px;
-    height: 9px;
-    border: 2px solid #F0E8D0;
-    border-top: none;
-    border-left: none;
-    transform: rotate(45deg) translate(-1px, -1px);
-}
-
-.product-row.batch-selected {
-    background: rgba(38,31,14,0.05);
-    border-color: rgba(38,31,14,0.25) !important;
-}
-
-.batch-select-mode .product-row { cursor: default; }
-.batch-select-mode .product-row:hover { background: rgba(38,31,14,0.04); }
-
-/* ── Batch toolbar ── */
-.batch-toolbar {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.6rem 0.85rem;
-    margin-bottom: 0.6rem;
-    background: #261F0E;
-    border-radius: 0.65rem;
+    gap: 0.6rem;
     flex-wrap: wrap;
-}
-
-.batch-cancel-btn {
-    background: transparent;
-    color: #F0E8D0;
-    border: 1px solid rgba(240,232,208,0.25);
-    border-radius: 0.45rem;
-    padding: 0.3rem 0.8rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    font-family: 'Lora', serif;
-    cursor: pointer;
-    opacity: 0.75;
-    transition: opacity 0.15s;
-}
-.batch-cancel-btn:hover { opacity: 1; }
-
-.batch-select-all-btn {
-    background: transparent;
-    color: #F0E8D0;
-    border: 1px solid rgba(240,232,208,0.25);
-    border-radius: 0.45rem;
-    padding: 0.3rem 0.8rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    font-family: 'Lora', serif;
-    cursor: pointer;
-    opacity: 0.75;
-    transition: opacity 0.15s;
-}
-.batch-select-all-btn:hover { opacity: 1; }
-
-.batch-selection-count {
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: #F0E8D0;
-    opacity: 0.6;
-    flex: 1;
-    text-align: center;
-}
-
-.batch-next-btn {
-    background: #F0E8D0;
-    color: #261F0E;
-    border: none;
-    border-radius: 0.45rem;
-    padding: 0.3rem 1rem;
-    font-size: 0.78rem;
-    font-weight: 700;
-    font-family: 'Lora', serif;
-    cursor: pointer;
-    transition: opacity 0.15s;
-    margin-left: auto;
-}
-.batch-next-btn:hover    { opacity: 0.8; }
-.batch-next-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-
-/* ── Batch trigger button (sits in the search bar) ── */
-.batch-trigger-btn {
-    background: transparent;
-    color: #261F0E;
-    border: 1px solid #D2C8AE;
-    border-radius: 0.5rem;
-    padding: 0.6rem 1rem;
-    font-size: 0.82rem;
-    font-weight: 600;
-    font-family: 'Lora', serif;
-    cursor: pointer;
-    white-space: nowrap;
-    opacity: 0.65;
-    transition: opacity 0.15s, background 0.15s;
-}
-.batch-trigger-btn:hover { opacity: 1; background: rgba(38,31,14,0.05); }
-
-/* ── Shared modal close button (reused across all batch modals) ── */
-.batch-modal-close-btn {
-    flex-shrink: 0;
-    width: 2rem;
-    height: 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: none;
-    color: #261F0E;
-    opacity: 0.35;
-    cursor: pointer;
-    border-radius: 0.5rem;
-    margin-left: auto;
-    transition: opacity 0.15s, background 0.15s;
-}
-.batch-modal-close-btn:hover { opacity: 0.7; background: rgba(38,31,14,0.07); }
-
-/* ── Shared modal buttons (reused across all batch modals) ── */
-.batch-primary-btn {
-    background: #261F0E;
-    color: #F0E8D0;
-    border: none;
-    border-radius: 0.6rem;
-    padding: 0.65rem 1.25rem;
-    font-size: 0.85rem;
-    font-weight: 600;
-    font-family: 'Lora', serif;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: opacity 0.15s;
-}
-.batch-primary-btn:hover    { opacity: 0.8; }
-.batch-primary-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-.batch-ghost-btn {
-    background: transparent;
-    color: #261F0E;
+    margin-bottom: 0.9rem;
+    padding: 0.55rem 0.85rem;
+    background: rgba(38,31,14,0.03);
     border: 1px solid #D2C8AE;
     border-radius: 0.6rem;
-    padding: 0.65rem 1.25rem;
-    font-size: 0.85rem;
-    font-weight: 600;
-    font-family: 'Lora', serif;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: background 0.15s;
-}
-.batch-ghost-btn:hover { background: rgba(38,31,14,0.06); }
-
-/* ── Error banner (shared across batch modals) ── */
-.batch-run-error {
-    margin: 0.75rem 1.5rem 0;
-    padding: 0.6rem 0.9rem;
-    border-radius: 0.5rem;
-    background: rgba(255,26,26,0.08);
-    border: 1px solid rgba(255,26,26,0.2);
-    color: #FF1A1A;
-    font-size: 0.8rem;
-    flex-shrink: 0;
 }
 
-/* ══════════════════════════════════════════════════════
-   BATCH CHART MODAL — product tab strip + chart area
-══════════════════════════════════════════════════════ */
-
-.bcm-card {
-    position: relative;
-    background: #F0E8D0;
-    border: 1px solid #D2C8AE;
-    border-radius: 1.25rem;
-    box-shadow: 0 24px 64px rgba(38,31,14,0.3);
-    display: flex;
-    flex-direction: column;
-    width: min(1100px, 96vw);
-    max-height: 92vh;
-    margin: 1rem;
-    overflow: hidden;
-}
-
-.bcm-header {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 1.25rem 1.5rem 1rem;
-    border-bottom: 1px solid #D2C8AE;
-    flex-shrink: 0;
-}
-
-.bcm-eyebrow {
-    font-size: 0.62rem;
+.product-range-label {
+    font-size: 0.7rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: #261F0E;
-    opacity: 0.4;
-    margin-bottom: 0.2rem;
-}
-
-.bcm-title {
-    font-size: 1rem;
-    font-weight: 600;
-    color: #261F0E;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* Product tab strip */
-.bcm-tabs {
-    display: flex;
-    overflow-x: auto;
-    border-bottom: 1px solid #D2C8AE;
-    background: rgba(38,31,14,0.02);
-    flex-shrink: 0;
-    padding: 0 0.5rem;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(38,31,14,0.15) transparent;
-}
-.bcm-tabs::-webkit-scrollbar { height: 3px; }
-.bcm-tabs::-webkit-scrollbar-thumb { background: rgba(38,31,14,0.15); border-radius: 2px; }
-
-.bcm-tab {
-    flex-shrink: 0;
-    padding: 0.65rem 1rem;
-    border: none;
-    background: transparent;
-    color: #261F0E;
-    font-size: 0.8rem;
-    font-weight: 600;
-    font-family: 'Lora', serif;
-    cursor: pointer;
-    opacity: 0.45;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
-    white-space: nowrap;
-    transition: opacity 0.15s, border-color 0.15s;
-}
-.bcm-tab:hover  { opacity: 0.75; }
-.bcm-tab.active { opacity: 1; border-bottom-color: #261F0E; }
-
-/* Chart render area — ChartModal.renderIn() target */
-.bcm-chart-area {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(38,31,14,0.15) transparent;
-}
-.bcm-chart-area::-webkit-scrollbar { width: 4px; }
-.bcm-chart-area::-webkit-scrollbar-thumb { background: rgba(38,31,14,0.15); border-radius: 2px; }
-
-/* Footer */
-.bcm-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding: 1rem 1.5rem;
-    border-top: 1px solid #D2C8AE;
-    flex-shrink: 0;
-}
-
-/* ══════════════════════════════════════════════════════
-   BATCH NEWSVENDOR MODAL — fast-generate all products
-══════════════════════════════════════════════════════ */
-
-.bnv-card {
-    position: relative;
-    background: #F0E8D0;
-    border: 1px solid #D2C8AE;
-    border-radius: 1.25rem;
-    box-shadow: 0 24px 64px rgba(38,31,14,0.3);
-    display: flex;
-    flex-direction: column;
-    width: min(960px, 96vw);
-    max-height: 90vh;
-    margin: 1rem;
-    overflow: hidden;
-}
-
-.bnv-header {
-    display: flex;
-    align-items: flex-start;
-    gap: 1rem;
-    padding: 1.25rem 1.5rem 1rem;
-    border-bottom: 1px solid #D2C8AE;
-    flex-shrink: 0;
-}
-
-.bnv-eyebrow {
-    font-size: 0.62rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: #261F0E;
-    opacity: 0.4;
-    margin-bottom: 0.2rem;
-}
-
-.bnv-title {
-    font-size: 1rem;
-    font-weight: 600;
-    color: #261F0E;
-    line-height: 1.4;
-}
-
-.bnv-body {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    padding: 0 1.5rem;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(38,31,14,0.15) transparent;
-}
-.bnv-body::-webkit-scrollbar { width: 4px; }
-.bnv-body::-webkit-scrollbar-thumb { background: rgba(38,31,14,0.15); border-radius: 2px; }
-
-.bnv-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding: 1rem 1.5rem;
-    border-top: 1px solid #D2C8AE;
-    flex-shrink: 0;
-}
-
-/* Newsvendor input table */
-.bnv-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 1rem 0;
-    font-size: 0.82rem;
-}
-
-.bnv-th {
-    text-align: left;
-    padding: 0.5rem 0.75rem;
-    font-size: 0.62rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: #261F0E;
-    opacity: 0.45;
-    border-bottom: 1px solid #D2C8AE;
-    white-space: nowrap;
-}
-
-.bnv-row { border-bottom: 1px solid rgba(210,200,174,0.5); }
-.bnv-row:last-child { border-bottom: none; }
-
-.bnv-td {
-    padding: 0.65rem 0.75rem;
-    color: #261F0E;
-    vertical-align: middle;
-}
-
-.bnv-td-name {
-    font-weight: 600;
-    min-width: 8rem;
-    max-width: 16rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.bnv-input-wrap {
-    display: flex;
-    align-items: center;
-    border: 1px solid rgba(38,31,14,0.18);
-    border-radius: 0.45rem;
-    background: #F0E8D0;
-    overflow: hidden;
-    min-width: 85px;
-    max-width: 130px;
-    transition: border-color 0.15s;
-}
-.bnv-input-wrap:focus-within { border-color: rgba(38,31,14,0.45); }
-
-.bnv-input-affix {
-    padding: 0 0.4rem;
-    font-size: 0.78rem;
-    color: #261F0E;
-    opacity: 0.4;
-    background: rgba(38,31,14,0.04);
-    border-right: 1px solid rgba(38,31,14,0.1);
-    align-self: stretch;
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
-}
-.bnv-input-affix-right {
-    border-right: none;
-    border-left: 1px solid rgba(38,31,14,0.1);
-}
-
-.bnv-input {
-    flex: 1;
-    min-width: 0;
-    background: transparent;
-    border: none;
-    padding: 0.4rem 0.5rem;
-    color: #261F0E;
-    font-size: 0.82rem;
-    font-family: 'Lora', serif;
-    outline: none;
-    width: 100%;
-}
-.bnv-input::-webkit-inner-spin-button,
-.bnv-input::-webkit-outer-spin-button { opacity: 0.35; }
-
-.bnv-hint {
-    font-size: 0.62rem;
-    color: #261F0E;
-    opacity: 0.38;
-    margin: 0.15rem 0 0;
-}
-
-/* Status badges in the result column */
-.bnv-status-pending {
-    color: #261F0E;
-    opacity: 0.3;
-    font-size: 0.8rem;
-}
-
-.bnv-status-running {
-    display: inline-block;
-    font-size: 0.75rem;
-    color: #261F0E;
-    opacity: 0.55;
-}
-
-.bnv-status-ok {
-    display: inline-block;
-    padding: 0.2rem 0.6rem;
-    border-radius: 999px;
-    background: rgba(26,105,51,0.1);
-    color: #1A6933;
-    font-size: 0.72rem;
-    font-weight: 700;
-    white-space: nowrap;
-}
-
-.bnv-status-err {
-    display: inline-block;
-    font-size: 0.75rem;
-    color: #FF1A1A;
-    font-weight: 600;
-}
-
-.bnv-status-skip {
-    display: inline-block;
-    font-size: 0.75rem;
-    color: #261F0E;
-    opacity: 0.38;
-}
-
-.bnv-result-detail {
-    display: block;
-    font-size: 0.72rem;
-    color: #261F0E;
-    opacity: 0.65;
-    margin-top: 0.25rem;
-    white-space: nowrap;
-}
-
-/* ══════════════════════════════════════════════════════
-   BATCH SAVE MODAL — select which forecasts to save
-══════════════════════════════════════════════════════ */
-
-.bsv-card {
-    position: relative;
-    background: #F0E8D0;
-    border: 1px solid #D2C8AE;
-    border-radius: 1.25rem;
-    box-shadow: 0 24px 64px rgba(38,31,14,0.3);
-    display: flex;
-    flex-direction: column;
-    width: min(520px, 96vw);
-    max-height: 85vh;
-    margin: 1rem;
-    overflow: hidden;
-}
-
-.bsv-header {
-    display: flex;
-    align-items: flex-start;
-    gap: 1rem;
-    padding: 1.25rem 1.5rem 1rem;
-    border-bottom: 1px solid #D2C8AE;
-    flex-shrink: 0;
-}
-
-.bsv-eyebrow {
-    font-size: 0.62rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: #261F0E;
-    opacity: 0.45;
-    margin-bottom: 0.2rem;
-}
-
-.bsv-title {
-    font-size: 1rem;
-    font-weight: 700;
-    color: #261F0E;
-    line-height: 1.3;
-}
-
-.bsv-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0.25rem 0;
-}
-.bsv-body::-webkit-scrollbar { width: 4px; }
-.bsv-body::-webkit-scrollbar-thumb { background: rgba(38,31,14,0.15); border-radius: 2px; }
-
-.bsv-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.9rem 1.5rem;
-    border-top: 1px solid #D2C8AE;
-    flex-shrink: 0;
-}
-
-/* Select-all row */
-.bsv-select-all-row {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.7rem 1.5rem;
-    border-bottom: 1px solid #D2C8AE;
-    cursor: pointer;
-}
-.bsv-select-all-label {
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: #261F0E;
-    opacity: 0.55;
-    user-select: none;
-}
-
-/* Product rows */
-.bsv-row {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.6rem 1.5rem;
-    cursor: pointer;
-    transition: background 0.1s;
-}
-.bsv-row:hover { background: rgba(38,31,14,0.04); }
-
-.bsv-check {
-    width: 1rem;
-    height: 1rem;
-    flex-shrink: 0;
-    accent-color: #261F0E;
-    cursor: pointer;
-}
-
-.bsv-row-info {
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-    min-width: 0;
-}
-
-.bsv-name {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: #261F0E;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.bsv-detail {
-    font-size: 0.72rem;
+    letter-spacing: 0.05em;
     color: #261F0E;
     opacity: 0.5;
 }
 
-.bsv-row-saved { opacity: 0.55; cursor: default; }
-.bsv-row-saved:hover { background: transparent; }
-.bsv-row-saved .bsv-check { accent-color: #1A6933; cursor: default; }
-
-.bsv-detail-saved {
-    font-size: 0.72rem;
-    font-weight: 700;
-    color: #1A6933;
+.product-range-input-wrap {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid #D2C8AE;
+    border-radius: 0.45rem;
+    background: #F0E8D0;
+    padding: 0 0.6rem;
 }
+.product-range-input-wrap:focus-within { border-color: #261F0E; }
+
+.product-range-input {
+    width: 3.2rem;
+    border: none;
+    background: transparent;
+    padding: 0.35rem 0;
+    font-family: 'Lora', serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #261F0E;
+    outline: none;
+}
+.product-range-affix { font-size: 0.72rem; color: #261F0E; opacity: 0.5; padding-left: 0.3rem; }
+
+.product-range-btn {
+    background: #261F0E;
+    color: #F0E8D0;
+    border: none;
+    border-radius: 0.45rem;
+    padding: 0.4rem 0.9rem;
+    font-family: 'Lora', serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+.product-range-btn:hover    { opacity: 0.85; }
+.product-range-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.product-range-note { font-size: 0.72rem; color: #261F0E; opacity: 0.55; }
+.product-range-note.is-error { color: #FF1A1A; opacity: 1; }
+
+/* Inline forecast view container (ChartModal.renderIn target) */
+.analysis-forecast {
+    margin-top: 0.25rem;
+}
+
+.af-inline-loading,
+.af-inline-error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    /* Reserve the chart's height while loading so selecting a product doesn't
+       collapse the card — the collapse shifts the product list + footer up into
+       view for a moment before the scroll animates. */
+    min-height: 22rem;
+    padding: 3rem 1rem;
+    font-size: 0.85rem;
+    color: #261F0E;
+    opacity: 0.6;
+}
+.af-inline-error { color: #FF1A1A; opacity: 0.8; }
+
+/* Right side of the filters row: view switcher (aggregate) OR the selected
+   product chip (product mode) — mutually exclusive, share the slot. */

@@ -1065,7 +1065,10 @@ async function doImport(mapping, replace) {
         var data = await res.json();
 
         if (data.success) {
-            window.location = '<?php echo BASE_URL; ?>/pages/forecast.view.php';
+            // Ask the owner how far ahead to forecast, then forecast the whole
+            // catalogue before the Forecast page loads. The redirect happens
+            // inside startPostImportForecast() once forecasting finishes.
+            showHorizonChoice();
         } else {
             showMappingError('Import failed: ' + (data.error || 'Unknown error.'));
             btn.innerHTML = IMPORT_BTN_HTML;
@@ -1076,6 +1079,55 @@ async function doImport(mapping, replace) {
         btn.innerHTML = IMPORT_BTN_HTML;
         btn.disabled  = false;
     }
+}
+
+// Step 1 after import: show the horizon-choice overlay. The forecast + redirect
+// happen when the owner confirms (startPostImportForecast).
+function showHorizonChoice() {
+    document.getElementById('af-choose').style.display   = '';
+    document.getElementById('af-progress').style.display = 'none';
+    document.getElementById('af-overlay').classList.remove('hidden');
+}
+
+// Step 2: save the chosen horizon, forecast every product for it (progress
+// overlay), then go to the Forecast page. Best-effort — if the product list or a
+// product fails, we still continue (the user can re-forecast in Settings).
+async function startPostImportForecast() {
+    var days = parseInt(document.getElementById('af-horizon-input').value, 10);
+    if (isNaN(days) || days < 1 || days > 60) days = 30;
+
+    // Save the horizon as the user's global setting.
+    try {
+        var sbody = new FormData();
+        sbody.append('forecast_horizon_days', days);
+        await fetch('<?php echo BASE_URL; ?>/api/update_settings.php', { method: 'POST', body: sbody });
+    } catch (e) {}
+
+    document.getElementById('af-choose').style.display   = 'none';
+    document.getElementById('af-progress').style.display = '';
+
+    var fill  = document.getElementById('af-progress-fill');
+    var label = document.getElementById('af-progress-label');
+
+    var products = [];
+    try {
+        var r = await fetch('<?php echo BASE_URL; ?>/api/catalogue_products.php');
+        products = (await r.json()).products || [];
+    } catch (e) { products = []; }
+
+    if (products.length) {
+        await AutoForecast.run(products, days, null, {
+            onProgress: function (done, total, name) {
+                var pct = total > 0 ? Math.round((done / total) * 100) : 0;
+                if (fill)  fill.style.width  = pct + '%';
+                if (label) label.textContent = (name && done < total)
+                    ? 'Forecasting ' + name + '… (' + (done + 1) + ' / ' + total + ')'
+                    : done + ' / ' + total + ' products forecast';
+            },
+        });
+    }
+
+    window.location = '<?php echo BASE_URL; ?>/pages/forecast.view.php';
 }
 
 function showMappingError(msg) {
@@ -1089,6 +1141,43 @@ function showMappingError(msg) {
 // Initial state is handled by CSS .reveal-line
 </script>
 
+
+<!-- Post-import overlay — step 1: choose horizon, step 2: forecasting progress -->
+<div id="af-overlay" class="af-overlay hidden">
+
+    <!-- Step 1 — choose the forecast range -->
+    <div id="af-choose" class="af-overlay-card">
+        <h2 class="af-title">How far ahead should we forecast?</h2>
+        <p class="af-sub">
+            Choose how many days of demand to forecast for each product. Shorter ranges
+            forecast more accurately. You can change this any time in Settings.
+        </p>
+        <div class="af-choose-input">
+            <input type="number" id="af-horizon-input" min="1" max="60" value="30">
+            <span>days ahead</span>
+        </div>
+        <p class="af-choose-hint">Between 1 and 60 days</p>
+        <button type="button" class="af-choose-btn" onclick="startPostImportForecast()">Start forecasting →</button>
+    </div>
+
+    <!-- Step 2 — forecasting progress -->
+    <div id="af-progress" class="af-overlay-card" style="display:none">
+        <svg class="af-spinner" width="30" height="30" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+        </svg>
+        <h2 class="af-title">Forecasting your products…</h2>
+        <p class="af-sub">
+            Projecting demand and a restock quantity for every product.
+            This runs once — your forecasts will be ready in a moment.
+        </p>
+        <div class="af-progress-track"><div id="af-progress-fill" class="af-progress-fill"></div></div>
+        <p id="af-progress-label" class="af-progress-label">Starting…</p>
+    </div>
+</div>
+
+<script>const AUTO_BASE_URL = '<?php echo BASE_URL; ?>';</script>
+<script src="<?php echo BASE_URL; ?>/pages/js/autorun_forecast.js?v=<?php echo filemtime(__DIR__ . '/js/autorun_forecast.js'); ?>"></script>
 
 <?php require_once __DIR__ . '/../includes/confirm_modal.php'; ?>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

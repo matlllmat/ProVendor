@@ -31,7 +31,7 @@ require_once __DIR__ . '/../includes/header.php';
             else if (ref.includes('forecast')) label = 'Back to Forecast';
             else if (ref.includes('reports'))  label = 'Back to Reports';
             else if (ref.includes('events'))   label = 'Back to Events';
-            else if (ref.includes('import'))   label = 'Back to My Store';
+            else if (ref.includes('import'))   label = 'Back to Settings';
         }
         var el = document.getElementById('about-back-label');
         if (el) el.textContent = label;
@@ -95,7 +95,7 @@ require_once __DIR__ . '/../includes/header.php';
                         </div>
                         <div>
                             <p class="text-[#F0E8D0] font-semibold text-sm mb-1">Built for Philippine SMEs</p>
-                            <p class="text-[#D2C8AE]/70 text-sm leading-relaxed">Evaluated with a real partner store, factoring in local context — payday cycles and Philippine holidays that affect small-store demand.</p>
+                            <p class="text-[#D2C8AE]/70 text-sm leading-relaxed">Evaluated with a real partner store, factoring in local context — month-end paydays and the Christmas/New Year season that shape small-store demand.</p>
                         </div>
                     </div>
                 </div>

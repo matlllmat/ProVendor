@@ -35,7 +35,7 @@ $historyEnd   = $dateRange['latest']   ?? date('Y-m-d');
 $occurrences  = expandEvents([$event], $historyStart, $historyEnd);
 
 // Load Prophet regressor cache for this event (populated during forecast runs).
-$prophetCache = getEventImpactCache($pdo, $eventId);
+$prophetCache = getEventImpactCache($pdo, $eventId, $_SESSION['user_id']);
 
 // Fallback: populate avg_impact_pct from window method when no Prophet cache exists yet.
 // Once Prophet has run at least once, refreshEventAvgImpact() owns avg_impact_pct.

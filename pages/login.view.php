@@ -103,7 +103,7 @@ require_once __DIR__ . '/../includes/header.php';
 
                         <div class="form-group">
                             <label for="login-email" class="form-label">Email Address</label>
-                            <input type="email" id="login-email" name="email" class="form-input" required placeholder="you@example.com">
+                            <input type="email" id="login-email" name="email" class="form-input" required placeholder="you@example.com" value="<?php echo htmlspecialchars($loginEmail); ?>">
                         </div>
 
                         <div class="form-group">
@@ -121,17 +121,17 @@ require_once __DIR__ . '/../includes/header.php';
 
                         <div class="form-group">
                             <label for="signup-name" class="form-label">Full Name</label>
-                            <input type="text" id="signup-name" name="name" class="form-input" required placeholder="Juan dela Cruz">
+                            <input type="text" id="signup-name" name="name" class="form-input" required placeholder="Juan dela Cruz" value="<?php echo htmlspecialchars($signupName); ?>">
                         </div>
 
                         <div class="form-group">
                             <label for="signup-store" class="form-label">Store Name</label>
-                            <input type="text" id="signup-store" name="store_name" class="form-input" required placeholder="dela Cruz Merchandise">
+                            <input type="text" id="signup-store" name="store_name" class="form-input" required placeholder="dela Cruz Merchandise" value="<?php echo htmlspecialchars($signupStoreName); ?>">
                         </div>
 
                         <div class="form-group">
                             <label for="signup-email" class="form-label">Email Address</label>
-                            <input type="email" id="signup-email" name="email" class="form-input" required placeholder="you@example.com">
+                            <input type="email" id="signup-email" name="email" class="form-input" required placeholder="you@example.com" value="<?php echo htmlspecialchars($signupEmail); ?>">
                         </div>
 
                         <div class="form-group">
@@ -155,7 +155,7 @@ require_once __DIR__ . '/../includes/header.php';
                         
                         <div class="form-group">
                             <label for="forgot-email" class="form-label">Account Email</label>
-                            <input type="email" id="forgot-email" name="email" class="form-input" required placeholder="you@example.com">
+                            <input type="email" id="forgot-email" name="email" class="form-input" required placeholder="you@example.com" value="<?php echo htmlspecialchars($forgotEmail); ?>">
                         </div>
 
                         <button type="submit" class="btn-submit">Send Code</button>
@@ -197,7 +197,364 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
         </section>
 
+        <!-- Scroll indicator -->
+        <div class="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-none">
+            <span class="text-[#D2C8AE]/40 text-[10px] uppercase tracking-widest">Scroll</span>
+            <div class="nudge">
+                <svg class="w-4 h-4 text-[#D2C8AE]/30" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+        </div>
+
     </div>
+
+
+    <!-- ════════════════════════════════════════════
+         SECTION 1 — How It Works
+    ════════════════════════════════════════════ -->
+    <section class="bg-[#261F0E] dot-pattern py-28 border-t border-[#F0E8D0]/10">
+        <div class="max-w-5xl mx-auto px-16">
+
+            <div class="sa mb-16">
+                <p class="text-[#1A6933] text-[10px] font-semibold uppercase tracking-widest mb-3">How It Works</p>
+                <h2 class="text-4xl font-semibold text-[#F0E8D0] leading-tight">From spreadsheet to smart decisions<br>in three steps.</h2>
+                <div class="reveal-line mt-6 h-px w-16 bg-[#D2C8AE]/30"></div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-10">
+
+                <div class="sa d1">
+                    <div class="w-10 h-10 rounded-xl border border-[#F0E8D0]/15 flex items-center justify-center mb-6" style="background:rgba(240,232,208,0.06)">
+                        <svg class="w-5 h-5 text-[#D2C8AE]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                    </div>
+                    <p class="text-[#D2C8AE]/40 text-xs font-semibold uppercase tracking-widest mb-2">Step 01</p>
+                    <p class="text-[#F0E8D0] font-semibold text-base mb-2">Upload Your CSV</p>
+                    <p class="text-[#D2C8AE] text-sm leading-relaxed">Export your transaction records from any source — notebook, spreadsheet, POS. As long as it has dates, products, and quantities, ProVendor can work with it.</p>
+                </div>
+
+                <div class="sa d2">
+                    <div class="w-10 h-10 rounded-xl border border-[#F0E8D0]/15 flex items-center justify-center mb-6" style="background:rgba(240,232,208,0.06)">
+                        <svg class="w-5 h-5 text-[#D2C8AE]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                        </svg>
+                    </div>
+                    <p class="text-[#D2C8AE]/40 text-xs font-semibold uppercase tracking-widest mb-2">Step 02</p>
+                    <p class="text-[#F0E8D0] font-semibold text-base mb-2">System Analyzes</p>
+                    <p class="text-[#D2C8AE] text-sm leading-relaxed">Meta's Prophet model detects trends, weekly cycles, and seasonal patterns in your sales data — automatically. It factors in preset Filipino retail events — month-end payday, Christmas, New Year — plus any custom events you define, to sharpen its predictions.</p>
+                </div>
+
+                <div class="sa d3">
+                    <div class="w-10 h-10 rounded-xl border border-[#F0E8D0]/15 flex items-center justify-center mb-6" style="background:rgba(240,232,208,0.06)">
+                        <svg class="w-5 h-5 text-[#D2C8AE]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                        </svg>
+                    </div>
+                    <p class="text-[#D2C8AE]/40 text-xs font-semibold uppercase tracking-widest mb-2">Step 03</p>
+                    <p class="text-[#F0E8D0] font-semibold text-base mb-2">Get Recommendations</p>
+                    <p class="text-[#D2C8AE] text-sm leading-relaxed">The Newsvendor model turns forecasts into exact restock quantities — balancing the cost of running out against the cost of over-ordering, per product.</p>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+
+    <!-- ════════════════════════════════════════════
+         SECTION 2 — Pain Point Stats
+    ════════════════════════════════════════════ -->
+    <section class="bg-[#F0E8D0] dot-pattern-light py-28">
+        <div class="max-w-5xl mx-auto px-16">
+
+            <div class="sa mb-16 text-center">
+                <p class="text-[#1A6933] text-[10px] font-semibold uppercase tracking-widest mb-3">The Problem</p>
+                <h2 class="text-4xl font-semibold text-[#261F0E] leading-tight">Guessing is costing you more<br>than you think.</h2>
+                <div class="reveal-line mt-6 h-px w-16 bg-[#261F0E]/20 mx-auto"></div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-10 text-center">
+
+                <div class="sa d1">
+                    <p class="text-6xl font-semibold text-[#261F0E] counter" data-target="34">0</p>
+                    <p class="text-[#1A6933] font-semibold text-lg mt-1">%</p>
+                    <div class="w-8 h-px bg-[#D2C8AE] mx-auto my-4"></div>
+                    <p class="text-[#261F0E] font-semibold text-sm mb-1">of small retailers</p>
+                    <p class="text-[#261F0E]/60 text-sm leading-relaxed">experience sales losses directly caused by running out of stock at the wrong time.</p>
+                </div>
+
+                <div class="sa d2">
+                    <p class="text-6xl font-semibold text-[#261F0E] counter" data-target="75">0</p>
+                    <p class="text-[#1A6933] font-semibold text-lg mt-1">%+</p>
+                    <div class="w-8 h-px bg-[#D2C8AE] mx-auto my-4"></div>
+                    <p class="text-[#261F0E] font-semibold text-sm mb-1">forecast accuracy</p>
+                    <p class="text-[#261F0E]/60 text-sm leading-relaxed">ProVendor targets versus actual sales records — far better than gut-feel restocking decisions.</p>
+                </div>
+
+                <div class="sa d3">
+                    <p class="text-6xl font-semibold text-[#261F0E]">1</p>
+                    <p class="text-[#1A6933] font-semibold text-lg mt-1">CSV</p>
+                    <div class="w-8 h-px bg-[#D2C8AE] mx-auto my-4"></div>
+                    <p class="text-[#261F0E] font-semibold text-sm mb-1">all you need to start</p>
+                    <p class="text-[#261F0E]/60 text-sm leading-relaxed">No POS system, no special hardware, no IT setup. Just your sales history in a spreadsheet.</p>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+
+    <!-- ════════════════════════════════════════════
+         SECTION 3 — What You'll See
+    ════════════════════════════════════════════ -->
+    <section class="bg-[#261F0E] dot-pattern py-28 border-t border-[#F0E8D0]/10">
+        <div class="max-w-5xl mx-auto px-16">
+
+            <div class="sa mb-16">
+                <p class="text-[#1A6933] text-[10px] font-semibold uppercase tracking-widest mb-3">What You'll See</p>
+                <h2 class="text-4xl font-semibold text-[#F0E8D0] leading-tight">Every insight you need.<br>Nothing you don't.</h2>
+                <div class="reveal-line mt-6 h-px w-16 bg-[#D2C8AE]/30"></div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-6">
+
+                <!-- Preview: Demand Chart -->
+                <div class="sa d1 rounded-xl border border-[#F0E8D0]/10 overflow-hidden" style="background:rgba(240,232,208,0.05)">
+                    <div class="px-5 py-4 border-b border-[#F0E8D0]/10">
+                        <p class="text-[#F0E8D0] text-xs font-semibold">Demand Forecast</p>
+                        <p class="text-[#D2C8AE]/50 text-[10px] mt-0.5">Beverages · Next 30 days</p>
+                    </div>
+                    <div class="px-5 py-5">
+                        <div class="flex items-end gap-1 h-20 mb-3">
+                            <div class="flex-1 rounded-t-sm bg-[#1A6933]/40" style="height:55%"></div>
+                            <div class="flex-1 rounded-t-sm bg-[#1A6933]/40" style="height:40%"></div>
+                            <div class="flex-1 rounded-t-sm bg-[#1A6933]/40" style="height:70%"></div>
+                            <div class="flex-1 rounded-t-sm bg-[#1A6933]/40" style="height:50%"></div>
+                            <div class="flex-1 rounded-t-sm bg-[#1A6933]/60" style="height:85%"></div>
+                            <div class="flex-1 rounded-t-sm bg-[#1A6933]/60" style="height:90%"></div>
+                            <div class="flex-1 rounded-t-sm bg-[#1A6933]/40" style="height:65%"></div>
+                            <div class="flex-1 rounded-t-sm bg-[#1A6933]/40" style="height:45%"></div>
+                            <div class="flex-1 rounded-t-sm bg-[#1A6933]/30" style="height:75%"></div>
+                            <div class="flex-1 rounded-t-sm bg-[#1A6933]/30" style="height:100%"></div>
+                            <div class="flex-1 rounded-t-sm bg-[#1A6933]/30" style="height:80%"></div>
+                            <div class="flex-1 rounded-t-sm bg-[#1A6933]/30" style="height:60%"></div>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-[#D2C8AE]/40 text-[9px]">Today</span>
+                            <span class="text-[#D2C8AE]/40 text-[9px]">+30 days</span>
+                        </div>
+                        <div class="mt-3 flex items-center gap-2">
+                            <div class="w-2 h-2 rounded-full bg-[#1A6933]/60"></div>
+                            <span class="text-[#D2C8AE]/50 text-[10px]">Forecasted demand</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview: Product Cards -->
+                <div class="sa d2 rounded-xl border border-[#F0E8D0]/10 overflow-hidden" style="background:rgba(240,232,208,0.05)">
+                    <div class="px-5 py-4 border-b border-[#F0E8D0]/10">
+                        <p class="text-[#F0E8D0] text-xs font-semibold">Product Overview</p>
+                        <p class="text-[#D2C8AE]/50 text-[10px] mt-0.5">12 products tracked</p>
+                    </div>
+                    <div class="px-5 py-4 space-y-3">
+                        <div class="flex items-center justify-between py-2 border-b border-[#F0E8D0]/08">
+                            <div>
+                                <p class="text-[#F0E8D0] text-xs font-semibold">Bottled Water</p>
+                                <p class="text-[#D2C8AE]/50 text-[10px]">Beverages</p>
+                            </div>
+                            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full text-[#1A6933]" style="background:rgba(26,105,51,0.2)">Restock: 48</span>
+                        </div>
+                        <div class="flex items-center justify-between py-2 border-b border-[#F0E8D0]/08">
+                            <div>
+                                <p class="text-[#F0E8D0] text-xs font-semibold">Instant Noodles</p>
+                                <p class="text-[#D2C8AE]/50 text-[10px]">Food</p>
+                            </div>
+                            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full text-[#FF5722]" style="background:rgba(255,87,34,0.2)">Restock: 24</span>
+                        </div>
+                        <div class="flex items-center justify-between py-2">
+                            <div>
+                                <p class="text-[#F0E8D0] text-xs font-semibold">Canned Sardines</p>
+                                <p class="text-[#D2C8AE]/50 text-[10px]">Food</p>
+                            </div>
+                            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full text-[#1A6933]" style="background:rgba(26,105,51,0.2)">Restock: 36</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview: Restock Calculator -->
+                <div class="sa d3 rounded-xl border border-[#F0E8D0]/10 overflow-hidden" style="background:rgba(240,232,208,0.05)">
+                    <div class="px-5 py-4 border-b border-[#F0E8D0]/10">
+                        <p class="text-[#F0E8D0] text-xs font-semibold">Restock Calculator</p>
+                        <p class="text-[#D2C8AE]/50 text-[10px] mt-0.5">Bottled Water</p>
+                    </div>
+                    <div class="px-5 py-4 space-y-3">
+                        <div>
+                            <p class="text-[#D2C8AE]/50 text-[9px] uppercase tracking-wider mb-1">Forecast Days</p>
+                            <div class="h-7 rounded bg-[#F0E8D0]/08 border border-[#F0E8D0]/10 px-3 flex items-center">
+                                <span class="text-[#D2C8AE]/60 text-xs">30</span>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-[#D2C8AE]/50 text-[9px] uppercase tracking-wider mb-1">Cost / Selling Price</p>
+                            <div class="h-7 rounded bg-[#F0E8D0]/08 border border-[#F0E8D0]/10 px-3 flex items-center">
+                                <span class="text-[#D2C8AE]/60 text-xs">₱12 / ₱20</span>
+                            </div>
+                        </div>
+                        <div class="pt-2 border-t border-[#F0E8D0]/10">
+                            <p class="text-[#D2C8AE]/50 text-[9px] uppercase tracking-wider mb-1">Recommended Restock</p>
+                            <p class="text-[#1A6933] text-2xl font-semibold">48 <span class="text-sm font-normal text-[#D2C8AE]/50">units</span></p>
+                            <p class="text-[#D2C8AE]/50 text-[10px] mt-1">Est. profit: ₱384</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+
+    <!-- ════════════════════════════════════════════
+         SECTION 4 — What Data You Need
+    ════════════════════════════════════════════ -->
+    <section class="bg-[#F0E8D0] dot-pattern-light py-28">
+        <div class="max-w-5xl mx-auto px-16">
+
+            <div class="grid grid-cols-2 gap-20 items-center">
+
+                <div class="sa">
+                    <p class="text-[#1A6933] text-[10px] font-semibold uppercase tracking-widest mb-3">Getting Started</p>
+                    <h2 class="text-4xl font-semibold text-[#261F0E] leading-tight mb-6">You probably already<br>have what you need.</h2>
+                    <p class="text-[#261F0E]/60 text-sm leading-relaxed mb-8">ProVendor works with any CSV that has three columns: a date, a product name, and a quantity sold. Everything else is optional — the system adapts to what you provide.</p>
+
+                    <div class="space-y-4">
+                        <div class="flex items-start gap-3">
+                            <div class="w-5 h-5 rounded bg-[#1A6933]/20 border border-[#1A6933]/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <svg class="w-2.5 h-2.5 text-[#1A6933]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            </div>
+                            <div>
+                                <p class="text-[#261F0E] font-semibold text-sm">Required: Date, Product, Quantity</p>
+                                <p class="text-[#261F0E]/50 text-xs mt-0.5">The minimum needed to run a forecast</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <div class="w-5 h-5 rounded bg-[#D2C8AE] border border-[#D2C8AE] flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <svg class="w-2.5 h-2.5 text-[#261F0E]/40" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            </div>
+                            <div>
+                                <p class="text-[#261F0E] font-semibold text-sm">Optional: Category, Cost, Price</p>
+                                <p class="text-[#261F0E]/50 text-xs mt-0.5">Unlocks category grouping and profit estimates</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <div class="w-5 h-5 rounded bg-[#D2C8AE] border border-[#D2C8AE] flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <svg class="w-2.5 h-2.5 text-[#261F0E]/40" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            </div>
+                            <div>
+                                <p class="text-[#261F0E] font-semibold text-sm">Column names don't matter</p>
+                                <p class="text-[#261F0E]/50 text-xs mt-0.5">ProVendor auto-detects columns and asks you to confirm</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CSV mockup table -->
+                <div class="sa d1">
+                    <div class="rounded-xl border border-[#D2C8AE] overflow-hidden shadow-[0_8px_30px_rgba(38,31,14,0.08)]">
+                        <div class="bg-[#261F0E] px-5 py-3 flex items-center gap-2">
+                            <div class="w-2.5 h-2.5 rounded-full bg-[#FF1A1A]/60"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-[#FF5722]/60"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-[#1A6933]/60"></div>
+                            <span class="ml-2 text-[#D2C8AE]/50 text-[10px]">sales_data.csv</span>
+                        </div>
+                        <table class="w-full text-xs">
+                            <thead>
+                                <tr class="bg-[#D2C8AE]">
+                                    <th class="text-left px-4 py-2.5 text-[#261F0E] font-semibold text-[10px] uppercase tracking-wider">Date</th>
+                                    <th class="text-left px-4 py-2.5 text-[#261F0E] font-semibold text-[10px] uppercase tracking-wider">Product</th>
+                                    <th class="text-left px-4 py-2.5 text-[#261F0E] font-semibold text-[10px] uppercase tracking-wider">Qty</th>
+                                    <th class="text-left px-4 py-2.5 text-[#261F0E]/40 font-semibold text-[10px] uppercase tracking-wider">Category</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-[#F0E8D0]">
+                                <tr class="border-t border-[#D2C8AE]">
+                                    <td class="px-4 py-2.5 text-[#261F0E]/70">2024-01-03</td>
+                                    <td class="px-4 py-2.5 text-[#261F0E]">Bottled Water</td>
+                                    <td class="px-4 py-2.5 text-[#261F0E] font-semibold">12</td>
+                                    <td class="px-4 py-2.5 text-[#261F0E]/40">Beverages</td>
+                                </tr>
+                                <tr class="border-t border-[#D2C8AE]">
+                                    <td class="px-4 py-2.5 text-[#261F0E]/70">2024-01-03</td>
+                                    <td class="px-4 py-2.5 text-[#261F0E]">Instant Noodles</td>
+                                    <td class="px-4 py-2.5 text-[#261F0E] font-semibold">8</td>
+                                    <td class="px-4 py-2.5 text-[#261F0E]/40">Food</td>
+                                </tr>
+                                <tr class="border-t border-[#D2C8AE]">
+                                    <td class="px-4 py-2.5 text-[#261F0E]/70">2024-01-04</td>
+                                    <td class="px-4 py-2.5 text-[#261F0E]">Bottled Water</td>
+                                    <td class="px-4 py-2.5 text-[#261F0E] font-semibold">15</td>
+                                    <td class="px-4 py-2.5 text-[#261F0E]/40">Beverages</td>
+                                </tr>
+                                <tr class="border-t border-[#D2C8AE]">
+                                    <td class="px-4 py-2.5 text-[#261F0E]/70">2024-01-04</td>
+                                    <td class="px-4 py-2.5 text-[#261F0E]">Canned Sardines</td>
+                                    <td class="px-4 py-2.5 text-[#261F0E] font-semibold">6</td>
+                                    <td class="px-4 py-2.5 text-[#261F0E]/40">Food</td>
+                                </tr>
+                                <tr class="border-t border-[#D2C8AE] bg-[#D2C8AE]/30">
+                                    <td class="px-4 py-2 text-[#261F0E]/30 text-[10px]" colspan="4">· · ·</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="bg-[#D2C8AE]/40 px-4 py-2 border-t border-[#D2C8AE]">
+                            <span class="text-[#261F0E]/40 text-[10px]">Required columns highlighted — rest is optional</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+
+    <!-- ════════════════════════════════════════════
+         FOOTER
+    ════════════════════════════════════════════ -->
+    <footer class="bg-[#261F0E] border-t border-[#F0E8D0]/10 py-14">
+        <div class="max-w-5xl mx-auto px-16">
+            <div class="flex items-start justify-between">
+
+                <div>
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-8 h-8 rounded-lg bg-[#F0E8D0]/10 border border-[#F0E8D0]/20 flex items-center justify-center">
+                            <span class="text-[#F0E8D0] text-[10px] font-semibold tracking-widest">PV</span>
+                        </div>
+                        <span class="text-[#F0E8D0] font-semibold text-base">ProVendor</span>
+                    </div>
+                    <p class="text-[#D2C8AE]/50 text-sm leading-relaxed max-w-xs">Data-driven restocking for SME convenience store owners. Stop guessing. Start stocking smarter.</p>
+                </div>
+
+                <div class="text-right">
+                    <p class="text-[#D2C8AE]/30 text-xs uppercase tracking-widest mb-1">Academic Prototype</p>
+                    <p class="text-[#D2C8AE]/50 text-sm">Built with Prophet &amp; Newsvendor Model</p>
+                </div>
+
+            </div>
+
+            <div class="mt-10 pt-6 border-t border-[#F0E8D0]/08 flex items-center justify-between">
+                <p class="text-[#D2C8AE]/25 text-xs">© <?php echo date('Y'); ?> ProVendor. All rights reserved.</p>
+                <div class="flex items-center gap-6">
+                    <a href="<?php echo BASE_URL; ?>/pages/about.view.php"
+                       class="text-[#D2C8AE]/55 hover:text-[#D2C8AE]/90 transition-colors text-xs uppercase tracking-widest">
+                        About Us
+                    </a>
+                    <a href="#" onclick="window.scrollTo({top:0,behavior:'smooth'}); return false;"
+                       class="text-[#D2C8AE]/30 hover:text-[#D2C8AE]/60 transition-colors text-xs uppercase tracking-widest">
+                        Back to top ↑
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
@@ -299,6 +656,39 @@ require_once __DIR__ . '/../includes/header.php';
             meter.style.width = width;
             meter.style.backgroundColor = color;
         }
+
+        // Scroll-reveal animations
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.15 });
+
+        document.querySelectorAll('.sa, .reveal-line').forEach(el => observer.observe(el));
+
+        // Counter animation (stats section)
+        const counterObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (!entry.isIntersecting) return;
+                const el     = entry.target;
+                const target = parseInt(el.dataset.target, 10);
+                const dur    = 1200;
+                const step   = 16;
+                const inc    = target / (dur / step);
+                let current  = 0;
+                const timer  = setInterval(() => {
+                    current += inc;
+                    if (current >= target) { el.textContent = target; clearInterval(timer); }
+                    else { el.textContent = Math.floor(current); }
+                }, step);
+                counterObserver.unobserve(el);
+            });
+        }, { threshold: 0.5 });
+
+        document.querySelectorAll('.counter').forEach(el => counterObserver.observe(el));
     </script>
 
 <?php require_once __DIR__ . '/../includes/confirm_modal.php'; ?>

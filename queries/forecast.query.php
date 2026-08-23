@@ -19,6 +19,7 @@ function getCategories(PDO $pdo, int $userId): array
 function getProducts(PDO $pdo, int $userId, string $search = '', string $category = ''): array
 {
     $sql    = 'SELECT id, name, sku, category, subcategory, cost_price, selling_price,
+                      orig_cost_price, orig_selling_price, forecast_horizon_days,
                       accuracy_pct, accuracy_mape, accuracy_mae, accuracy_rmse,
                       accuracy_horizon_days, accuracy_residual_rho, accuracy_computed_at
                FROM products WHERE user_id = ?';
@@ -41,6 +42,39 @@ function getProducts(PDO $pdo, int $userId, string $search = '', string $categor
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     return $stmt->fetchAll();
+}
+
+// Returns a product's effective forecast horizon in days: its own override if set,
+// otherwise the user's global horizon. Ownership enforced via the user_id match.
+function getProductHorizon(PDO $pdo, int $userId, int $productId): int
+{
+    $stmt = $pdo->prepare(
+        'SELECT COALESCE(p.forecast_horizon_days, u.forecast_horizon_days) AS days
+         FROM products p
+         JOIN users u ON u.id = p.user_id
+         WHERE p.id = ? AND p.user_id = ? LIMIT 1'
+    );
+    $stmt->execute([$productId, $userId]);
+    $days = $stmt->fetchColumn();
+    return $days !== false ? (int) $days : 30;
+}
+
+// Sets a product's per-product horizon override (NULL clears it → use the global
+// horizon). Ownership enforced via user_id. Caller clamps to 1–60.
+function setProductHorizon(PDO $pdo, int $userId, int $productId, ?int $days): void
+{
+    $pdo->prepare('UPDATE products SET forecast_horizon_days = ? WHERE id = ? AND user_id = ?')
+        ->execute([$days, $productId, $userId]);
+}
+
+// Sets a product's EFFECTIVE cost/selling price (the values the forecast + Newsvendor
+// use). Leaves orig_cost_price / orig_selling_price untouched so the imported price is
+// still recoverable via "Reset to imported price". Ownership enforced via user_id.
+// To reset, the caller passes the product's orig_* values back in.
+function setProductPricing(PDO $pdo, int $userId, int $productId, float $cost, float $price): void
+{
+    $pdo->prepare('UPDATE products SET cost_price = ?, selling_price = ? WHERE id = ? AND user_id = ?')
+        ->execute([$cost, $price, $productId, $userId]);
 }
 
 // Returns the cached forecast-accuracy stats for a single product (or null fields
@@ -211,38 +245,139 @@ function invalidateProductAccuracy(PDO $pdo, array $productIds): void
     )->execute(array_values($productIds));
 }
 
-// Saves a set of forecast rows to the forecasts table.
+// Returns each product's current forecast summary, indexed by product_id.
+//
+// Since the app now auto-forecasts the whole catalogue and keeps only ONE
+// forecast per product (saveForecastRows replaces, it no longer accumulates
+// history), every product has at most one session here. We still MAX/MIN across
+// its rows to collapse the per-day rows into a single summary the product cards
+// can render without another query.
+function getLatestForecasts(PDO $pdo, int $userId): array
+{
+    $stmt = $pdo->prepare(
+        'SELECT f.product_id,
+                MIN(f.forecast_date)              AS date_from,
+                MAX(f.forecast_date)              AS date_to,
+                ROUND(SUM(f.predicted_demand), 0) AS total_predicted,
+                MAX(f.restock_qty)                AS restock_qty,
+                MAX(f.current_stock)              AS current_stock,
+                MAX(f.est_profit)                 AS est_profit,
+                COUNT(*)                          AS day_count,
+                MAX(f.generated_at)               AS generated_at
+         FROM forecasts f
+         JOIN products p ON p.id = f.product_id
+         WHERE p.user_id = ?
+         GROUP BY f.product_id'
+    );
+    $stmt->execute([$userId]);
+
+    // Index by product_id so the view can look up a card's forecast in O(1).
+    $byProduct = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $byProduct[(int) $row['product_id']] = $row;
+    }
+    return $byProduct;
+}
+
+// Saves a product's forecast, REPLACING any forecast it already had.
 // Each row: {date, predicted, lower, upper}. restock_qty is the same for all rows
 // (the Newsvendor total-order recommendation for the full horizon).
-// Each save creates a new snapshot — use generated_at to identify sessions.
+//
+// The old app kept every forecast run as a separate "session" (grouped by
+// generated_at) for the Reports history view. That view is gone — the forecast
+// page only ever shows a product's current forecast — so we delete the previous
+// rows first and keep exactly one forecast per product. This keeps the table
+// lean and getLatestForecasts() trivial.
 function saveForecastRows(
     PDO $pdo, int $productId, array $forecastRows, int $restockQty,
     float $costPrice, float $sellingPrice, int $currentStock,
     float $totalStd, int $optimalTotal, float $estProfit,
     ?float $rhoUsed = null, ?float $stdInflationFactor = null
 ): void {
-    // One fixed timestamp so all rows in the batch share the same generated_at.
-    // Without this, per-row DEFAULT CURRENT_TIMESTAMP can split a batch across
-    // two seconds, breaking GROUP BY product_id, generated_at session grouping.
+    // Drop the product's previous forecast before writing the new one.
+    $del = $pdo->prepare('DELETE FROM forecasts WHERE product_id = ?');
+    $del->execute([$productId]);
+
+    // One fixed timestamp so all rows in this write share the same generated_at.
     $generatedAt = date('Y-m-d H:i:s');
 
     $stmt = $pdo->prepare(
         'INSERT INTO forecasts
-             (product_id, forecast_date, predicted_demand, restock_qty,
-              cost_price, selling_price, current_stock, total_std,
+             (product_id, forecast_date, predicted_demand, predicted_lower, predicted_upper,
+              restock_qty, cost_price, selling_price, current_stock, total_std,
               optimal_total, est_profit, rho_used, std_inflation_factor,
               components, generated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
     foreach ($forecastRows as $row) {
         $components = isset($row['components']) && is_array($row['components'])
             ? json_encode($row['components'])
             : null;
         $stmt->execute([
-            $productId, $row['date'], $row['predicted'], $restockQty,
-            $costPrice, $sellingPrice, $currentStock, $totalStd,
+            $productId, $row['date'], $row['predicted'],
+            $row['lower'] ?? null, $row['upper'] ?? null,
+            $restockQty, $costPrice, $sellingPrice, $currentStock, $totalStd,
             $optimalTotal, $estProfit, $rhoUsed, $stdInflationFactor,
             $components, $generatedAt,
         ]);
     }
+}
+
+// Returns one product's saved forecast for the inline chart on the forecast page:
+// per-day rows (date, predicted, lower, upper, components) plus the single
+// restock "meta" (order qty, profit, inputs, AR(1) disclosure). Null if the
+// product has no saved forecast yet. Ownership is enforced via the products join.
+function getProductForecast(PDO $pdo, int $userId, int $productId): ?array
+{
+    $stmt = $pdo->prepare(
+        'SELECT f.forecast_date AS date, f.predicted_demand AS predicted,
+                f.predicted_lower AS lower, f.predicted_upper AS upper, f.components,
+                f.restock_qty, f.cost_price, f.selling_price, f.current_stock,
+                f.total_std, f.optimal_total, f.est_profit,
+                f.rho_used, f.std_inflation_factor
+         FROM forecasts f
+         JOIN products p ON p.id = f.product_id
+         WHERE f.product_id = ? AND p.user_id = ?
+         ORDER BY f.forecast_date'
+    );
+    $stmt->execute([$productId, $userId]);
+    $rows = $stmt->fetchAll();
+    if (empty($rows)) return null;
+
+    // Per-day series for the chart.
+    $forecast = array_map(function ($r) {
+        $row = [
+            'date'      => $r['date'],
+            'predicted' => (float) $r['predicted'],
+            'lower'     => $r['lower'] !== null ? (float) $r['lower'] : (float) $r['predicted'],
+            'upper'     => $r['upper'] !== null ? (float) $r['upper'] : (float) $r['predicted'],
+        ];
+        if (!empty($r['components'])) {
+            $decoded = json_decode($r['components'], true);
+            if (is_array($decoded)) $row['components'] = $decoded;
+        }
+        return $row;
+    }, $rows);
+
+    // Restock meta is identical on every row — read it off the first.
+    $first = $rows[0];
+    $meta  = null;
+    if ($first['restock_qty'] !== null) {
+        $totalPredicted = 0.0;
+        foreach ($forecast as $fr) { $totalPredicted += $fr['predicted']; }
+        $meta = [
+            'total_predicted'      => (int) round($totalPredicted),
+            'restock_qty'          => (int)   $first['restock_qty'],
+            'current_stock'        => $first['current_stock'] !== null ? (int)   $first['current_stock'] : 0,
+            'cost_price'           => $first['cost_price']    !== null ? (float) $first['cost_price']    : null,
+            'selling_price'        => $first['selling_price'] !== null ? (float) $first['selling_price'] : null,
+            'total_std'            => $first['total_std']     !== null ? (float) $first['total_std']     : null,
+            'optimal_total'        => $first['optimal_total'] !== null ? (int)   $first['optimal_total'] : null,
+            'est_profit'           => $first['est_profit']    !== null ? (float) $first['est_profit']    : null,
+            'rho_used'             => $first['rho_used']             !== null ? (float) $first['rho_used']             : null,
+            'std_inflation_factor' => $first['std_inflation_factor'] !== null ? (float) $first['std_inflation_factor'] : null,
+        ];
+    }
+
+    return ['forecast' => $forecast, 'meta' => $meta];
 }

@@ -118,6 +118,26 @@ function restoreSalesFromSnapshot(PDO $pdo, int $userId, int $versionId): void
     )->execute([$versionId, $userId]);
 }
 
+// Returns a version's snapshotted sales in the same CSV-ready shape as
+// getSalesForExport(). The snapshot only stores (product_id, sale_date,
+// quantity), so the descriptive columns (category, sku, prices) come from the
+// CURRENT products table — product metadata isn't versioned. Ownership is
+// enforced via the dataset_versions join. Used by api/export_version.php.
+function getVersionSalesForExport(PDO $pdo, int $userId, int $versionId): array
+{
+    $stmt = $pdo->prepare(
+        'SELECT ss.sale_date, p.name AS product_name, ss.quantity_sold,
+                p.category, p.subcategory, p.sku, p.cost_price, p.selling_price
+         FROM sales_snapshots ss
+         JOIN dataset_versions v ON v.id = ss.version_id
+         JOIN products p ON p.id = ss.product_id
+         WHERE ss.version_id = ? AND v.user_id = ?
+         ORDER BY p.name, ss.sale_date'
+    );
+    $stmt->execute([$versionId, $userId]);
+    return $stmt->fetchAll();
+}
+
 // Deletes a single version after verifying ownership. Returns true on success.
 function deleteDatasetVersion(PDO $pdo, int $versionId, int $userId): bool
 {

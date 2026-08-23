@@ -8,6 +8,10 @@ CREATE TABLE IF NOT EXISTS `users` (
     `store_name` VARCHAR(100) NOT NULL,
     `email`      VARCHAR(150) NOT NULL,
     `password`   VARCHAR(255) NOT NULL,
+    -- Global forecast horizon in days (1–60), chosen at onboarding and editable on
+    -- the Settings page. Every product forecasts this many days out unless it has
+    -- its own products.forecast_horizon_days override.
+    `forecast_horizon_days` INT NOT NULL DEFAULT 30,
     `created_at` TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `users_email_unique` (`email`)
@@ -22,6 +26,16 @@ CREATE TABLE IF NOT EXISTS `products` (
     `subcategory`            VARCHAR(50)   DEFAULT NULL,
     `cost_price`             DECIMAL(10,2) DEFAULT NULL,
     `selling_price`          DECIMAL(10,2) DEFAULT NULL,
+    -- The price the imported dataset originally provided. cost_price/selling_price
+    -- above are the EFFECTIVE (editable) values used by the forecast/Newsvendor;
+    -- orig_* preserve the imported value so the forecast page's "Reset to imported
+    -- price" can restore it. Captured on import (upsertProduct).
+    `orig_cost_price`        DECIMAL(10,2) DEFAULT NULL,
+    `orig_selling_price`     DECIMAL(10,2) DEFAULT NULL,
+    -- Per-product forecast horizon override in days. NULL = use the user's
+    -- global users.forecast_horizon_days. Set from the inline "Forecast range"
+    -- control on the forecast page.
+    `forecast_horizon_days`  INT           DEFAULT NULL,
     -- Forecast accuracy cache, populated by /forecast/product/evaluate.
     -- accuracy_pct = 100 - MAPE on a held-out window. residual_rho is the
     -- lag-1 autocorrelation of backtest residuals, fed back into /optimize
@@ -47,6 +61,14 @@ CREATE TABLE IF NOT EXISTS `products` (
 --     ADD COLUMN `accuracy_horizon_days` INT          DEFAULT NULL,
 --     ADD COLUMN `accuracy_residual_rho` DECIMAL(6,4) DEFAULT NULL,
 --     ADD COLUMN `accuracy_computed_at`  TIMESTAMP    NULL DEFAULT NULL;
+-- Forecast horizon columns (added later):
+--   ALTER TABLE `users`    ADD COLUMN `forecast_horizon_days` INT NOT NULL DEFAULT 30;
+--   ALTER TABLE `products` ADD COLUMN `forecast_horizon_days` INT DEFAULT NULL;
+-- Original imported price columns (added later, for "Reset to imported price"):
+--   ALTER TABLE `products`
+--     ADD COLUMN `orig_cost_price`    DECIMAL(10,2) DEFAULT NULL,
+--     ADD COLUMN `orig_selling_price` DECIMAL(10,2) DEFAULT NULL;
+--   UPDATE `products` SET `orig_cost_price` = `cost_price`, `orig_selling_price` = `selling_price`;
 
 CREATE TABLE IF NOT EXISTS `sales` (
     `id`            INT       NOT NULL AUTO_INCREMENT,
@@ -107,6 +129,10 @@ CREATE TABLE IF NOT EXISTS `forecasts` (
     `product_id`            INT           NOT NULL,
     `forecast_date`         DATE          NOT NULL,
     `predicted_demand`      DECIMAL(10,2) NOT NULL,
+    -- Prophet confidence band per day (yhat_lower / yhat_upper). Persisted so the
+    -- forecast page can draw the band inline from saved data, without re-running.
+    `predicted_lower`       DECIMAL(10,2) DEFAULT NULL,
+    `predicted_upper`       DECIMAL(10,2) DEFAULT NULL,
     `restock_qty`           INT           DEFAULT NULL,
     `cost_price`            DECIMAL(10,2) DEFAULT NULL,
     `selling_price`         DECIMAL(10,2) DEFAULT NULL,

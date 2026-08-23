@@ -53,6 +53,32 @@ foreach ($productsIn as $p) {
         continue;
     }
 
+    // A product with no valid cost/selling price can't run the Newsvendor model
+    // (it needs a positive margin). We still persist its demand forecast so the
+    // product card shows predicted demand — just with no restock quantity.
+    if ($costPrice <= 0 || $sellingPrice <= 0 || $sellingPrice <= $costPrice) {
+        saveForecastRows(
+            $pdo, $productId, $forecastRows,
+            0,                          // restock_qty — none, no optimization ran
+            $costPrice, $sellingPrice, $currentStock,
+            0.0, 0, 0.0, null, null
+        );
+        $totalPredicted = 0.0;
+        foreach ($forecastRows as $fr) { $totalPredicted += (float) ($fr['predicted'] ?? 0); }
+
+        $results[] = [
+            'product_id'      => $productId,
+            'product_name'    => $productRow['name'],
+            'success'         => true,
+            'priced'          => false,
+            'total_predicted' => (int) round($totalPredicted),
+            'restock_qty'     => 0,
+            'current_stock'   => $currentStock,
+            'est_profit'      => 0.0,
+        ];
+        continue;
+    }
+
     // Look up cached residual_rho for AR(1) σ correction.
     $residualRho = 0.0;
     $acc = getProductAccuracy($pdo, $userId, $productId);
@@ -100,14 +126,25 @@ foreach ($productsIn as $p) {
         isset($optData['std_inflation_factor']) ? (float) $optData['std_inflation_factor'] : null
     );
 
+    // Echo the full optimize payload (not just the headline numbers) so a
+    // single-product "refine" call can drive the modal's Newsvendor disclosure
+    // panel — total_std / optimal_total / rho_used / std_inflation_factor — the
+    // same way the old run_optimize.php response did.
     $results[] = [
-        'product_id'      => $productId,
-        'product_name'    => $productRow['name'],
-        'success'         => true,
-        'total_predicted' => (int) round($optData['total_predicted'] ?? 0),
-        'restock_qty'     => (int) ($optData['restock_qty']          ?? 0),
-        'current_stock'   => $currentStock,
-        'est_profit'      => (float) ($optData['est_profit']         ?? 0.0),
+        'product_id'           => $productId,
+        'product_name'         => $productRow['name'],
+        'success'              => true,
+        'priced'               => true,
+        'total_predicted'      => (int)   round($optData['total_predicted'] ?? 0),
+        'restock_qty'          => (int)   ($optData['restock_qty']          ?? 0),
+        'current_stock'        => $currentStock,
+        'cost_price'           => $costPrice,
+        'selling_price'        => $sellingPrice,
+        'est_profit'           => (float) ($optData['est_profit']           ?? 0.0),
+        'total_std'            => (float) ($optData['total_std']            ?? 0.0),
+        'optimal_total'        => (int)   ($optData['optimal_total']        ?? 0),
+        'rho_used'             => isset($optData['rho_used'])             ? (float) $optData['rho_used']             : null,
+        'std_inflation_factor' => isset($optData['std_inflation_factor']) ? (float) $optData['std_inflation_factor'] : null,
     ];
 }
 

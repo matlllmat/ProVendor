@@ -27,6 +27,18 @@ $initialEventId   = isset($_GET['event_id'])   ? (int) $_GET['event_id']   : nul
 $categories = getCategories($pdo, $_SESSION['user_id']);
 $products   = getProducts($pdo, $_SESSION['user_id'], $search, '');
 
+// Current forecast per product (indexed by product_id) so each product card can
+// render its saved forecast + restock recommendation on page load — no manual
+// "generate" step. Empty until the user runs the catalogue auto-forecast.
+$latestForecasts = getLatestForecasts($pdo, $_SESSION['user_id']);
+
+// The full catalogue (ignoring any active search filter) drives the "Forecast
+// All Products" run, so searching the list never limits what actually gets
+// forecast. Reuse $products when no search is active to avoid a second query.
+$catalogue = ($search === '')
+    ? $products
+    : getProducts($pdo, $_SESSION['user_id'], '', '');
+
 // ── Events for chart annotations ──────────────────────────────────────────────
 // Expand from the earliest sale date (so historical events render) to 1 year
 // from today (so upcoming events render too).
@@ -41,3 +53,11 @@ $expandTo = date('Y-m-d', strtotime('+1 year'));
 
 $rawEvents   = getRawEventsForUser($pdo, $_SESSION['user_id']);
 $chartEvents = expandEvents($rawEvents, $expandFrom, $expandTo);
+
+// Catalogue-wide last sale date — the forecast window's start is clamped to the
+// day after this (Prophet only projects past the last known sale).
+$lastSaleDate = $saleDateRange['latest'] ?? null;
+
+// The user's global forecast horizon (days). On-demand and per-product forecasts
+// on this page use a product's own override if set, else this default.
+$userHorizon = getForecastHorizon($pdo, $_SESSION['user_id']);

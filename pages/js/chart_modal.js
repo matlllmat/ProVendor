@@ -11,8 +11,6 @@
 //   ChartModal.close()             — close overlay
 //   ChartModal.renderIn(el, cfg)   — render results into existing element (forecast page)
 //   ChartModal.destroyIn()         — destroy charts rendered via renderIn
-//   ChartModal.setSaveBtnState(d, t) — disable/re-enable + relabel the save button
-//   ChartModal.showSaveMsg(type, html) — show error/success message in action row
 
 var ChartModal = (function () {
     // ── Per-product input persistence (session-scoped) ───────────────────────
@@ -54,15 +52,14 @@ var ChartModal = (function () {
     // Hides the bottom metrics panel — used when accuracy isn't applicable
     // (no productId, reports flow, insufficient history, fetch failure).
     function _hideMetricsPanel() {
-        var panel = document.getElementById('cm-metrics-panel');
-        if (panel) panel.style.display = 'none';
+        _st.infoAvail.accuracy = false;
+        _updateInfoTabs();
     }
 
     // Fills the three metric cards from the same payload that drives the chip.
     function _renderMetricsPanel(data) {
         var panel = document.getElementById('cm-metrics-panel');
         if (!panel) return;
-        panel.style.display = '';
 
         var fmtPct  = function (v) { return v != null ? v.toFixed(1) + '%'    : '—'; };
         var fmtUnit = function (v) { return v != null ? v.toFixed(1)           : '—'; };
@@ -81,6 +78,9 @@ var ChartModal = (function () {
             if (data.residual_rho != null) bits.push('Residual ρ = ' + data.residual_rho.toFixed(2) + ' (drives Newsvendor σ correction).');
             footer.textContent = bits.join(' ');
         }
+
+        _st.infoAvail.accuracy = true;
+        _updateInfoTabs();
     }
 
     function _loadAccuracyChip(cfg, forceRefresh) {
@@ -305,11 +305,9 @@ var ChartModal = (function () {
 
     // ── results HTML ──────────────────────────────────────────────────────────
     function _resultsHTML(cfg) {
-        var saveBtn   = cfg.onSave     ? '<button id="cm-save-btn" class="cm-primary-btn" disabled style="opacity:0.45;cursor:not-allowed">Save Forecast</button>' : '';
         var againBtn  = cfg.onRunAgain ? '<button id="cm-run-again-btn" class="cm-ghost-btn-lg">← Run Again</button>' : '';
-        var actionRow = (cfg.onSave || cfg.onRunAgain)
-            ? '<div id="cm-save-msg" class="cm-msg" style="display:none;margin:0 1.5rem 0.75rem"></div>' +
-              '<div class="cm-action-row">' + againBtn + saveBtn + '</div>'
+        var actionRow = cfg.onRunAgain
+            ? '<div class="cm-action-row">' + againBtn + '</div>'
             : '';
 
         return '<div class="cm-chart-wrap">' +
@@ -320,14 +318,15 @@ var ChartModal = (function () {
                             ' Historical ' +
                             '<span class="cm-legend-info" data-tip="Actual units sold each day before this forecast — the real demand pattern the model learned from.">ⓘ</span>' +
                         '</span>' +
-                        '<span class="cm-legend-item">' +
+                        '<span id="cm-pd-legend" class="cm-legend-item">' +
                             '<svg width="18" height="10" viewBox="0 0 18 10"><line x1="0" y1="5" x2="18" y2="5" stroke="#FF5722" stroke-width="2" stroke-dasharray="5 3"/></svg>' +
                             ' Projected Demand ' +
                             '<span class="cm-legend-info" data-tip="Units the model predicts will be needed each day. This drives the recommended order quantity.">ⓘ</span>' +
                         '</span>' +
                         '<span id="cm-band-legend" class="cm-legend-item">' +
                             '<span style="display:inline-block;width:18px;height:10px;border-radius:3px;background:rgba(255,87,34,0.2)"></span>' +
-                            ' Confidence band' +
+                            ' Confidence band ' +
+                            '<span class="cm-legend-info" data-tip="The likely range around each day&rsquo;s projected demand — the model is about 95% confident actual sales land inside this band. A wider band means more uncertainty for that day.">ⓘ</span>' +
                         '</span>' +
                         '<span id="cm-nv-legend" class="cm-legend-item" style="display:none">' +
                             '<svg width="18" height="10" viewBox="0 0 18 10"><line x1="0" y1="5" x2="18" y2="5" stroke="#FF1493" stroke-width="2.5" stroke-dasharray="3 3"/></svg>' +
@@ -351,7 +350,11 @@ var ChartModal = (function () {
                                 '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>' +
                             '</button>' +
                         '</div>' +
-                        '<button id="cm-fo-btn" class="cm-toggle-btn">Forecast Only</button>' +
+                        '<button id="cm-fo-btn" class="cm-toggle-btn" title="Show or hide the historical year lines">History</button>' +
+                        '<button id="cm-fc-line-btn" class="cm-toggle-btn" title="Show or hide the forecast (projected demand) line + band">' +
+                            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 7"/></svg>' +
+                            ' Forecast' +
+                        '</button>' +
                         '<button id="cm-nv-overlay-btn" class="cm-toggle-btn cm-nv-toggle" style="display:none" title="Overlay the Newsvendor-recommended order quantity on the chart">' +
                             '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
                                 '<circle cx="12" cy="12" r="10"/>' +
@@ -367,22 +370,23 @@ var ChartModal = (function () {
                     '</div>' +
                 '</div>' +
                 '<div id="cm-year-sel" class="cm-year-selector"></div>' +
-                '<div id="cm-nv-banner" class="cm-nv-banner" style="display:none">' +
-                    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-                        '<circle cx="12" cy="12" r="10"/>' +
-                        '<circle cx="12" cy="12" r="6"/>' +
-                        '<circle cx="12" cy="12" r="2"/>' +
-                    '</svg>' +
-                    '<span><strong>Newsvendor view active</strong> — green line/bars show Prophet&rsquo;s forecast scaled to your optimal order quantity.</span>' +
-                '</div>' +
                 '<canvas id="cm-canvas" style="max-height:280px"></canvas>' +
             '</div>' +
 
+            // ── Detail organizer: tabs, collapsed by default so the chart stays clean.
+            //    Each tab reveals one panel; clicking the active tab collapses it. ──
+            '<div id="cm-info" class="cm-info" style="display:none">' +
+                '<div class="cm-info-tabs">' +
+                    '<button type="button" class="cm-info-tab" data-tab="restock">Restock</button>' +
+                    '<button type="button" class="cm-info-tab" data-tab="why">Why this forecast</button>' +
+                    '<button type="button" class="cm-info-tab" data-tab="accuracy">Accuracy</button>' +
+                '</div>' +
+
             // Forecast reasoning — populated by _renderReasoning() from per-day components.
-            '<div id="cm-reasoning" class="cm-reasoning" style="display:none"></div>' +
+            '<div id="cm-reasoning" class="cm-reasoning cm-info-panel" data-panel="why" style="display:none"></div>' +
 
             // Restock insight — initial form, then results after submission.
-            '<div id="cm-restock-section">' +
+            '<div id="cm-restock-section" class="cm-info-panel" data-panel="restock" style="display:none">' +
                 _restockFormHTML(cfg) +
                 '<div id="cm-restock-results" style="display:none">' +
                     '<div class="cm-stats-grid">' +
@@ -390,6 +394,41 @@ var ChartModal = (function () {
                         '<div class="cm-stat-card"><p class="cm-stat-label">Current Stock</p><p id="cm-s-stock" class="cm-stat-value"></p><p class="cm-stat-sub">units on hand</p></div>' +
                         '<div class="cm-stat-card"><p class="cm-stat-label">Order Qty</p><p id="cm-s-order" class="cm-stat-value cm-stat-accent"></p><p class="cm-stat-sub">units to order</p></div>' +
                         '<div class="cm-stat-card"><p class="cm-stat-label">Est. Profit</p><p id="cm-s-profit" class="cm-stat-value cm-stat-green"></p><p class="cm-stat-sub">at forecast demand</p></div>' +
+                    '</div>' +
+                    // Adjust cost / price / stock and recompute. Prices default from
+                    // the product's saved values but are editable so the profit is
+                    // accurate; the edit sticks (persisted by the forecast page).
+                    // "Reset to imported price" restores the value the dataset provided.
+                    '<div class="cm-refine">' +
+                        '<p class="cm-refine-title">Adjust price &amp; stock</p>' +
+                        '<div class="cm-refine-fields">' +
+                            '<div class="cm-refine-field">' +
+                                '<label class="cm-refine-label" for="cm-refine-cost">Cost Price</label>' +
+                                '<div class="cm-rs-input-wrap"><span class="cm-rs-input-affix">₱</span>' +
+                                    '<input type="number" id="cm-refine-cost" class="cm-rs-input" min="0" step="0.01" placeholder="0.00">' +
+                                '</div>' +
+                                '<p class="cm-refine-status" id="cm-refine-cost-status"></p>' +
+                            '</div>' +
+                            '<div class="cm-refine-field">' +
+                                '<label class="cm-refine-label" for="cm-refine-price">Selling Price</label>' +
+                                '<div class="cm-rs-input-wrap"><span class="cm-rs-input-affix">₱</span>' +
+                                    '<input type="number" id="cm-refine-price" class="cm-rs-input" min="0" step="0.01" placeholder="0.00">' +
+                                '</div>' +
+                                '<p class="cm-refine-status" id="cm-refine-price-status"></p>' +
+                            '</div>' +
+                            '<div class="cm-refine-field">' +
+                                '<label class="cm-refine-label" for="cm-refine-stock">Current stock</label>' +
+                                '<div class="cm-rs-input-wrap">' +
+                                    '<input type="number" id="cm-refine-stock" class="cm-rs-input" min="0" step="1" value="0">' +
+                                    '<span class="cm-rs-input-affix cm-rs-input-affix-right">units</span>' +
+                                '</div>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="cm-refine-actions">' +
+                            '<button type="button" id="cm-refine-btn" class="cm-ghost-btn-lg">Update order</button>' +
+                            '<button type="button" id="cm-refine-reset" class="cm-refine-reset" style="display:none"></button>' +
+                        '</div>' +
+                        '<p id="cm-refine-msg" class="cm-msg" style="display:none;margin-top:0.5rem"></p>' +
                     '</div>' +
                     '<div class="cm-nv-section">' +
                         '<button id="cm-nv-toggle" class="cm-nv-header">' +
@@ -401,18 +440,11 @@ var ChartModal = (function () {
                 '</div>' +
             '</div>' +
 
-            // Forecast accuracy metrics — three standard error metrics computed
-            // by /forecast/product/evaluate. Populated by _loadAccuracyChip()
-            // (same fetch as the header chip). Hidden until data arrives.
-            '<div id="cm-metrics-panel" class="cm-metrics-panel" style="display:none">' +
-                '<button id="cm-metrics-toggle" class="cm-metrics-toggle">' +
-                    '<div style="min-width:0">' +
-                        '<p class="cm-metrics-eyebrow">Forecast Accuracy</p>' +
-                        '<h3 class="cm-metrics-title">How well does this model predict for this product?</h3>' +
-                    '</div>' +
-                    '<svg id="cm-metrics-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform 0.2s;flex-shrink:0;transform:rotate(-90deg)"><polyline points="6 9 12 15 18 9"/></svg>' +
-                '</button>' +
-                '<div id="cm-metrics-content" class="cm-metrics-content" style="display:none">' +
+            // Forecast accuracy metrics — populated by _loadAccuracyChip() (same fetch
+            // as the header chip). Shown directly inside its tab (no inner collapse).
+            '<div id="cm-metrics-panel" class="cm-metrics-panel cm-info-panel" data-panel="accuracy" style="display:none">' +
+                    '<p class="cm-metrics-eyebrow">Forecast Accuracy</p>' +
+                    '<h3 class="cm-metrics-title">How well does this model predict for this product?</h3>' +
                     '<p class="cm-metrics-sub">Three standard error metrics, computed on a held-out window of the most recent sales. ' +
                        'These tell different stories — read all three together rather than picking one.</p>' +
                     '<div class="cm-metrics-grid">' +
@@ -462,8 +494,8 @@ var ChartModal = (function () {
                     '</div>' +
                 '</div>' +
                     '<p id="cm-metrics-footer" class="cm-metrics-footer"></p>' +
-                '</div>' +
-            '</div>' +
+            '</div>' + // /cm-metrics-panel (accuracy tab)
+            '</div>' + // /#cm-info
 
             actionRow;
     }
@@ -480,6 +512,7 @@ var ChartModal = (function () {
             });
         }
         document.getElementById('cm-fo-btn').addEventListener('click', _toggleForecastOnly);
+        document.getElementById('cm-fc-line-btn').addEventListener('click', _toggleForecast);
         document.getElementById('cm-zoom-btn').addEventListener('click', function () { if (_chart) _chart.resetZoom(); });
 
         var nvOverlayBtn = document.getElementById('cm-nv-overlay-btn');
@@ -501,16 +534,30 @@ var ChartModal = (function () {
         var rb = document.getElementById('cm-restock-btn');
         if (rb) rb.addEventListener('click', function () { _submitRestock(cfg); });
 
+        // Price/stock refine button (shown once restock results are visible)
+        var refineBtn = document.getElementById('cm-refine-btn');
+        if (refineBtn) refineBtn.addEventListener('click', function () { _refineStock(cfg); });
+
+        // "Reset to imported price" — asks for confirmation with full details first.
+        var resetBtn = document.getElementById('cm-refine-reset');
+        if (resetBtn) resetBtn.addEventListener('click', function () { _confirmResetPricing(cfg); });
+
+        // Recolour the cost/price fields (green = from data, orange = customized) live.
+        ['cm-refine-cost', 'cm-refine-price'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.addEventListener('input', _updateRefinePriceStatus);
+        });
+
         // Wire newsvendor toggle once results panel exists (it's there but hidden)
         var nvToggle = document.getElementById('cm-nv-toggle');
         if (nvToggle) nvToggle.addEventListener('click', _toggleNv);
 
-        var metricsToggle = document.getElementById('cm-metrics-toggle');
-        if (metricsToggle) metricsToggle.addEventListener('click', _toggleMetrics);
+        // Detail tabs (Restock / Why this forecast / Accuracy) — collapsed by default.
+        document.querySelectorAll('#cm-info .cm-info-tab').forEach(function (btn) {
+            btn.addEventListener('click', function () { _setInfoTab(btn.dataset.tab); });
+        });
 
-        var saveBtn  = document.getElementById('cm-save-btn');
         var againBtn = document.getElementById('cm-run-again-btn');
-        if (saveBtn  && cfg.onSave)     saveBtn.addEventListener('click', cfg.onSave);
         if (againBtn && cfg.onRunAgain) againBtn.addEventListener('click', cfg.onRunAgain);
     }
 
@@ -574,24 +621,145 @@ var ChartModal = (function () {
         _renderStats(meta);
         _renderNv(meta);
 
-        // Reveal the Newsvendor chart overlay toggle and turn it on by default —
-        // the user just generated this number, surface it on the chart immediately.
-        _st.showOptimal = true;
+        // Sync the refine inputs to the values this result used. The control only
+        // works when the product has a valid margin — hide it otherwise.
+        var refine   = document.querySelector('.cm-refine');
+        var costInp  = document.getElementById('cm-refine-cost');
+        var priceInp = document.getElementById('cm-refine-price');
+        var stockInp = document.getElementById('cm-refine-stock');
+        var priced   = meta.cost_price > 0 && meta.selling_price > meta.cost_price;
+        if (refine)   refine.style.display = (priced && _st.cfg && _st.cfg.onGenerateRestock) ? '' : 'none';
+        if (costInp)  costInp.value  = meta.cost_price    != null ? Number(meta.cost_price).toFixed(2)    : '';
+        if (priceInp) priceInp.value = meta.selling_price != null ? Number(meta.selling_price).toFixed(2) : '';
+        if (stockInp) stockInp.value = (meta.current_stock != null ? meta.current_stock : 0);
+        var refineMsg = document.getElementById('cm-refine-msg');
+        if (refineMsg) refineMsg.style.display = 'none';
+
+        // "Reset to imported price" — shown only when the effective price differs
+        // from the imported original (i.e. the owner has edited it).
+        var resetBtn = document.getElementById('cm-refine-reset');
+        if (resetBtn) {
+            var oc = _st.cfg ? _st.cfg.productOrigCost  : null;
+            var op = _st.cfg ? _st.cfg.productOrigPrice : null;
+            var edited = (oc != null && op != null) &&
+                (Math.abs((meta.cost_price || 0) - oc) > 0.005 || Math.abs((meta.selling_price || 0) - op) > 0.005);
+            resetBtn.style.display = edited ? '' : 'none';
+            if (edited) { resetBtn.disabled = false; resetBtn.textContent = 'Reset to imported (₱' + Number(op).toFixed(2) + ')'; }
+        }
+
+        // Colour the cost/price fields: green = matches imported data, orange = customized.
+        _updateRefinePriceStatus();
+
+        // Reveal the Newsvendor overlay toggle, but keep it OFF by default — the
+        // default chart shows only the forecasted demand. The user turns on the
+        // Newsvendor overlay from the button when they want to see it.
+        _st.showOptimal = false;
         var nvBtn = document.getElementById('cm-nv-overlay-btn');
         if (nvBtn) {
             nvBtn.style.display = '';
-            nvBtn.classList.add('cm-btn-on');
+            nvBtn.classList.remove('cm-btn-on');
         }
-        _applyNvBannerVisibility();
+        _applyNvOverlayState();
         _renderView();
+    }
 
-        // Enable save now that we have something to save.
-        var saveBtn = document.getElementById('cm-save-btn');
-        if (saveBtn) {
-            saveBtn.disabled    = false;
-            saveBtn.style.opacity = '';
-            saveBtn.style.cursor  = '';
+    // ── Price / stock refine ──────────────────────────────────────────────────
+    // Re-runs the Newsvendor model with the entered cost / selling price / stock,
+    // then re-renders in place. The forecast page persists the edited price so it
+    // sticks; the imported price stays recoverable via _resetPricing().
+    function _refineStock(cfg) {
+        if (!cfg || !cfg.onGenerateRestock) return;
+        var costEl  = document.getElementById('cm-refine-cost');
+        var priceEl = document.getElementById('cm-refine-price');
+        var stockEl = document.getElementById('cm-refine-stock');
+        var btn     = document.getElementById('cm-refine-btn');
+        var msg     = document.getElementById('cm-refine-msg');
+
+        var cost  = costEl  ? (parseFloat(costEl.value)  || 0) : 0;
+        var price = priceEl ? (parseFloat(priceEl.value) || 0) : 0;
+        var stock = stockEl ? (parseInt(stockEl.value, 10) || 0) : 0;
+
+        function err(m) { if (msg) { msg.className = 'cm-msg cm-msg-error'; msg.textContent = m; msg.style.display = ''; } }
+        if (cost  <= 0)    { err('Enter a cost price.'); return; }
+        if (price <= cost) { err('Selling price must be greater than cost price.'); return; }
+
+        if (btn) { btn.disabled = true; btn.textContent = 'Updating…'; }
+        if (msg) msg.style.display = 'none';
+
+        cfg.onGenerateRestock(
+            { cost_price: cost, selling_price: price, current_stock: stock },
+            function (result) {
+                if (btn) { btn.disabled = false; btn.textContent = 'Update order'; }
+                if (!result || result.error) {
+                    err((result && result.error) || 'Could not update the order.');
+                    return;
+                }
+                _showRestockResults(result);
+            }
+        );
+    }
+
+    // Restore the imported cost/price and re-run. Persisting the imported value back
+    // to cost_price (via the forecast page) makes it equal orig again — i.e. reverts.
+    function _resetPricing(cfg) {
+        if (!cfg || cfg.productOrigCost == null || cfg.productOrigPrice == null) return;
+        var costEl  = document.getElementById('cm-refine-cost');
+        var priceEl = document.getElementById('cm-refine-price');
+        if (costEl)  costEl.value  = Number(cfg.productOrigCost).toFixed(2);
+        if (priceEl) priceEl.value = Number(cfg.productOrigPrice).toFixed(2);
+        _refineStock(cfg);
+    }
+
+    // Ask before reverting — spell out exactly what the numbers become.
+    function _confirmResetPricing(cfg) {
+        if (!cfg || cfg.productOrigCost == null || cfg.productOrigPrice == null) return;
+        var oc = Number(cfg.productOrigCost).toFixed(2);
+        var op = Number(cfg.productOrigPrice).toFixed(2);
+        var curC = _st.meta && _st.meta.cost_price    != null ? Number(_st.meta.cost_price).toFixed(2)    : oc;
+        var curP = _st.meta && _st.meta.selling_price != null ? Number(_st.meta.selling_price).toFixed(2) : op;
+
+        var msg = 'This puts this product back to the price from your imported data — '
+            + 'cost ₱' + oc + ' and selling price ₱' + op + '. '
+            + 'Your customized values (cost ₱' + curC + ', selling ₱' + curP + ') will be replaced, '
+            + 'and the order quantity and estimated profit will be recalculated. You can edit again anytime.';
+
+        if (typeof showConfirm === 'function') {
+            showConfirm({
+                title:        'Reset to imported price?',
+                message:      msg,
+                confirmText:  'Reset price',
+                confirmStyle: 'warning',
+                onConfirm:    function () { _resetPricing(cfg); },
+            });
+        } else {
+            _resetPricing(cfg);
         }
+    }
+
+    // Colour a cost/selling field green when it matches the imported (database)
+    // value and orange when it's been customized; keep a small caption in sync.
+    function _priceFieldStatus(inputId, statusId, orig) {
+        var inp = document.getElementById(inputId);
+        var st  = document.getElementById(statusId);
+        if (!inp) return;
+        var wrap   = inp.closest('.cm-rs-input-wrap');
+        var val    = parseFloat(inp.value);
+        var hasOrig = orig != null && !isNaN(orig);
+        var isOrig  = hasOrig && !isNaN(val) && Math.abs(val - orig) < 0.005;
+
+        inp.classList.toggle('is-original', isOrig);
+        inp.classList.toggle('is-custom', !isOrig);
+        if (wrap) { wrap.classList.toggle('is-original', isOrig); wrap.classList.toggle('is-custom', !isOrig); }
+        if (st) {
+            st.textContent = isOrig ? 'From your data' : 'Customized';
+            st.className    = 'cm-refine-status ' + (isOrig ? 'is-original' : 'is-custom');
+        }
+    }
+
+    function _updateRefinePriceStatus() {
+        var cfg = _st.cfg || {};
+        _priceFieldStatus('cm-refine-cost',  'cm-refine-cost-status',  cfg.productOrigCost);
+        _priceFieldStatus('cm-refine-price', 'cm-refine-price-status', cfg.productOrigPrice);
     }
 
     // ── Newsvendor overlay toggle ────────────────────────────────────────────
@@ -600,33 +768,71 @@ var ChartModal = (function () {
         _st.showOptimal = !_st.showOptimal;
         var btn = document.getElementById('cm-nv-overlay-btn');
         if (btn) btn.classList.toggle('cm-btn-on', _st.showOptimal);
-        _applyNvBannerVisibility();
+        _applyNvOverlayState();
         _renderView();
     }
 
-    function _applyNvBannerVisibility() {
-        var banner = document.getElementById('cm-nv-banner');
+    // Shows/hides the Newsvendor legend item + chart tint based on whether the
+    // overlay is active. (The old on-chart "Newsvendor view active" banner was
+    // removed — the legend + toggle button state are enough.)
+    function _applyNvOverlayState() {
         var legend = document.getElementById('cm-nv-legend');
         var wrap   = document.querySelector('.cm-chart-wrap');
         var active = _st.showOptimal && _st.meta;
-        if (banner) banner.style.display = active ? '' : 'none';
         if (legend) legend.style.display = active ? '' : 'none';
         if (wrap)   wrap.classList.toggle('cm-chart-wrap-nv-active', !!active);
+    }
+
+    // ── detail tabs (collapsed by default) ───────────────────────────────────
+    // Activates a tab / panel. Clicking the already-active tab collapses it
+    // (name === current → null), so "nothing shown" is a valid state.
+    function _setInfoTab(name) {
+        var info = document.getElementById('cm-info');
+        if (!info) return;
+        if (_st.infoTab === name) name = null; // toggle collapse
+        _st.infoTab = name;
+        info.querySelectorAll('.cm-info-tab').forEach(function (b) {
+            b.classList.toggle('cm-info-tab-on', b.dataset.tab === name);
+        });
+        info.querySelectorAll('.cm-info-panel').forEach(function (p) {
+            p.style.display = (p.dataset.panel === name) ? '' : 'none';
+        });
+    }
+
+    // Shows a tab button only when its content is available, hides the whole
+    // organizer when nothing is available, and collapses the active tab if it
+    // just became unavailable.
+    function _updateInfoTabs() {
+        var info = document.getElementById('cm-info');
+        if (!info) return;
+        var any = false;
+        ['restock', 'why', 'accuracy'].forEach(function (name) {
+            var avail = !!(_st.infoAvail && _st.infoAvail[name]);
+            if (avail) any = true;
+            var btn = info.querySelector('.cm-info-tab[data-tab="' + name + '"]');
+            if (btn) btn.style.display = avail ? '' : 'none';
+        });
+        info.style.display = any ? '' : 'none';
+        if (_st.infoTab && !(_st.infoAvail && _st.infoAvail[_st.infoTab])) _setInfoTab(null);
     }
 
     // ── render results into a container ──────────────────────────────────────
     function _render(container, cfg) {
         _destroyCharts();
         _st.activeYears  = new Set();
-        _st.forecastOnly = false;
+        _st.forecastOnly = true;   // default: show only the projected line, not the year lines
         _st.eventsOn     = false;
         _st.fcStart      = null;
         _st.disabledIds  = cfg.disabledEventIds || new Set();
         _st.nvOpen       = false;
-        _st.metricsOpen  = false;
         _st.view         = 'daily';
         _st.cfg          = cfg;
         _st.meta         = null;
+
+        // Detail tabs start collapsed ("hidden first"); availability is filled in
+        // below as each section's content is rendered.
+        _st.infoTab   = null;
+        _st.infoAvail = { restock: false, why: false, accuracy: false };
 
         // Index per-day Prophet components by normalized date so the tooltip and
         // reasoning panel can look them up without rescanning the forecast array.
@@ -637,6 +843,9 @@ var ChartModal = (function () {
 
         // Newsvendor overlay starts hidden — only shown once restock is generated.
         _st.showOptimal = false;
+        // Forecast line + band shown by default; its own toggle can hide it,
+        // independent of the Newsvendor overlay.
+        _st.showForecast = true;
 
         container.innerHTML = _resultsHTML(cfg);
         _wire(cfg);
@@ -649,15 +858,18 @@ var ChartModal = (function () {
         _renderView();
         _renderReasoning(cfg.forecast);
 
-        // Reports page passes meta directly (saved forecasts already have restock data).
-        // Skip the form and show the results immediately.
+        // The Restock tab is available when there's a saved restock (priced product)
+        // or a way to generate one (the form). A view-only product with neither has
+        // no Restock tab.
+        _st.infoAvail.restock = !!(cfg.meta && cfg.meta.cost_price) || !!cfg.onGenerateRestock;
+
+        // Priced products already have saved restock data — fill the results in
+        // (still behind the collapsed Restock tab). Unpriced show the generate form.
         if (cfg.meta && cfg.meta.cost_price) {
             _showRestockResults(cfg.meta);
-        } else if (!cfg.onGenerateRestock) {
-            // No way to generate insight and no pre-existing data — hide the whole section.
-            var section = document.getElementById('cm-restock-section');
-            if (section) section.style.display = 'none';
         }
+
+        _updateInfoTabs();
     }
 
     // ── public: standalone modal (reports) ───────────────────────────────────
@@ -739,13 +951,32 @@ var ChartModal = (function () {
         var zoomBtn    = document.getElementById('cm-zoom-btn');
         var bandLeg    = document.getElementById('cm-band-legend');
 
-        // Year pills make sense everywhere except the single-bar Yearly view.
-        if (yearSel)   yearSel.style.display   = _st.view === 'yearly' ? 'none' : '';
+        // Year pills make sense everywhere except the single-bar Yearly view — and
+        // are moot in forecast-only mode (all year series are hidden).
+        if (yearSel)   yearSel.style.display   = (_st.view === 'yearly' || (_st.view === 'daily' && _st.forecastOnly)) ? 'none' : '';
         if (eventsGrp) eventsGrp.style.display = _st.view === 'daily'  ? '' : 'none';
-        if (foBtn)     foBtn.style.display     = _st.view === 'daily'  ? '' : 'none';
-        if (bandLeg)   bandLeg.style.display   = (_st.view === 'daily' && cfg.hasBand) ? '' : 'none';
+        if (foBtn) {
+            foBtn.style.display = _st.view === 'daily' ? '' : 'none';
+            foBtn.classList.toggle('cm-btn-on', !_st.forecastOnly);  // "History" is on when year lines show
+        }
+        if (bandLeg)   bandLeg.style.display   = (_st.view === 'daily' && cfg.hasBand && _st.showForecast) ? '' : 'none';
         // Reset Zoom is useful in every view now — bar charts support zoom too.
         if (zoomBtn)   zoomBtn.style.display   = '';
+
+        // ── Forecast line/band visibility — an independent toggle, like Newsvendor.
+        // Hide the projected datasets by label (works across all view builders)
+        // without disturbing the Newsvendor overlay or the historical lines.
+        var FC_LABELS = { 'Projected Demand': 1, 'Projected (elapsed)': 1, 'Forecast': 1, 'Forecast portion': 1, '_upper': 1, '_lower': 1 };
+        if (_chart) {
+            _chart.data.datasets.forEach(function (ds, i) {
+                if (FC_LABELS[ds.label]) _chart.setDatasetVisibility(i, _st.showForecast);
+            });
+            _chart.update('none');
+        }
+        var pdLeg = document.getElementById('cm-pd-legend');
+        if (pdLeg) pdLeg.style.display = _st.showForecast ? '' : 'none';
+        var fcBtn = document.getElementById('cm-fc-line-btn');
+        if (fcBtn) fcBtn.classList.toggle('cm-btn-on', _st.showForecast);
     }
 
     // Custom HTML tooltip handler. The actual implementation lives in
@@ -762,6 +993,15 @@ var ChartModal = (function () {
         return n === '2000-02-29' ? '2000-02-28' : n;
     }
 
+    // Today as a local 'YYYY-MM-DD' — the boundary between the elapsed (dimmed)
+    // and remaining (highlighted) parts of a forecast window.
+    function _todayYMD() {
+        var d = new Date();
+        return d.getFullYear() + '-'
+            + String(d.getMonth() + 1).padStart(2, '0') + '-'
+            + String(d.getDate()).padStart(2, '0');
+    }
+
     // ── DAILY VIEW — year-overlaid line chart, matches Demand Analysis ──────
     // Each historical year is its own line on a shared Jan→Dec axis (year 2000
     // base). Forecast dates are normalized the same way, so the projected
@@ -775,7 +1015,7 @@ var ChartModal = (function () {
             var c = YEAR_COLORS[i % YEAR_COLORS.length];
             return {
                 label: yr, data: byYear[yr],
-                hidden: !(allActive || _st.activeYears.has(yr)),
+                hidden: _st.forecastOnly ? true : !(allActive || _st.activeYears.has(yr)),
                 borderColor: c, backgroundColor: 'transparent',
                 borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 3,
                 fill: false, tension: 0.3,
@@ -788,7 +1028,23 @@ var ChartModal = (function () {
             fcDS.push({ label: '_upper', data: forecast.map(function (r) { return { x: _nd(r.date), y: r.upper }; }), borderColor: 'transparent', backgroundColor: 'rgba(255,87,34,0.13)', borderWidth: 0, pointRadius: 0, fill: '+1', tension: 0.3 });
             fcDS.push({ label: '_lower', data: forecast.map(function (r) { return { x: _nd(r.date), y: r.lower }; }), borderColor: 'transparent', borderWidth: 0, pointRadius: 0, fill: false, tension: 0.3 });
         }
-        fcDS.push({ label: 'Projected Demand', data: forecast.map(function (r) { return { x: _nd(r.date), y: r.predicted }; }), borderColor: '#FF5722', borderWidth: 3, borderDash: [6, 3], backgroundColor: 'transparent', pointRadius: 0, pointHoverRadius: 4, fill: false, tension: 0.3 });
+        // Split the projected line at "today": days already elapsed render dimmed
+        // (the forecast that was made, kept as a record), the rest bright.
+        var today   = _todayYMD();
+        var pastPts = [], futurePts = [];
+        forecast.forEach(function (r) {
+            var pt = { x: _nd(r.date), y: r.predicted };
+            if (r.date < today) pastPts.push(pt);
+            else                futurePts.push(pt);
+        });
+        // Bridge the boundary so the line stays continuous across "today".
+        if (pastPts.length && futurePts.length) {
+            futurePts = [pastPts[pastPts.length - 1]].concat(futurePts);
+        }
+        if (pastPts.length) {
+            fcDS.push({ label: 'Projected (elapsed)', data: pastPts, borderColor: 'rgba(255,87,34,0.28)', borderWidth: 2.5, borderDash: [6, 3], backgroundColor: 'transparent', pointRadius: 0, pointHoverRadius: 3, fill: false, tension: 0.3 });
+        }
+        fcDS.push({ label: 'Projected Demand', data: futurePts, borderColor: '#FF5722', borderWidth: 3, borderDash: [6, 3], backgroundColor: 'transparent', pointRadius: 0, pointHoverRadius: 4, fill: false, tension: 0.3 });
 
         // Newsvendor overlay — Prophet's forecast scaled to the optimal order total.
         if (_st.showOptimal && _st.meta && _st.meta.total_predicted > 0) {
@@ -808,6 +1064,10 @@ var ChartModal = (function () {
         var minN = '2000-12-31', maxN = '2000-01-01';
         datasets.forEach(function (ds) {
             if (ds.label === '_upper' || ds.label === '_lower') return;
+            // Forecast-only mode fits the x-axis to just the forecast window (skip
+            // the historical year series) so the projected line fills the chart
+            // instead of sitting as a small segment on a full Jan–Dec axis.
+            if (_st.forecastOnly && years.indexOf(ds.label) !== -1) return;
             ds.data.forEach(function (p) {
                 if (p.x && p.x < minN) minN = p.x;
                 if (p.x && p.x > maxN) maxN = p.x;
@@ -1106,21 +1366,18 @@ var ChartModal = (function () {
     }
 
     // ── forecast-only toggle ──────────────────────────────────────────────────
+    // Re-renders the view so the x-axis refits: forecast-only tightens to the
+    // forecast window; turning it off restores the full historical span.
     function _toggleForecastOnly() {
         _st.forecastOnly = !_st.forecastOnly;
-        var btn = document.getElementById('cm-fo-btn');
-        if (btn) btn.classList.toggle('cm-btn-on', _st.forecastOnly);
-        if (!_chart) return;
-        var all = _st.activeYears.size === 0;
-        _chart.data.datasets.forEach(function (ds) {
-            if (ds.label === 'Projected Demand' || ds.label === '_upper' || ds.label === '_lower') return;
-            if (ds.label === 'Historical') {
-                ds.hidden = _st.forecastOnly;
-                return;
-            }
-            ds.hidden = _st.forecastOnly ? true : !(all || _st.activeYears.has(ds.label));
-        });
-        _chart.update();
+        _renderView();
+    }
+
+    // Show / hide the forecast (projected demand line + confidence band). Independent
+    // of the Newsvendor overlay — either, both, or neither can be shown.
+    function _toggleForecast() {
+        _st.showForecast = !_st.showForecast;
+        _renderView();
     }
 
     // ── events toggle ─────────────────────────────────────────────────────────
@@ -1154,15 +1411,6 @@ var ChartModal = (function () {
         if (chev) chev.style.transform = _st.nvOpen ? 'rotate(0deg)' : 'rotate(-90deg)';
     }
 
-    // ── accuracy metrics toggle ───────────────────────────────────────────────
-    function _toggleMetrics() {
-        _st.metricsOpen = !_st.metricsOpen;
-        var content = document.getElementById('cm-metrics-content');
-        var chev    = document.getElementById('cm-metrics-chev');
-        if (content) content.style.display = _st.metricsOpen ? '' : 'none';
-        if (chev)    chev.style.transform  = _st.metricsOpen ? 'rotate(0deg)' : 'rotate(-90deg)';
-    }
-
     // ── forecast reasoning panel ─────────────────────────────────────────────
     // Aggregates Prophet's per-day components into a "Why this forecast?" card.
     // Each prediction's yhat = trend + weekly + yearly + Σ event regressors —
@@ -1171,7 +1419,8 @@ var ChartModal = (function () {
         var container = document.getElementById('cm-reasoning');
         if (!container) return;
         if (!forecast || !forecast.length || !forecast[0] || !forecast[0].components) {
-            container.style.display = 'none';
+            _st.infoAvail.why = false;
+            _updateInfoTabs();
             return;
         }
 
@@ -1257,8 +1506,9 @@ var ChartModal = (function () {
             html += '</div>';
         }
 
-        container.innerHTML   = html;
-        container.style.display = '';
+        container.innerHTML = html;
+        _st.infoAvail.why = true;
+        _updateInfoTabs();
     }
 
     // ── stat cards ────────────────────────────────────────────────────────────
@@ -1367,30 +1617,12 @@ var ChartModal = (function () {
         if (_chart) { _chart.destroy(); _chart = null; }
     }
 
-    // ── public helpers for save flow ──────────────────────────────────────────
-    function setSaveBtnState(disabled, text) {
-        var btn = document.getElementById('cm-save-btn');
-        if (!btn) return;
-        btn.disabled    = disabled;
-        btn.textContent = text;
-    }
-
-    function showSaveMsg(type, html) {
-        var el = document.getElementById('cm-save-msg');
-        if (!el) return;
-        el.className     = 'cm-msg cm-msg-' + type;
-        el.innerHTML     = html;
-        el.style.display = '';
-    }
-
     return {
-        open:            open,
-        openLoading:     openLoading,
-        showResults:     showResults,
-        close:           close,
-        renderIn:        renderIn,
-        destroyIn:       destroyIn,
-        setSaveBtnState: setSaveBtnState,
-        showSaveMsg:     showSaveMsg,
+        open:        open,
+        openLoading: openLoading,
+        showResults: showResults,
+        close:       close,
+        renderIn:    renderIn,
+        destroyIn:   destroyIn,
     };
 })();

@@ -253,6 +253,33 @@
 
 .upload-btn-primary:hover { opacity: 0.85; }
 
+/* ── Section header actions (Export CSV + Update Sales Data) ── */
+.section-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Secondary "Export CSV" button — ghost style so the green primary stays dominant. */
+.export-data-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: transparent;
+    color: #261F0E;
+    border: 1px solid #D2C8AE;
+    border-radius: 0.625rem;
+    padding: 0.55rem 1rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: border-color 0.15s, background 0.15s;
+}
+.export-data-btn:hover {
+    border-color: #261F0E;
+    background: rgba(38,31,14,0.05);
+}
+
 /* ── Sessions list ── */
 .sessions-list {
     background: #F0E8D0;
@@ -1760,6 +1787,7 @@ tr:hover .qty-edit-btn { opacity: 0.45; }
     white-space: nowrap;
 }
 
+.version-download-btn,
 .version-restore-btn,
 .version-delete-btn {
     background: transparent;
@@ -1775,6 +1803,15 @@ tr:hover .qty-edit-btn { opacity: 0.45; }
     flex-shrink: 0;
 }
 
+/* Download link styled like the icon buttons beside it. */
+.version-download-btn { text-decoration: none; }
+.version-download-btn:hover {
+    opacity: 1;
+    border-color: #261F0E;
+    color: #261F0E;
+    background: rgba(38,31,14,0.06);
+}
+
 .version-restore-btn:hover {
     opacity: 1;
     border-color: #1A6933;
@@ -1788,3 +1825,120 @@ tr:hover .qty-edit-btn { opacity: 0.45; }
     color: #c0392b;
     background: rgba(192,57,43,0.06);
 }
+
+/* ======================================================
+   AUTO-FORECAST PROGRESS OVERLAY (post-import)
+====================================================== */
+.af-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(38,31,14,0.55);
+    backdrop-filter: blur(2px);
+}
+.af-overlay.hidden { display: none; }
+
+.af-overlay-card {
+    width: min(92vw, 30rem);
+    background: #F0E8D0;
+    border: 1px solid #D2C8AE;
+    border-radius: 1rem;
+    padding: 2rem 1.75rem;
+    text-align: center;
+    box-shadow: 0 12px 48px rgba(38,31,14,0.25);
+}
+
+.af-spinner {
+    color: #1A6933;
+    animation: spin 1s linear infinite;
+    margin-bottom: 0.75rem;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.af-title {
+    font-family: 'Lora', serif;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #261F0E;
+}
+
+.af-sub {
+    font-family: 'Lora', serif;
+    font-size: 0.82rem;
+    color: #261F0E;
+    opacity: 0.55;
+    line-height: 1.5;
+    margin: 0.4rem 0 1.1rem;
+}
+
+.af-progress-track {
+    width: 100%;
+    height: 8px;
+    background: rgba(38,31,14,0.1);
+    border-radius: 999px;
+    overflow: hidden;
+}
+.af-progress-fill {
+    height: 100%;
+    width: 0;
+    background: #1A6933;
+    border-radius: 999px;
+    transition: width 0.25s ease;
+}
+.af-progress-label {
+    font-family: 'Lora', serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #261F0E;
+    opacity: 0.6;
+    margin-top: 0.5rem;
+}
+
+/* ── Post-import horizon choice (step 1 of the overlay) ── */
+.af-choose-input {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin: 1.1rem 0 0.4rem;
+}
+.af-choose-input input {
+    width: 5rem;
+    text-align: center;
+    border: 1px solid #D2C8AE;
+    border-radius: 0.55rem;
+    background: rgba(38,31,14,0.04);
+    padding: 0.55rem 0.5rem;
+    font-family: 'Lora', serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #261F0E;
+    outline: none;
+}
+.af-choose-input input:focus { border-color: #261F0E; }
+.af-choose-input span { font-family: 'Lora', serif; font-size: 0.9rem; color: #261F0E; opacity: 0.6; }
+
+.af-choose-hint {
+    font-family: 'Lora', serif;
+    font-size: 0.72rem;
+    color: #261F0E;
+    opacity: 0.45;
+    margin-bottom: 1.1rem;
+}
+
+.af-choose-btn {
+    background: #1A6933;
+    color: #F0E8D0;
+    border: none;
+    border-radius: 0.6rem;
+    padding: 0.65rem 1.5rem;
+    font-family: 'Lora', serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+.af-choose-btn:hover { opacity: 0.88; }

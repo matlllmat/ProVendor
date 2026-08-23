@@ -26,8 +26,11 @@ function upsertProduct(PDO $pdo, int $userId, string $name, ?string $sku, ?strin
         if ($existing['sku']         === null && $sku         !== null) { $updates[] = 'sku = ?';         $params[] = $sku; }
         if ($existing['category']    === null && $category    !== null) { $updates[] = 'category = ?';    $params[] = $category; }
         if ($existing['subcategory'] === null && $subcategory !== null) { $updates[] = 'subcategory = ?'; $params[] = $subcategory; }
-        if ($cost  !== null) { $updates[] = 'cost_price = ?';    $params[] = $cost;  }
-        if ($price !== null) { $updates[] = 'selling_price = ?'; $params[] = $price; }
+        // Money is last-write-wins from the import. Mirror the imported value into
+        // orig_* so the forecast page's "Reset to imported price" can restore it,
+        // even after the owner edits cost_price/selling_price on the forecast page.
+        if ($cost  !== null) { $updates[] = 'cost_price = ?';    $params[] = $cost;  $updates[] = 'orig_cost_price = ?';    $params[] = $cost;  }
+        if ($price !== null) { $updates[] = 'selling_price = ?'; $params[] = $price; $updates[] = 'orig_selling_price = ?'; $params[] = $price; }
 
         if (!empty($updates)) {
             $params[] = (int) $existing['id'];
@@ -39,10 +42,11 @@ function upsertProduct(PDO $pdo, int $userId, string $name, ?string $sku, ?strin
     }
 
     $stmt = $pdo->prepare(
-        'INSERT INTO products (user_id, name, sku, category, subcategory, cost_price, selling_price)
-         VALUES (?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO products (user_id, name, sku, category, subcategory,
+                               cost_price, selling_price, orig_cost_price, orig_selling_price)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
-    $stmt->execute([$userId, $name, $sku, $category, $subcategory, $cost, $price]);
+    $stmt->execute([$userId, $name, $sku, $category, $subcategory, $cost, $price, $cost, $price]);
     return (int) $pdo->lastInsertId();
 }
 
@@ -200,6 +204,24 @@ function insertSalesBatch(PDO $pdo, array $rows): void
 
         $pdo->prepare($sql)->execute($values);
     }
+}
+
+// Returns the user's current sales data in a flat, CSV-ready shape: one row per
+// sale, with the product's metadata joined in. Column order matches the import
+// format (Date, Product, Quantity, then the optional descriptive columns) so an
+// exported file can be re-uploaded. Used by api/export_data.php.
+function getSalesForExport(PDO $pdo, int $userId): array
+{
+    $stmt = $pdo->prepare(
+        'SELECT s.sale_date, p.name AS product_name, s.quantity_sold,
+                p.category, p.subcategory, p.sku, p.cost_price, p.selling_price
+         FROM sales s
+         JOIN products p ON p.id = s.product_id
+         WHERE p.user_id = ?
+         ORDER BY p.name, s.sale_date'
+    );
+    $stmt->execute([$userId]);
+    return $stmt->fetchAll();
 }
 
 // Returns total product and sales counts for this user.

@@ -32,6 +32,8 @@ $_navClass = function(string $keyword) use ($_navFile): string {
         <div class="flex items-center gap-6">
 
             <nav class="flex items-center gap-6">
+                <a href="<?php echo BASE_URL; ?>/pages/dashboard.view.php"
+                   class="<?php echo $_navClass('dashboard'); ?>">Dashboard</a>
                 <a href="<?php echo BASE_URL; ?>/pages/forecast.view.php"
                    class="<?php echo $_navClass('forecast'); ?>">Forecast</a>
                 <a href="<?php echo BASE_URL; ?>/pages/events.view.php"
@@ -39,7 +41,7 @@ $_navClass = function(string $keyword) use ($_navFile): string {
                 <a href="<?php echo BASE_URL; ?>/pages/reports.view.php"
                    class="<?php echo $_navClass('reports'); ?>">Reports</a>
                 <a href="<?php echo BASE_URL; ?>/pages/import.view.php"
-                   class="<?php echo $_navClass('import'); ?>">My Store</a>
+                   class="<?php echo $_navClass('import'); ?>">Settings</a>
             </nav>
 
             <!-- Divider -->

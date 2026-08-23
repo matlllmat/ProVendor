@@ -419,7 +419,16 @@ function refreshEventAvgImpact(PDO $pdo, int $eventId): void
 
 // Returns cached Prophet impact rows for an event, joined with product names.
 // Sorted by |impact_pct| DESC so the most-impacted products appear first.
-function getEventImpactCache(PDO $pdo, int $eventId): array
+//
+// Scoped to $userId's own products: event_impact_cache is keyed by
+// (event_id, product_id), and global/preset events (seasonal_events.user_id
+// IS NULL) are shared across every account, so every user's forecasted
+// products can have a cache row for the SAME preset event. Without the
+// products.user_id filter this returned every user's products mixed
+// together on one event's detail page / dashboard panel — a cross-account
+// data leak (looked like "duplicate" rows when two accounts happened to
+// have products with matching names).
+function getEventImpactCache(PDO $pdo, int $eventId, int $userId): array
 {
     $stmt = $pdo->prepare(
         'SELECT
@@ -433,10 +442,10 @@ function getEventImpactCache(PDO $pdo, int $eventId): array
              eic.computed_at
          FROM event_impact_cache eic
          JOIN products p ON p.id = eic.product_id
-         WHERE eic.event_id = ?
+         WHERE eic.event_id = ? AND p.user_id = ?
          ORDER BY ABS(eic.coefficient / NULLIF(eic.mean_daily_sales, 0)) DESC'
     );
-    $stmt->execute([$eventId]);
+    $stmt->execute([$eventId, $userId]);
     return $stmt->fetchAll();
 }
 

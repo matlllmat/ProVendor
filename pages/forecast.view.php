@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // pages/forecast.view.php
 // Presentation only — demand chart + product list.
 
@@ -21,7 +21,7 @@ require_once __DIR__ . '/../includes/header.php';
     <div class="mb-6">
         <h1 class="text-2xl font-semibold text-[#261F0E] tracking-tight">Demand Forecast</h1>
         <p class="text-sm text-[#261F0E] mt-1" style="opacity:0.5">
-            Historical sales + demand forecast. Select a product, then run a forecast.
+            Pick a time frame and ProVendor forecasts demand + a restock quantity for every product automatically.
         </p>
     </div>
 
@@ -33,27 +33,18 @@ require_once __DIR__ . '/../includes/header.php';
             <div id="demand-chart-btns" class="fc-chart-btns"></div>
         </div>
 
-        <!-- Filters row: categories left, view switcher right -->
+        <!-- Controls row: view switcher (Daily/Weekly/Monthly/Yearly) + the date
+             (year) filter inline. The selected-product chip replaces them when a
+             product is selected. Category filtering lives with the product list below. -->
         <div class="chart-filters-row">
-            <div class="category-tabs">
-                <button class="category-tab active" data-category="">All</button>
-                <?php foreach ($categories as $cat): ?>
-                <button class="category-tab" data-category="<?php echo htmlspecialchars($cat); ?>">
-                    <?php echo htmlspecialchars($cat); ?>
-                </button>
-                <?php endforeach; ?>
-            </div>
             <div class="view-tabs">
                 <button type="button" class="view-tab active" data-view="daily">Daily</button>
                 <button type="button" class="view-tab"        data-view="weekly">Weekly</button>
                 <button type="button" class="view-tab"        data-view="monthly">Monthly</button>
                 <button type="button" class="view-tab"        data-view="yearly">Yearly</button>
             </div>
-        </div>
 
-        <!-- Year pills (left) + Selected product / Run Forecast (right) -->
-        <div class="year-product-row">
-
+            <!-- Date filter — year pills; scrolls horizontally when there are many years -->
             <div class="year-selector" id="year-selector"></div>
 
             <div id="chart-selected-product" class="chart-selected-product" style="display:none">
@@ -67,11 +58,7 @@ require_once __DIR__ . '/../includes/header.php';
                     </svg>
                     Deselect
                 </button>
-                <button class="fc-run-btn" onclick="openForecastModal()">
-                    Run Forecast →
-                </button>
             </div>
-
         </div>
 
         <!-- Chart canvas -->
@@ -137,18 +124,29 @@ require_once __DIR__ . '/../includes/header.php';
             <p class="insights-quality" id="ins-quality"></p>
         </div>
 
+        <!-- Per-product forecast range override — shown in product mode only. -->
+        <div id="product-range" class="product-range" style="display:none">
+            <span class="product-range-label">Forecast range</span>
+            <div class="product-range-input-wrap">
+                <input type="number" id="product-range-input" class="product-range-input" min="1" max="60">
+                <span class="product-range-affix">days</span>
+            </div>
+            <button type="button" id="product-range-apply" class="product-range-btn" onclick="applyProductRange()">Apply</button>
+            <span id="product-range-note" class="product-range-note"></span>
+        </div>
+
+        <!-- Inline forecast view — ChartModal.renderIn() target. Shown when a
+             single product with a saved forecast is selected; it replaces the
+             native historical chart + controls above (this IS the default
+             "run forecast" view, now inline instead of in a modal). -->
+        <div id="analysis-forecast" class="analysis-forecast" style="display:none"></div>
+
     </div>
 
-    <!-- ── Product List ───────────────────────────────────────────────────── -->
+    <!-- The catalogue is forecast automatically on import; the horizon lives in
+         Settings. Selecting a product shows its forecast inline (generated on the
+         spot if it has none yet); its range can be overridden near the chart. -->
     <div id="product-section">
-
-        <!-- Batch selection toolbar — hidden by default, shown when batch mode is active -->
-        <div id="batch-toolbar" class="batch-toolbar" style="display:none">
-            <button type="button" class="batch-cancel-btn" onclick="BatchForecast.exitMode()">✕ Cancel</button>
-            <button type="button" class="batch-select-all-btn" onclick="BatchForecast.selectAllVisible()">Select All visible</button>
-            <span id="batch-selection-count" class="batch-selection-count">0 selected</span>
-            <button type="button" id="batch-next-btn" class="batch-next-btn" onclick="BatchForecast.openFcModal()" disabled>Next →</button>
-        </div>
 
         <form method="GET" action="<?php echo BASE_URL; ?>/pages/forecast.view.php">
             <div class="search-bar">
@@ -159,10 +157,40 @@ require_once __DIR__ . '/../includes/header.php';
                 <?php if ($search): ?>
                 <a href="<?php echo BASE_URL; ?>/pages/forecast.view.php" class="search-clear-btn">Clear</a>
                 <?php endif; ?>
-                <button type="button" id="batch-trigger-btn" class="batch-trigger-btn"
-                        onclick="BatchForecast.enterMode()">Batch Forecast</button>
             </div>
         </form>
+
+        <?php if (!empty($products)): ?>
+        <div class="product-list-toolbar">
+            <div class="category-select-wrap">
+                <label class="category-select-label" for="category-select">Category</label>
+                <div class="category-select-control">
+                    <select id="category-select" class="category-select">
+                        <option value="">All categories</option>
+                        <?php foreach ($categories as $cat): ?>
+                        <option value="<?php echo htmlspecialchars($cat); ?>"><?php echo htmlspecialchars($cat); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <svg class="category-select-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                </div>
+            </div>
+            <div class="view-toggle" role="group" aria-label="Product list view">
+                <button type="button" class="view-toggle-btn active" data-view="list"
+                        aria-pressed="true" title="List view" onclick="setProductView('list')">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/></svg>
+                    List
+                </button>
+                <button type="button" class="view-toggle-btn" data-view="cards"
+                        aria-pressed="false" title="Card view" onclick="setProductView('cards')">
+                    <svg viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
+                    Cards
+                </button>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <div class="product-list">
             <?php if (empty($products)): ?>
@@ -170,16 +198,16 @@ require_once __DIR__ . '/../includes/header.php';
             <?php else: ?>
 
                 <?php foreach ($products as $product): ?>
+                <?php $fc = $latestForecasts[$product['id']] ?? null; ?>
                 <button class="product-row"
                         data-product-id="<?php echo $product['id']; ?>"
                         data-product-name="<?php echo htmlspecialchars($product['name']); ?>"
                         data-product-sku="<?php echo htmlspecialchars($product['sku'] ?? ''); ?>"
                         data-category="<?php echo htmlspecialchars($product['category'] ?? ''); ?>"
                         data-cost-price="<?php echo $product['cost_price']    !== null ? htmlspecialchars((string) $product['cost_price'])    : ''; ?>"
-                        data-selling-price="<?php echo $product['selling_price'] !== null ? htmlspecialchars((string) $product['selling_price']) : ''; ?>">
-
-                    <!-- Checkbox visible only in batch selection mode (toggled via CSS) -->
-                    <span class="batch-row-check" id="bchk-<?php echo $product['id']; ?>"></span>
+                        data-selling-price="<?php echo $product['selling_price'] !== null ? htmlspecialchars((string) $product['selling_price']) : ''; ?>"
+                        data-orig-cost-price="<?php echo $product['orig_cost_price']    !== null ? htmlspecialchars((string) $product['orig_cost_price'])    : ''; ?>"
+                        data-orig-selling-price="<?php echo $product['orig_selling_price'] !== null ? htmlspecialchars((string) $product['orig_selling_price']) : ''; ?>">
 
                     <div class="product-row-info">
                         <span class="product-row-name"><?php echo htmlspecialchars($product['name']); ?></span>
@@ -190,6 +218,24 @@ require_once __DIR__ . '/../includes/header.php';
                             <span class="product-row-sku"><?php echo htmlspecialchars($product['sku']); ?></span>
                             <?php endif; ?>
                         </div>
+                    </div>
+
+                    <!-- Saved forecast summary. Rendered from the DB on load, and
+                         updated live by AutoForecast as each product finishes. -->
+                    <div class="product-row-forecast" id="prf-<?php echo $product['id']; ?>">
+                        <?php if ($fc): ?>
+                            <span class="prf-demand">
+                                <?php echo number_format((float) $fc['total_predicted']); ?>
+                                <span class="prf-unit">units</span>
+                            </span>
+                            <?php if ((int) $fc['restock_qty'] > 0): ?>
+                            <span class="prf-order">Order <?php echo number_format((int) $fc['restock_qty']); ?></span>
+                            <?php else: ?>
+                            <span class="prf-no-order">No price set</span>
+                            <?php endif; ?>
+                        <?php else: ?>
+                            <span class="prf-empty">Not forecast yet</span>
+                        <?php endif; ?>
                     </div>
 
                     <div class="product-row-badges">
@@ -237,6 +283,23 @@ const CHART_EVENTS        = <?php echo json_encode($chartEvents); ?>;
 const EVENT_COLOR         = '#FF5722';
 const INITIAL_PRODUCT_ID  = <?php echo json_encode($initialProductId); ?>;
 const INITIAL_EVENT_ID    = <?php echo json_encode($initialEventId); ?>;
+
+// Forecast inputs: last catalogue sale date (window start is clamped past it),
+// the user's global horizon, and the full product list (id + prices + per-product
+// horizon override), independent of the search filter.
+const LAST_SALE_DATE      = <?php echo json_encode($lastSaleDate); ?>;
+const USER_HORIZON        = <?php echo (int) $userHorizon; ?>;
+const AUTO_PRODUCTS       = <?php echo json_encode(array_map(function ($p) {
+    return [
+        'id'        => (int) $p['id'],
+        'name'      => $p['name'],
+        'cost'      => $p['cost_price']    !== null ? (float) $p['cost_price']    : null,
+        'price'     => $p['selling_price'] !== null ? (float) $p['selling_price'] : null,
+        'origCost'  => $p['orig_cost_price']    !== null ? (float) $p['orig_cost_price']    : null,
+        'origPrice' => $p['orig_selling_price'] !== null ? (float) $p['orig_selling_price'] : null,
+        'horizon'   => $p['forecast_horizon_days'] !== null ? (int) $p['forecast_horizon_days'] : null,
+    ];
+}, $catalogue)); ?>;
 </script>
 <script src="<?php echo BASE_URL; ?>/pages/js/chart.shared.js?v=<?php echo filemtime(__DIR__ . '/js/chart.shared.js'); ?>"></script>
 <script src="<?php echo BASE_URL; ?>/pages/js/chart_modal.js?v=<?php echo filemtime(__DIR__ . '/js/chart_modal.js'); ?>"></script>
@@ -252,18 +315,13 @@ let activeCategory    = '';
 let activeProductId    = null;
 let activeProductName  = '';
 let activeProductSku   = '';    // descriptive name from products.sku, if available
-let activeProductCost  = null;  // from products.cost_price (null = not set in DB)
-let activeProductPrice = null;  // from products.selling_price
+let activeProductCost  = null;  // effective products.cost_price (null = not set in DB)
+let activeProductPrice = null;  // effective products.selling_price
+let activeProductOrigCost  = null;  // imported price — for "Reset to imported price"
+let activeProductOrigPrice = null;
 let fullHistorical     = [];
 let activeYears        = new Set();
 let currentView        = 'daily'; // 'daily' | 'weekly' | 'monthly' | 'yearly'
-
-let fcForecastRows   = [];
-let fcOptimizeResult = null;
-let fcCurrentStock   = 0;
-let fcCostPrice      = 0;
-let fcSellingPrice   = 0;
-var fcBatchMode      = false;
 
 function loadDisabledEvents() {
     const saved = localStorage.getItem('pv_disabled_events');
@@ -276,11 +334,115 @@ function saveDisabledEvents() {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
+// Gentle eased scroll to bring an element just below the sticky navbar. Native
+// scrollIntoView({behavior:'smooth'}) can't be tuned and often feels fast/abrupt —
+// this animates over a distance-scaled duration with an ease-in-out curve.
+function smoothScrollToEl(el) {
+    if (!el) return;
+    var navOffset = 80; // sticky navbar (h-16) + a little breathing room
+    var startY    = window.pageYOffset;
+    var targetY   = Math.max(0, el.getBoundingClientRect().top + startY - navOffset);
+    var dist      = targetY - startY;
+    if (Math.abs(dist) < 4) return;
+
+    // Respect reduced-motion — jump straight there.
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        window.scrollTo(0, targetY);
+        return;
+    }
+
+    // app.css sets `html { scroll-behavior: smooth }`; override it to auto for the
+    // duration so our per-frame scrollTo() calls land instantly instead of each
+    // queuing its own native smooth scroll (which fights this animation and is the
+    // source of the abrupt, janky feel). Restore it when we're done.
+    var root = document.documentElement;
+    var prevBehavior = root.style.scrollBehavior;
+    root.style.scrollBehavior = 'auto';
+
+    // Distance-scaled duration so short and long hops both feel unhurried.
+    var duration = Math.min(900, Math.max(450, Math.abs(dist) * 0.55));
+    var startT = null;
+    function ease(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; } // easeInOutCubic
+    function step(ts) {
+        if (startT === null) startT = ts;
+        var p = Math.min((ts - startT) / duration, 1);
+        window.scrollTo(0, startY + dist * ease(p));
+        if (p < 1) { requestAnimationFrame(step); }
+        else       { root.style.scrollBehavior = prevBehavior; }
+    }
+    requestAnimationFrame(step);
+}
+
 // Scroll to the product list section (search bar + list).
 function scrollToProductList() {
-    const section = document.getElementById('product-section');
-    if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    smoothScrollToEl(document.getElementById('product-section'));
 }
+
+// ── Product list view: list ⇆ cards ───────────────────────────────────────────
+// Same product buttons either way — only the .product-list layout changes — so
+// every existing behavior (click-to-chart, active state, live forecast updates,
+// category filter) keeps working. Choice is remembered per browser.
+function setProductView(view) {
+    var list = document.querySelector('.product-list');
+    if (!list) return;
+    list.classList.toggle('as-cards', view === 'cards');
+    document.querySelectorAll('.view-toggle-btn').forEach(function (b) {
+        var on = b.dataset.view === view;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    try { localStorage.setItem('pv_product_view', view); } catch (e) {}
+}
+// Apply the saved preference on load (runs at parse time — the list is already
+// in the DOM above this script — so there's no list→cards flash).
+(function () {
+    var saved = 'list';
+    try { saved = localStorage.getItem('pv_product_view') || 'list'; } catch (e) {}
+    if (saved === 'cards') setProductView('cards');
+}());
+
+// Smoothly animate the Demand Analysis card's height when its content changes
+// size — most visibly when switching between the aggregate (all-products) chart
+// and a taller individual-product forecast view. Height:auto can't be CSS-
+// transitioned, so a ResizeObserver watches the card's natural height and eases
+// the change (setting an explicit px height only for the ~0.4s animation, so
+// pop-overs/tooltips aren't clipped the rest of the time).
+document.addEventListener('DOMContentLoaded', function () {
+    var card = document.querySelector('.chart-card');
+    if (!card || !('ResizeObserver' in window)) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    var lastH = card.offsetHeight;
+    var animating = false;
+    var timer = null;
+
+    var ro = new ResizeObserver(function () {
+        if (animating) return;                       // ignore our own explicit-height writes
+        var target = card.offsetHeight;              // natural height (card is on auto)
+        if (Math.abs(target - lastH) < 8) { lastH = target; return; }
+
+        var fromH = lastH;
+        lastH = target;
+        animating = true;
+        card.style.overflow   = 'hidden';
+        card.style.height     = fromH + 'px';
+        card.getBoundingClientRect();                // reflow so the start height sticks
+        card.style.transition = 'height 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+        card.style.height     = target + 'px';
+
+        clearTimeout(timer);
+        timer = setTimeout(function () {
+            card.style.transition = '';
+            card.style.height     = '';              // release back to auto
+            card.style.overflow   = '';
+            lastH = card.offsetHeight;               // resync to the true natural height
+            animating = false;
+        }, 440);
+    });
+
+    // Start observing after the first chart settles so page load doesn't animate.
+    setTimeout(function () { lastH = card.offsetHeight; ro.observe(card); }, 1200);
+});
 
 document.addEventListener('DOMContentLoaded', function() {
     // Show the floating "Products" pill only while the product list isn't on screen.
@@ -302,6 +464,8 @@ document.addEventListener('DOMContentLoaded', function() {
             row.dataset.productSku || '',
             row.dataset.costPrice    ? parseFloat(row.dataset.costPrice)    : null,
             row.dataset.sellingPrice ? parseFloat(row.dataset.sellingPrice) : null,
+            row.dataset.origCostPrice    ? parseFloat(row.dataset.origCostPrice)    : null,
+            row.dataset.origSellingPrice ? parseFloat(row.dataset.origSellingPrice) : null,
         ];
     }
 
@@ -313,8 +477,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Only on a fresh selection — clicking an already-selected row is "deselect"
             // and a sudden scroll-up there would feel unrelated to the user's intent.
             if (willSelect) {
-                const chartCard = document.querySelector('.chart-card');
-                if (chartCard) chartCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                smoothScrollToEl(document.querySelector('.chart-card'));
             }
         });
     });
@@ -332,21 +495,21 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// ── Category tabs ─────────────────────────────────────────────────────────────
-document.querySelectorAll('.category-tab').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-        document.querySelectorAll('.category-tab').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        activeCategory    = btn.dataset.category;
+// ── Category dropdown ─────────────────────────────────────────────────────────
+var categorySelect = document.getElementById('category-select');
+if (categorySelect) {
+    categorySelect.addEventListener('change', function() {
+        activeCategory    = categorySelect.value;
         activeProductId   = null;
         activeProductName = '';
         activeYears       = new Set();
         updateProductRows();
         updateChartContext();
         filterProductList(activeCategory);
+        enterAggregateMode();
         loadSalesChart(activeCategory, null);
     });
-});
+}
 
 // ── View tabs (Daily / Weekly / Monthly / Yearly) ─────────────────────────────
 document.querySelectorAll('.view-tab').forEach(function(btn) {
@@ -387,15 +550,17 @@ function filterProductList(category) {
 }
 
 // ── Product selection ─────────────────────────────────────────────────────────
-function selectProduct(productId, productName, productSku, costPrice, sellingPrice) {
+function selectProduct(productId, productName, productSku, costPrice, sellingPrice, origCost, origPrice) {
     if (activeProductId === productId) { deselectProduct(); return; }
     activeProductId    = productId;
     activeProductName  = productName;
     activeProductSku   = productSku || '';
     activeProductCost  = (costPrice    != null && !isNaN(costPrice)    && costPrice    > 0) ? costPrice    : null;
     activeProductPrice = (sellingPrice != null && !isNaN(sellingPrice) && sellingPrice > 0) ? sellingPrice : null;
+    activeProductOrigCost  = (origCost  != null && !isNaN(origCost)  && origCost  > 0) ? origCost  : null;
+    activeProductOrigPrice = (origPrice != null && !isNaN(origPrice) && origPrice > 0) ? origPrice : null;
     activeYears        = new Set();
-    loadSalesChart(activeCategory, productId);
+    showProductAnalysis();   // inline forecast view (or historical if not forecast yet)
     updateProductRows();
     updateChartContext();
 }
@@ -406,7 +571,10 @@ function deselectProduct() {
     activeProductSku   = '';
     activeProductCost  = null;
     activeProductPrice = null;
+    activeProductOrigCost  = null;
+    activeProductOrigPrice = null;
     activeYears        = new Set();
+    enterAggregateMode();
     loadSalesChart(activeCategory, null);
     updateProductRows();
     updateChartContext();
@@ -964,606 +1132,314 @@ function renderYearlyView(historical) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  FORECAST MODAL — input + loading panels only
-//  Results are rendered by ChartModal (chart_modal.js)
+//  INLINE FORECAST VIEW + HORIZON RE-FORECAST
+//  Selecting a product shows its forecast chart inline (ChartModal.renderIn)
+//  as the default Demand Analysis view — no modal, no manual "run" button.
 // ════════════════════════════════════════════════════════════════════
 
-document.addEventListener('DOMContentLoaded', function () {
-    document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') {
-            const modal = document.getElementById('fc-modal');
-            if (modal && !modal.classList.contains('hidden')) closeForecastModal();
-        }
+// Switch the Demand Analysis card between the aggregate historical chart (native
+// canvas + its controls) and the per-product forecast view rendered inline.
+function enterProductMode() {
+    var btns = document.getElementById('demand-chart-btns'); if (btns) btns.style.display = 'none';
+    var vt   = document.querySelector('.view-tabs');          if (vt)   vt.style.display   = 'none';
+    var ys   = document.getElementById('year-selector');      if (ys)   ys.style.display   = 'none';
+    ['chart-loading', 'chart-error', 'demand-chart', 'product-insights'].forEach(function (id) {
+        var el = document.getElementById(id); if (el) el.style.display = 'none';
     });
-    const toEl = document.getElementById('fc-to-date');
-    if (toEl) toEl.addEventListener('change', updateFcRangeWarning);
-});
-
-function updateFcRangeWarning() {
-    const toEl     = document.getElementById('fc-to-date');
-    const warnEl   = document.getElementById('fc-range-warning');
-    const lastDate = fullHistorical.length ? fullHistorical[fullHistorical.length - 1].date : null;
-    if (!warnEl || !toEl || !lastDate || !toEl.value) return;
-    const daysOut = (new Date(toEl.value + 'T00:00:00') - new Date(lastDate + 'T00:00:00')) / 86400000;
-    warnEl.style.display = daysOut > 365 ? '' : 'none';
+    var af = document.getElementById('analysis-forecast'); if (af) af.style.display = '';
+    var pr = document.getElementById('product-range');     if (pr) pr.style.display = 'flex';
 }
 
-// ── Per-product input persistence (session-scoped) ───────────────────────────
-// Survives modal close and page navigation within a login session.
-// Cleared on logout by pvLogout() in csrf.js.
-const PI_KEY = 'provendor_pi_v1';
-function piGet(pid) {
-    if (!pid) return {};
-    try {
-        const all = JSON.parse(sessionStorage.getItem(PI_KEY) || '{}');
-        return all[pid] || {};
-    } catch (e) { return {}; }
-}
-function piSet(pid, partial) {
-    if (!pid) return;
-    try {
-        const all = JSON.parse(sessionStorage.getItem(PI_KEY) || '{}');
-        all[pid] = Object.assign(all[pid] || {}, partial);
-        sessionStorage.setItem(PI_KEY, JSON.stringify(all));
-    } catch (e) {}
+function enterAggregateMode() {
+    ChartModal.destroyIn();
+    var af   = document.getElementById('analysis-forecast'); if (af)   af.style.display   = 'none';
+    var pr   = document.getElementById('product-range');      if (pr)   pr.style.display   = 'none';
+    var btns = document.getElementById('demand-chart-btns');  if (btns) btns.style.display = '';
+    var vt   = document.querySelector('.view-tabs');           if (vt)   vt.style.display   = '';
+    var ys   = document.getElementById('year-selector');       if (ys)   ys.style.display   = '';
+    // Product insights panel stays hidden — the inline forecast view has its own
+    // reasoning; chart-loading / chart-error / demand-chart are managed by showChartState().
+    var pi = document.getElementById('product-insights'); if (pi) pi.style.display = 'none';
 }
 
-function openForecastModal() {
-    if (!activeProductId && !fcBatchMode) return;
-
-    if (fcBatchMode) {
-        var n = BatchForecast.selectedCount();
-        document.getElementById('fc-modal-title').textContent =
-            'Batch Forecast — ' + n + ' product' + (n === 1 ? '' : 's');
-    } else {
-        document.getElementById('fc-modal-title').textContent = productDisplayLabel();
-    }
-
-    // Reset the reference toggle to "today" on every open.
-    forecastReferenceDate = 'today';
-    document.querySelectorAll('#fc-ref-pills .fc-preset-pill').forEach(function(b) {
-        b.classList.toggle('fc-preset-pill-on', b.dataset.ref === 'today');
-    });
-
-    // Default to "Next Month".
-    // applyForecastPreset handles batch mode by substituting yesterday as lastDate.
-    applyForecastPreset('month');
-
-    if (!fcBatchMode) {
-        // Capture any saved dates BEFORE applying the preset — applyForecastPreset
-        // writes its own values to storage, which would otherwise clobber the
-        // user's previously typed dates.
-        const saved = piGet(activeProductId);
-
-        // If the user had previously typed dates for this product, override the
-        // preset defaults and re-persist (the preset call just overwrote storage).
-        if (saved.fromDate || saved.toDate) {
-            const fromEl = document.getElementById('fc-from-date');
-            const toEl   = document.getElementById('fc-to-date');
-            if (saved.fromDate && fromEl) fromEl.value = saved.fromDate;
-            if (saved.toDate   && toEl)   toEl.value   = saved.toDate;
-            piSet(activeProductId, {
-                fromDate: saved.fromDate || (fromEl ? fromEl.value : ''),
-                toDate:   saved.toDate   || (toEl   ? toEl.value   : ''),
-            });
-            // Clear preset pill — values are user-chosen, not preset-derived.
-            document.querySelectorAll('#fc-preset-pills .fc-preset-pill').forEach(function(b) {
-                b.classList.remove('fc-preset-pill-on');
-            });
-        }
-    }
-
-    document.getElementById('fc-range-warning').style.display = 'none';
-    document.getElementById('fc-input-error').style.display   = 'none';
-
-    fcForecastRows   = [];
-    fcOptimizeResult = null;
-    setFcPanel('input');
-    document.getElementById('fc-modal').classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
-    updateFcRangeWarning();
+// Effective forecast horizon (days) for a product: its override from AUTO_PRODUCTS
+// if set, else the user's global horizon.
+function productHorizon(pid) {
+    var p = AUTO_PRODUCTS.find(function (x) { return x.id === pid; });
+    return (p && p.horizon) ? p.horizon : USER_HORIZON;
 }
 
-// ── Forecast range presets ───────────────────────────────────────────────────
-// Computes From/To dates relative to a chosen reference date (today by default,
-// or the last sale date if the user toggles it), sets the inputs, and
-// highlights the active pill. Manual date edits clear the pill state (see init).
-let forecastReferenceDate = 'today'; // 'today' | 'last'
-
-function applyForecastPreset(preset) {
-    const lastDate = fullHistorical.length
-        ? fullHistorical[fullHistorical.length - 1].date
-        : (fcBatchMode ? new Date(Date.now() - 86400000).toISOString().slice(0, 10) : null);
-    if (!lastDate) return;
-
-    // Format using LOCAL components — toISOString() converts to UTC, which in
-    // +UTC timezones rolls "Feb 1 00:00 local" back to "Jan 31 16:00 UTC" and
-    // strips the day. This bit us as a 1-day-off default before.
-    function toYMD(d) {
-        return d.getFullYear() + '-'
-            + String(d.getMonth() + 1).padStart(2, '0') + '-'
-            + String(d.getDate()).padStart(2, '0');
-    }
-
-    const lastDt  = new Date(lastDate + 'T00:00:00');
-    const todayDt = new Date();
-    todayDt.setHours(0, 0, 0, 0);
-
-    // The pivot all preset math is computed against
-    const refDt = (forecastReferenceDate === 'today') ? todayDt : lastDt;
-
-    let fromDt, toDt;
-
-    // Every preset snaps to a calendar boundary — never a rolling window.
-    if (preset === 'week') {
-        // Next calendar week: Monday → Sunday
-        fromDt = new Date(refDt);
-        const dow = fromDt.getDay();                 // 0=Sun, 1=Mon, ..., 6=Sat
-        const daysToNextMon = (8 - dow) % 7 || 7;    // always advance to the NEXT Monday
-        fromDt.setDate(fromDt.getDate() + daysToNextMon);
-        toDt = new Date(fromDt); toDt.setDate(toDt.getDate() + 6);
-    }
-    else if (preset === 'month') {
-        // 1st → last day of next calendar month
-        fromDt = new Date(refDt.getFullYear(), refDt.getMonth() + 1, 1);
-        toDt   = new Date(fromDt.getFullYear(), fromDt.getMonth() + 1, 0);
-    }
-    else if (preset === '3months') {
-        // Next calendar quarter (Q1 = Jan–Mar, Q2 = Apr–Jun, Q3 = Jul–Sep, Q4 = Oct–Dec)
-        const q                = Math.floor(refDt.getMonth() / 3);  // current quarter index (0..3)
-        const nextQStartMonth  = (q + 1) * 3;                       // 3, 6, 9, or 12 (auto-wraps to next Jan)
-        fromDt = new Date(refDt.getFullYear(), nextQStartMonth, 1);
-        toDt   = new Date(fromDt.getFullYear(), fromDt.getMonth() + 3, 0);
-    }
-    else if (preset === '6months') {
-        // Next calendar half-year (H1 = Jan–Jun, H2 = Jul–Dec)
-        const nextHStartMonth = refDt.getMonth() < 6 ? 6 : 12;      // Jul of same year, or Jan of next year
-        fromDt = new Date(refDt.getFullYear(), nextHStartMonth, 1);
-        toDt   = new Date(fromDt.getFullYear(), fromDt.getMonth() + 6, 0);
-    }
-    else if (preset === 'year') {
-        // The literal next calendar year: Jan 1 → Dec 31
-        fromDt = new Date(refDt.getFullYear() + 1, 0, 1);
-        toDt   = new Date(refDt.getFullYear() + 1, 11, 31);
-    }
-
-    // Date inputs can never start before the day after the last sale —
-    // Prophet only projects forward from historical data. If the reference
-    // is "today" but today is earlier than (or on) the last sale date,
-    // we clamp From so the user can't accidentally pick an invalid window.
-    const minDt = new Date(lastDt); minDt.setDate(minDt.getDate() + 1);
-    if (fromDt < minDt) fromDt = new Date(minDt);
-    if (toDt   < fromDt) toDt  = new Date(fromDt);
-
-    const minStr  = toYMD(minDt);
-    const fromStr = toYMD(fromDt);
-    const toStr   = toYMD(toDt);
-
-    const fromEl = document.getElementById('fc-from-date');
-    const toEl   = document.getElementById('fc-to-date');
-    if (fromEl) { fromEl.min = minStr; fromEl.value = fromStr; }
-    if (toEl)   { toEl.min   = minStr; toEl.value   = toStr;   }
-
-    document.querySelectorAll('#fc-preset-pills .fc-preset-pill').forEach(function(b) {
-        b.classList.toggle('fc-preset-pill-on', b.dataset.preset === preset);
-    });
-
-    // Programmatic value changes don't fire the input event, so persist explicitly.
-    piSet(activeProductId, { fromDate: fromStr, toDate: toStr });
-
-    updateFcRangeWarning();
+function _rangeNote(text, isError) {
+    var note = document.getElementById('product-range-note');
+    if (!note) return;
+    note.textContent = text;
+    note.className   = 'product-range-note' + (isError ? ' is-error' : '');
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('#fc-preset-pills .fc-preset-pill').forEach(function(btn) {
-        btn.addEventListener('click', function() { applyForecastPreset(btn.dataset.preset); });
-    });
+// Per-product range override: save it, then re-forecast just this product at the
+// new range and re-render (generateProductForecast reads productHorizon()).
+function applyProductRange() {
+    var pid = activeProductId;
+    if (pid === null) return;
 
-    // Reference-date toggle: switch the pivot between today and last-sale, then
-    // re-apply whichever preset is currently active so the dates refresh.
-    document.querySelectorAll('#fc-ref-pills .fc-preset-pill').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            forecastReferenceDate = btn.dataset.ref;
-            document.querySelectorAll('#fc-ref-pills .fc-preset-pill').forEach(function(b) {
-                b.classList.toggle('fc-preset-pill-on', b.dataset.ref === forecastReferenceDate);
-            });
-            var activePreset = document.querySelector('#fc-preset-pills .fc-preset-pill.fc-preset-pill-on');
-            if (activePreset) applyForecastPreset(activePreset.dataset.preset);
-        });
-    });
+    var days = parseInt(document.getElementById('product-range-input').value, 10);
+    var btn  = document.getElementById('product-range-apply');
+    if (isNaN(days) || days < 1 || days > 60) { _rangeNote('Enter 1–60 days.', true); return; }
 
-    // Manual date edits exit preset mode (no pill highlighted) and persist.
-    ['fc-from-date', 'fc-to-date'].forEach(function(id) {
-        var el = document.getElementById(id);
-        if (el) {
-            el.addEventListener('input', function() {
-                document.querySelectorAll('#fc-preset-pills .fc-preset-pill').forEach(function(b) {
-                    b.classList.remove('fc-preset-pill-on');
-                });
-                piSet(activeProductId, id === 'fc-from-date' ? { fromDate: el.value } : { toDate: el.value });
-            });
-        }
-    });
-});
+    if (btn) { btn.disabled = true; btn.textContent = 'Applying…'; }
+    _rangeNote('', false);
 
-function closeForecastModal() {
-    fcBatchMode = false;
-    document.getElementById('fc-modal').classList.add('hidden');
-    document.body.style.overflow = '';
-}
+    var body = new FormData();
+    body.append('product_id', pid);
+    body.append('forecast_horizon_days', days);
 
-function setFcPanel(panel) {
-    document.getElementById('fc-input-panel').style.display   = panel === 'input'   ? '' : 'none';
-    document.getElementById('fc-loading-panel').style.display = panel === 'loading' ? '' : 'none';
-}
-
-// ── Run forecast (Prophet only — Newsvendor is opt-in from the result modal) ──
-function runForecast() {
-    const fromDate = document.getElementById('fc-from-date').value;
-    const toDate   = document.getElementById('fc-to-date').value;
-    const errEl    = document.getElementById('fc-input-error');
-
-    if (!fromDate || !toDate) { errEl.textContent = 'Please select both a start and end date.'; errEl.style.display = ''; return; }
-    if (fromDate >= toDate)   { errEl.textContent = 'End date must be after start date.';       errEl.style.display = ''; return; }
-
-    if (!fcBatchMode) {
-        const lastDate = fullHistorical.length ? fullHistorical[fullHistorical.length - 1].date : null;
-        if (lastDate && fromDate <= lastDate) { errEl.textContent = 'Start date must be after your last sale date (' + lastDate + ').'; errEl.style.display = ''; return; }
-    }
-
-    errEl.style.display = 'none';
-    setFcPanel('loading');
-
-    // In batch mode, delegate to the batch Prophet runner and bail out.
-    if (fcBatchMode) {
-        BatchForecast.runProphet(fromDate, toDate);
-        return;
-    }
-
-    const forecastBody = new FormData();
-    forecastBody.append('product_id', activeProductId);
-    forecastBody.append('from_date',  fromDate);
-    forecastBody.append('to_date',    toDate);
-
-    fetch('<?php echo BASE_URL; ?>/api/run_product_forecast.php', { method: 'POST', body: forecastBody })
-        .then(r => r.json())
+    fetch('<?php echo BASE_URL; ?>/api/update_product_horizon.php', { method: 'POST', body: body })
+        .then(function (r) { return r.json(); })
         .then(function (data) {
-            if (data.error) { showFcInputError(data.error); return; }
-            fcForecastRows = data.forecast;
-
-            // Close input modal, open ChartModal with forecast only.
-            // Newsvendor / restock insight is opt-in from inside the result modal.
-            closeForecastModal();
-            ChartModal.open({
-                label:               'Demand Forecast',
-                title:               productDisplayLabel(),
-                productId:           activeProductId,      // keys per-product input persistence
-                accuracyBase:        '<?php echo BASE_URL; ?>', // for /api/run_product_accuracy.php
-                historical:          data.historical,
-                forecast:            data.forecast,
-                hasBand:             true,
-                productCostPrice:    activeProductCost,    // null if not in DB
-                productSellingPrice: activeProductPrice,   // null if not in DB
-                disabledEventIds:    disabledEventIds,
-                onRunAgain: function () {
-                    ChartModal.close();
-                    openForecastModal();
-                },
-                onGenerateRestock: function (inputs, done) {
-                    // Called by chart_modal.js when user submits the restock form.
-                    // inputs = { cost_price, selling_price, current_stock }
-                    // done   = callback(opt | { error })
-                    fcCurrentStock = inputs.current_stock;
-                    fcCostPrice    = inputs.cost_price;
-                    fcSellingPrice = inputs.selling_price;
-
-                    const optBody = new FormData();
-                    optBody.append('forecast',      JSON.stringify(data.forecast));
-                    optBody.append('cost_price',    inputs.cost_price);
-                    optBody.append('selling_price', inputs.selling_price);
-                    optBody.append('current_stock', inputs.current_stock);
-                    // Passes product_id so run_optimize.php can look up the
-                    // cached residual_rho and apply the AR(1) σ correction.
-                    optBody.append('product_id',    activeProductId);
-
-                    fetch('<?php echo BASE_URL; ?>/api/run_optimize.php', { method: 'POST', body: optBody })
-                        .then(r => r.json())
-                        .then(function (opt) {
-                            if (opt.error) { done(opt); return; }
-                            fcOptimizeResult = opt;
-                            done({
-                                total_predicted:      opt.total_predicted,
-                                restock_qty:          opt.restock_qty,
-                                current_stock:        inputs.current_stock,
-                                cost_price:           inputs.cost_price,
-                                selling_price:        inputs.selling_price,
-                                total_std:            opt.total_std,
-                                optimal_total:        opt.optimal_total,
-                                est_profit:           opt.est_profit,
-                                rho_used:             opt.rho_used,
-                                std_inflation_factor: opt.std_inflation_factor,
-                            });
-                        })
-                        .catch(function () { done({ error: 'Network error. Please try again.' }); });
-                },
-                onSave: saveForecast,
-            });
-        })
-        .catch(function () { showFcInputError('Network error. Please try again.'); });
-}
-
-function showFcInputError(msg) {
-    setFcPanel('input');
-    document.getElementById('fc-modal').classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
-    const errEl = document.getElementById('fc-input-error');
-    errEl.textContent   = msg;
-    errEl.style.display = '';
-}
-
-// ── Save forecast ─────────────────────────────────────────────────────────────
-function saveForecast() {
-    if (!fcForecastRows.length || !fcOptimizeResult) return;
-
-    ChartModal.setSaveBtnState(true, 'Saving…');
-
-    const body = new FormData();
-    body.append('product_id',    activeProductId);
-    body.append('forecast_data', JSON.stringify(fcForecastRows));
-    body.append('restock_qty',   fcOptimizeResult.restock_qty);
-    body.append('cost_price',    fcCostPrice);
-    body.append('selling_price', fcSellingPrice);
-    body.append('current_stock', fcCurrentStock);
-    body.append('total_std',     fcOptimizeResult.total_std);
-    body.append('optimal_total', fcOptimizeResult.optimal_total);
-    body.append('est_profit',    fcOptimizeResult.est_profit);
-    // AR(1) bookkeeping so the saved Newsvendor disclosure reproduces correctly
-    // when this forecast is reopened from the Reports page.
-    if (fcOptimizeResult.rho_used             != null) body.append('rho_used',             fcOptimizeResult.rho_used);
-    if (fcOptimizeResult.std_inflation_factor != null) body.append('std_inflation_factor', fcOptimizeResult.std_inflation_factor);
-
-    fetch('<?php echo BASE_URL; ?>/api/save_forecast.php', { method: 'POST', body: body })
-        .then(r => r.json())
-        .then(function (data) {
-            if (data.error) {
-                ChartModal.setSaveBtnState(false, 'Save Forecast');
-                ChartModal.showSaveMsg('error', data.error);
-                return;
-            }
-            ChartModal.setSaveBtnState(false, 'Saved ✓');
-            ChartModal.showSaveMsg('success',
-                'Forecast saved. <a href="<?php echo BASE_URL; ?>/pages/reports.view.php#forecasts" style="font-weight:600;text-decoration:underline">View in Reports →</a>'
-            );
+            if (btn) { btn.disabled = false; btn.textContent = 'Apply'; }
+            if (data.error) { _rangeNote(data.error, true); return; }
+            var p = AUTO_PRODUCTS.find(function (x) { return x.id === pid; });
+            if (p) p.horizon = days;
+            generateProductForecast(pid, fullHistorical);   // re-forecast at the new range
         })
         .catch(function () {
-            ChartModal.setSaveBtnState(false, 'Save Forecast');
-            ChartModal.showSaveMsg('error', 'Network error. Could not save.');
+            if (btn) { btn.disabled = false; btn.textContent = 'Apply'; }
+            _rangeNote('Network error. Try again.', true);
         });
 }
+
+// Load a selected product's historical + saved forecast, then render the forecast
+// chart inline. If the product has no saved forecast yet (e.g. added after the
+// last catalogue run), fall back to its historical chart.
+function showProductAnalysis() {
+    var pid = activeProductId;
+    enterProductMode();
+
+    // Sync the range control to this product's effective horizon.
+    var rangeInput = document.getElementById('product-range-input');
+    if (rangeInput) rangeInput.value = productHorizon(pid);
+    _rangeNote('', false);
+
+    var af = document.getElementById('analysis-forecast');
+    if (af) af.innerHTML =
+        '<div class="af-inline-loading">' +
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>' +
+        ' Loading forecast…</div>';
+
+    var histBody = new FormData(); histBody.append('product_id', pid);
+    var fcBody   = new FormData(); fcBody.append('product_id', pid);
+
+    Promise.all([
+        fetch('<?php echo BASE_URL; ?>/api/get_sales_chart.php',      { method: 'POST', body: histBody }).then(function (r) { return r.json(); }),
+        fetch('<?php echo BASE_URL; ?>/api/get_product_forecast.php', { method: 'POST', body: fcBody   }).then(function (r) { return r.json(); }),
+    ]).then(function (res) {
+        if (activeProductId !== pid) return; // selection changed while loading
+        var hist = (res[0] && res[0].historical) ? res[0].historical : [];
+        var fc   = res[1] || {};
+        fullHistorical = hist;
+
+        if (fc.forecast && fc.forecast.length) {
+            renderInlineForecast(hist, fc.forecast, fc.meta || null);
+        } else {
+            // No saved forecast for this product yet — generate one now (Prophet +
+            // Newsvendor at the current horizon) so the forecast always shows on
+            // click, even for data imported before the auto-forecast existed.
+            generateProductForecast(pid, hist);
+        }
+    }).catch(function () {
+        _showInlineForecastError('Could not load this product&rsquo;s forecast. Please refresh.');
+    });
+}
+
+// Generate a forecast for one product on demand: Prophet then Newsvendor (which
+// also saves it), then render it inline. current_stock defaults to 0; the user
+// can refine it from the Restock tab. Prices come from the selected product.
+function generateProductForecast(pid, hist) {
+    var af = document.getElementById('analysis-forecast');
+    if (af) af.innerHTML =
+        '<div class="af-inline-loading">' +
+        '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>' +
+        ' Forecasting this product… (first time may take a moment)</div>';
+
+    var range = AutoForecast.computeDayRange(productHorizon(pid), LAST_SALE_DATE);
+    var cost  = activeProductCost  != null ? activeProductCost  : 0;
+    var price = activeProductPrice != null ? activeProductPrice : 0;
+
+    // 1) Prophet forecast for this product.
+    fetch('<?php echo BASE_URL; ?>/api/run_batch_prophet.php', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ product_ids: [pid], from_date: range.from, to_date: range.to }),
+    })
+        .then(function (r) { return r.json(); })
+        .then(function (presp) {
+            if (activeProductId !== pid) return; // selection changed
+            var pres = presp.results && presp.results[0];
+            if (presp.error || !pres || !pres.success || !pres.forecast || !pres.forecast.length) {
+                _showInlineForecastError('Could not forecast this product. Make sure the forecast server is running and this product has enough sales history.');
+                return;
+            }
+            var forecast = pres.forecast;
+
+            // 2) Newsvendor — also saves the forecast (restock at 0 stock).
+            fetch('<?php echo BASE_URL; ?>/api/run_batch_newsvendor.php', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ products: [{ id: pid, cost_price: cost, selling_price: price, current_stock: 0, forecast: forecast }] }),
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (nvresp) {
+                    if (activeProductId !== pid) return;
+                    var opt  = nvresp.results && nvresp.results[0];
+                    var meta = null;
+                    if (opt && opt.success && opt.priced) {
+                        meta = {
+                            total_predicted:      opt.total_predicted,
+                            restock_qty:          opt.restock_qty,
+                            current_stock:        opt.current_stock,
+                            cost_price:           opt.cost_price,
+                            selling_price:        opt.selling_price,
+                            total_std:            opt.total_std,
+                            optimal_total:        opt.optimal_total,
+                            est_profit:           opt.est_profit,
+                            rho_used:             opt.rho_used,
+                            std_inflation_factor: opt.std_inflation_factor,
+                        };
+                    }
+                    if (opt && opt.success) updateProductCard(pid, opt.total_predicted, opt.restock_qty || 0);
+                    renderInlineForecast(hist, forecast, meta);
+                })
+                .catch(function () {
+                    // Newsvendor failed but Prophet succeeded — still show the forecast chart.
+                    if (activeProductId === pid) renderInlineForecast(hist, forecast, null);
+                });
+        })
+        .catch(function () {
+            _showInlineForecastError('Network error while forecasting. Please try again.');
+        });
+}
+
+function _showInlineForecastError(msg) {
+    var af = document.getElementById('analysis-forecast');
+    if (af) af.innerHTML = '<div class="af-inline-error">' + msg + '</div>';
+}
+
+// Render the forecast-projection view inline via the shared chart modal renderer.
+function renderInlineForecast(historical, forecast, meta) {
+    enterProductMode();
+
+    ChartModal.renderIn(document.getElementById('analysis-forecast'), {
+        label:               'Demand Forecast',
+        title:               productDisplayLabel(),
+        productId:           activeProductId,
+        accuracyBase:        '<?php echo BASE_URL; ?>',
+        historical:          historical,
+        forecast:            forecast,
+        hasBand:             true,
+        productCostPrice:    activeProductCost,
+        productSellingPrice: activeProductPrice,
+        productOrigCost:     activeProductOrigCost,   // imported price, for "Reset to imported"
+        productOrigPrice:    activeProductOrigPrice,
+        disabledEventIds:    disabledEventIds,
+        meta:                meta,
+        onRunAgain:          null,
+        // Restock refine: re-run Newsvendor for this product with the owner's real
+        // stock/prices. run_batch_newsvendor optimizes AND saves (replacing the
+        // product's forecast), so there's no separate Save step — we just refresh
+        // the card. Same callback contract chart_modal.js expects.
+        onGenerateRestock: function (inputs, done) {
+            fetch('<?php echo BASE_URL; ?>/api/run_batch_newsvendor.php', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ products: [{
+                    id:            activeProductId,
+                    cost_price:    inputs.cost_price,
+                    selling_price: inputs.selling_price,
+                    current_stock: inputs.current_stock,
+                    forecast:      forecast,
+                }] }),
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (resp) {
+                    var opt = resp.results && resp.results[0];
+                    if (resp.error || !opt || !opt.success) {
+                        done({ error: (resp.error) || (opt && opt.error) || 'Could not calculate restock insight.' });
+                        return;
+                    }
+                    // Persist the cost/price the owner used so it sticks (future
+                    // forecasts, cards, on-demand runs). orig_* is preserved server-side
+                    // for "Reset to imported price". Fire-and-forget + update local state.
+                    persistProductPricing(activeProductId, inputs.cost_price, inputs.selling_price);
+                    updateProductCard(activeProductId, opt.total_predicted, opt.restock_qty);
+                    done({
+                        total_predicted:      opt.total_predicted,
+                        restock_qty:          opt.restock_qty,
+                        current_stock:        inputs.current_stock,
+                        cost_price:           inputs.cost_price,
+                        selling_price:        inputs.selling_price,
+                        total_std:            opt.total_std,
+                        optimal_total:        opt.optimal_total,
+                        est_profit:           opt.est_profit,
+                        rho_used:             opt.rho_used,
+                        std_inflation_factor: opt.std_inflation_factor,
+                    });
+                })
+                .catch(function () { done({ error: 'Network error. Please try again.' }); });
+        },
+    });
+}
+
+// ── Update a product card's forecast summary ──────────────────────────────────
+// Called after a forecast is saved (auto-run or single-product refine) so the
+// card reflects the new numbers without a page reload. Exposed globally so the
+// auto-run driver (autorun_forecast.js) can reuse it. Cards for products hidden
+// by the current search filter simply aren't in the DOM — nothing to update.
+function updateProductCard(productId, totalPredicted, restockQty) {
+    const el = document.getElementById('prf-' + productId);
+    if (!el) return;
+
+    const demand = Number(totalPredicted || 0).toLocaleString();
+    const order  = Number(restockQty     || 0);
+    const orderHtml = order > 0
+        ? '<span class="prf-order">Order ' + order.toLocaleString() + '</span>'
+        : '<span class="prf-no-order">No price set</span>';
+
+    el.innerHTML =
+        '<span class="prf-demand">' + demand + ' <span class="prf-unit">units</span></span>' +
+        orderHtml;
+}
+window.updateProductCard = updateProductCard;
+
+// Persist an edited cost/price to the product (so it sticks) and sync local state
+// so the current selection, cards, and future on-demand runs use it. orig_* is
+// preserved server-side for "Reset to imported price". Best-effort.
+function persistProductPricing(productId, cost, price) {
+    if (!(cost > 0 && price > cost)) return;
+
+    activeProductCost  = cost;
+    activeProductPrice = price;
+
+    var p = AUTO_PRODUCTS.find(function (x) { return x.id === productId; });
+    if (p) { p.cost = cost; p.price = price; }
+
+    var row = document.querySelector('.product-row[data-product-id="' + productId + '"]');
+    if (row) { row.dataset.costPrice = cost; row.dataset.sellingPrice = price; }
+
+    var body = new FormData();
+    body.append('product_id', productId);
+    body.append('cost_price', cost);
+    body.append('selling_price', price);
+    fetch('<?php echo BASE_URL; ?>/api/update_product_pricing.php', { method: 'POST', body: body })
+        .catch(function () {});
+}
 </script>
-
-<!-- ════════════════════════════════════════════
-     FORECAST INPUT MODAL
-════════════════════════════════════════════ -->
-<div id="fc-modal" class="fixed inset-0 z-[1000] flex items-center justify-center hidden"
-     role="dialog" aria-modal="true" aria-labelledby="fc-modal-title">
-
-    <div class="absolute inset-0" style="background:rgba(38,31,14,0.55)" onclick="closeForecastModal()"></div>
-
-    <div class="fc-modal-card">
-
-        <!-- Header -->
-        <div class="fc-modal-header">
-            <div style="min-width:0">
-                <p class="fc-modal-label">Demand Forecast</p>
-                <h2 id="fc-modal-title" class="fc-modal-title">—</h2>
-            </div>
-            <button class="fc-modal-close" onclick="closeForecastModal()" title="Close">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-            </button>
-        </div>
-
-        <!-- Input panel — Prophet only needs a date range.
-             Cost / selling price / stock are collected later in the result
-             modal when the user generates a Newsvendor restock insight. -->
-        <div id="fc-input-panel">
-            <div class="fc-form">
-
-                <p class="fc-form-helptext">
-                    Prophet will fit a model to this product&rsquo;s sales history and project demand
-                    for every day in the window below. You can request a restock recommendation after
-                    you see the forecast.
-                </p>
-
-                <div class="fc-form-group">
-                    <label class="fc-form-label">Forecast Date Range</label>
-
-                    <!-- Reference date: presets are computed relative to this pivot. -->
-                    <div class="fc-ref-toggle">
-                        <span class="fc-ref-label">Compute from</span>
-                        <div class="fc-preset-pills" id="fc-ref-pills">
-                            <button type="button" class="fc-preset-pill fc-preset-pill-on" data-ref="today">Today&rsquo;s date</button>
-                            <button type="button" class="fc-preset-pill"                   data-ref="last">Last sale date</button>
-                        </div>
-                    </div>
-
-                    <!-- Quick presets: click to auto-fill From/To. Manual edits clear the active pill. -->
-                    <div class="fc-preset-pills" id="fc-preset-pills">
-                        <button type="button" class="fc-preset-pill"                          data-preset="week">Next Week</button>
-                        <button type="button" class="fc-preset-pill fc-preset-pill-on"        data-preset="month">Next Month</button>
-                        <button type="button" class="fc-preset-pill"                          data-preset="3months">Next 3 Months</button>
-                        <button type="button" class="fc-preset-pill"                          data-preset="6months">Next 6 Months</button>
-                        <button type="button" class="fc-preset-pill"                          data-preset="year">Next Year</button>
-                    </div>
-
-                    <div class="fc-form-row">
-                        <div class="fc-form-group">
-                            <label class="fc-form-label" for="fc-from-date">From</label>
-                            <div class="fc-input-wrap">
-                                <input type="date" id="fc-from-date" class="fc-input">
-                            </div>
-                        </div>
-                        <div class="fc-form-group">
-                            <label class="fc-form-label" for="fc-to-date">To</label>
-                            <div class="fc-input-wrap">
-                                <input type="date" id="fc-to-date" class="fc-input">
-                            </div>
-                        </div>
-                    </div>
-                    <div id="fc-range-warning" class="fc-range-warning" style="display:none">
-                        Forecasting this far beyond your last sale date — seasonal patterns will be captured
-                        but exact unit numbers are less reliable. Use as directional guidance only.
-                    </div>
-                </div>
-
-                <div id="fc-input-error" class="fc-msg fc-msg-error" style="display:none"></div>
-
-                <button id="fc-run-btn" class="fc-primary-btn" onclick="runForecast()">
-                    Run Forecast
-                </button>
-
-            </div>
-        </div>
-
-        <!-- Loading panel -->
-        <div id="fc-loading-panel" style="display:none">
-            <div class="fc-loading-state">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="2" style="animation:spin 1s linear infinite">
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-                </svg>
-                Running Prophet model&hellip;
-            </div>
-        </div>
-
-    </div>
-</div>
 
 <?php require_once __DIR__ . '/../includes/confirm_modal.php'; ?>
 
-<!-- ════════════════════════════════════════════
-     BATCH CHART MODAL
-     Product tab strip + ChartModal.renderIn() area + Newsvendor footer.
-════════════════════════════════════════════ -->
-<div id="batch-chart-modal" class="fixed inset-0 z-[1100] flex items-center justify-center hidden"
-     role="dialog" aria-modal="true">
-
-    <div class="absolute inset-0" style="background:rgba(38,31,14,0.55)" onclick="BatchForecast.confirmCloseChartModal()"></div>
-
-    <div class="bcm-card">
-
-        <div class="bcm-header">
-            <div style="min-width:0">
-                <p class="bcm-eyebrow">Batch Forecast</p>
-                <h2 id="bcm-title" class="bcm-title">—</h2>
-            </div>
-            <button type="button" class="batch-modal-close-btn" onclick="BatchForecast.confirmCloseChartModal()" title="Close">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-            </button>
-        </div>
-
-        <!-- Product tab strip — one tab per successfully forecast product -->
-        <div id="bcm-tabs" class="bcm-tabs"></div>
-
-        <!-- Chart area: ChartModal.renderIn() target -->
-        <div id="bcm-chart-area" class="bcm-chart-area"></div>
-
-        <div class="bcm-footer">
-            <button type="button" class="batch-ghost-btn" onclick="BatchForecast.confirmCloseChartModal()">Close</button>
-            <div style="display:flex;gap:0.6rem;align-items:center">
-                <button type="button" class="batch-ghost-btn" id="bcm-save-all-btn"
-                        style="display:none" onclick="BatchForecast.openSaveModal()">Save Forecast</button>
-                <button type="button" class="batch-primary-btn" id="bcm-nv-btn"
-                        onclick="BatchForecast.openNvModal()">Generate Newsvendor →</button>
-            </div>
-        </div>
-
-    </div>
-</div>
-
-<!-- ════════════════════════════════════════════
-     BATCH NEWSVENDOR MODAL
-     Fast-generate Newsvendor for all forecast products.
-════════════════════════════════════════════ -->
-<div id="batch-nv-modal" class="fixed inset-0 z-[1200] flex items-center justify-center hidden"
-     role="dialog" aria-modal="true">
-
-    <div class="absolute inset-0" style="background:rgba(38,31,14,0.55)"></div>
-
-    <div class="bnv-card">
-
-        <div class="bnv-header">
-            <div style="min-width:0">
-                <p class="bnv-eyebrow">Newsvendor — Fast Generate</p>
-                <h2 class="bnv-title">Set prices &amp; stock, then generate restock for all</h2>
-            </div>
-            <button type="button" class="batch-modal-close-btn" onclick="BatchForecast.closeNvModal()" title="Close">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-            </button>
-        </div>
-
-        <div id="bnv-error" class="batch-run-error" style="display:none"></div>
-
-        <div id="bnv-body" class="bnv-body"></div>
-
-        <div class="bnv-footer">
-            <button type="button" class="batch-ghost-btn" onclick="BatchForecast.closeNvModal()">Close</button>
-            <button type="button" class="batch-primary-btn" id="bnv-gen-btn"
-                    onclick="BatchForecast.confirmRunNewsvendor()">Generate All →</button>
-        </div>
-
-    </div>
-</div>
-
-<!-- ════════════════════════════════════════════
-     BATCH SAVE MODAL — select which forecasts to save
-════════════════════════════════════════════ -->
-<div id="batch-save-modal" class="fixed inset-0 z-[1300] flex items-center justify-center hidden"
-     role="dialog" aria-modal="true">
-
-    <div class="absolute inset-0" style="background:rgba(38,31,14,0.55)" onclick="BatchForecast.closeSaveModal()"></div>
-
-    <div class="bsv-card">
-
-        <div class="bsv-header">
-            <div style="min-width:0">
-                <p class="bsv-eyebrow">Batch Forecast</p>
-                <h2 class="bsv-title">Save Forecasts</h2>
-            </div>
-            <button type="button" class="batch-modal-close-btn" onclick="BatchForecast.closeSaveModal()" title="Close">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-            </button>
-        </div>
-
-        <div id="bsv-error" class="batch-run-error" style="display:none"></div>
-
-        <div id="bsv-body" class="bsv-body"></div>
-
-        <div class="bsv-footer">
-            <button type="button" class="batch-ghost-btn" onclick="BatchForecast.closeSaveModal()">Cancel</button>
-            <button type="button" class="batch-primary-btn" id="bsv-save-btn"
-                    onclick="BatchForecast.confirmSaveSelected()">Save Selected →</button>
-        </div>
-
-    </div>
-</div>
-
 <script>
-const BATCH_BASE_URL = '<?php echo BASE_URL; ?>';
+const AUTO_BASE_URL = '<?php echo BASE_URL; ?>';
 </script>
-<script src="<?php echo BASE_URL; ?>/pages/js/batch_forecast.js?v=<?php echo filemtime(__DIR__ . '/js/batch_forecast.js'); ?>"></script>
+<script src="<?php echo BASE_URL; ?>/pages/js/autorun_forecast.js?v=<?php echo filemtime(__DIR__ . '/js/autorun_forecast.js'); ?>"></script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 </body>

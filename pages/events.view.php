@@ -111,8 +111,10 @@ require_once __DIR__ . '/../includes/header.php';
 
     </div>
 
-    <!-- ── Hidden pool: PHP renders all rows here; JS moves them into #events-list ── -->
-    <div id="event-rows-pool" class="event-rows-pool">
+    <!-- ── Hidden pool: PHP renders all rows here; JS moves them into #events-list ──
+         Inline display:none as well as the class so the raw rows are NEVER visible
+         even if events.css is slow/stale — prevents them showing alongside the list. -->
+    <div id="event-rows-pool" class="event-rows-pool" style="display:none">
         <?php foreach ($events as $ev): ?>
         <div class="event-row"
              id="event-row-<?php echo $ev['id']; ?>"
@@ -238,7 +240,7 @@ window.EVENTS_CONFIG = {
     baseUrl: <?php echo json_encode(BASE_URL); ?>,
 };
 </script>
-<script src="<?php echo BASE_URL; ?>/assets/page_js/events.js"></script>
+<script src="<?php echo BASE_URL; ?>/assets/page_js/events.js?v=<?php echo filemtime(__DIR__ . '/../assets/page_js/events.js'); ?>"></script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 </body>

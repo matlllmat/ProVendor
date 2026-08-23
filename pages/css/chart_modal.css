@@ -1427,3 +1427,120 @@
     transition: background 0.15s;
 }
 .cm-ghost-btn-lg:hover { background: rgba(38,31,14,0.06); }
+
+/* ── Stock refine (inline, under the restock stats) ── */
+.cm-refine {
+    margin: 0 1.5rem 1rem;
+    padding: 0.9rem 1rem 1rem;
+    background: rgba(38,31,14,0.03);
+    border: 1px solid #D2C8AE;
+    border-radius: 0.6rem;
+}
+.cm-refine-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #261F0E;
+    opacity: 0.5;
+    margin-bottom: 0.7rem;
+}
+.cm-refine-fields {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+.cm-refine-field { flex: 1; min-width: 8rem; }
+.cm-refine-label {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #261F0E;
+    opacity: 0.65;
+    margin-bottom: 0.35rem;
+}
+.cm-refine-field .cm-rs-input-wrap { width: 100%; }
+.cm-refine-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    flex-wrap: wrap;
+}
+.cm-refine-reset {
+    background: transparent;
+    border: none;
+    color: #261F0E;
+    opacity: 0.55;
+    font-family: 'Lora', serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+.cm-refine-reset:hover { opacity: 0.9; }
+
+/* Cost/price field state — green = from the imported data, orange = customized.
+   Classes are only added to the refine inputs, so the restock form is unaffected. */
+.cm-refine-status {
+    margin-top: 0.3rem;
+    font-size: 0.64rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+.cm-refine-status.is-original { color: #1A6933; }
+.cm-refine-status.is-custom   { color: #FF5722; }
+
+.cm-rs-input-wrap.is-original { border-color: rgba(26,105,51,0.55); }
+.cm-rs-input-wrap.is-custom   { border-color: rgba(255,87,34,0.55); }
+.cm-refine .cm-rs-input.is-original { color: #1A6933; }
+.cm-refine .cm-rs-input.is-custom   { color: #FF5722; }
+
+/* ══════════════════════════════════════════════════════════════════
+   DETAIL TABS (Restock / Why this forecast / Accuracy)
+   Collapsed by default so the chart stays clean. One panel opens at a
+   time; the panels keep their own existing card styling.
+══════════════════════════════════════════════════════════════════ */
+.cm-info {
+    border-top: 1px solid #D2C8AE;
+    padding-top: 1rem;
+    margin-top: 0.25rem;
+}
+
+.cm-info-tabs {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin: 0 1.5rem;
+}
+
+.cm-info-tab {
+    padding: 0.4rem 1rem;
+    font-family: 'Lora', serif;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #261F0E;
+    background: rgba(38,31,14,0.05);
+    border: 1px solid #D2C8AE;
+    border-radius: 999px;
+    cursor: pointer;
+    opacity: 0.65;
+    transition: background 0.15s, color 0.15s, opacity 0.15s;
+}
+.cm-info-tab:hover { opacity: 0.9; }
+.cm-info-tab.cm-info-tab-on {
+    background: #261F0E;
+    color: #F0E8D0;
+    border-color: #261F0E;
+    opacity: 1;
+}
+
+/* Uniform small gap above whichever panel is open (overrides each panel's
+   own top margin without touching its horizontal inset). */
+.cm-info .cm-info-panel { margin-top: 0.85rem; }
+
+/* The accuracy panel lost its inner collapsible wrapper (which held the
+   padding), so give the panel its own padding now that content is direct. */
+.cm-info .cm-metrics-panel { padding: 1.1rem 1.25rem 1.25rem; }

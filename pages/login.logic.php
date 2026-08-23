@@ -17,6 +17,15 @@ $error     = null;
 $success   = null;
 $activeTab = 'login'; // States: 'login', 'signup', 'forgot', 'verify', 'reset'
 
+// Submitted text-field values, preserved across a failed submit so the user
+// doesn't have to retype everything. Password fields are intentionally NOT
+// preserved — a failed attempt clears only the passwords, never the rest.
+$loginEmail      = '';
+$signupName      = '';
+$signupStoreName = '';
+$signupEmail     = '';
+$forgotEmail     = '';
+
 if (isset($_GET['reset']) && $_GET['reset'] === 'success') {
     $success = "Password successfully reset. Please log in.";
 }
@@ -37,6 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'login') {
         $email    = trim($_POST['email']    ?? '');
         $password = trim($_POST['password'] ?? '');
+        $loginEmail = $email; // keep the typed email if the login fails
 
         if ($email === '' || $password === '') {
             $error = 'Please fill in all fields.';
@@ -50,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Assumes userHasSales is defined in user.query.php
                 $hasSales = function_exists('userHasSales') ? userHasSales($pdo, $user['id']) : false;
                 
-                header('Location: ' . BASE_URL . ($hasSales ? '/pages/forecast.view.php' : '/pages/landing.view.php'));
+                header('Location: ' . BASE_URL . ($hasSales ? '/pages/dashboard.view.php' : '/pages/landing.view.php'));
                 exit;
             } else {
                 $error = 'Incorrect email or password.';
@@ -65,6 +75,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $email           = trim($_POST['email']            ?? '');
         $password        = trim($_POST['password']         ?? '');
         $confirmPassword = trim($_POST['confirm_password'] ?? '');
+
+        // Keep the typed details if signup fails — only the passwords clear.
+        $signupName      = $name;
+        $signupStoreName = $storeName;
+        $signupEmail     = $email;
 
         if ($name === '' || $storeName === '' || $email === '' || $password === '' || $confirmPassword === '') {
             $error = 'Please fill in all fields.';
@@ -93,6 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'send_code') {
         $activeTab = 'forgot';
         $email     = trim($_POST['email'] ?? '');
+        $forgotEmail = $email; // keep the typed email if no account matches
         $user      = getUserByEmail($pdo, $email);
 
         if ($user) {

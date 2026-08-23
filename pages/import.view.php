@@ -4,8 +4,9 @@
 
 require_once __DIR__ . '/import.logic.php';
 
-$pageTitle = 'ProVendor — My Store';
+$pageTitle = 'ProVendor — Settings';
 $pageCss   = 'import.css';
+$extraCss  = 'settings.css';   // Forecast Range tab styles (merged from the old Settings page)
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
@@ -18,16 +19,17 @@ require_once __DIR__ . '/../includes/header.php';
 
     <!-- Page heading -->
     <div class="mb-1">
-        <h1 class="text-2xl font-semibold text-[#261F0E] tracking-tight">My Store</h1>
+        <h1 class="text-2xl font-semibold text-[#261F0E] tracking-tight">Settings</h1>
         <p class="text-sm text-[#261F0E] mt-1" style="opacity:0.5">
-            Manage your sales data and account settings.
+            Manage your sales data, account, and forecasting.
         </p>
     </div>
 
     <!-- Tab bar -->
     <div class="tab-bar">
-        <button id="tab-btn-import"  class="tab-btn"        onclick="switchTab('import')">Sales Data</button>
-        <button id="tab-btn-profile" class="tab-btn active" onclick="switchTab('profile')">My Profile</button>
+        <button id="tab-btn-import"   class="tab-btn"        onclick="switchTab('import')">Sales Data</button>
+        <button id="tab-btn-profile"  class="tab-btn active" onclick="switchTab('profile')">My Profile</button>
+        <button id="tab-btn-forecast" class="tab-btn"        onclick="switchTab('forecast')">Forecast Range</button>
     </div>
 
 
@@ -390,12 +392,24 @@ require_once __DIR__ . '/../includes/header.php';
         <!-- ── Version history ── -->
         <div class="section-header">
             <span class="section-title">Version History</span>
-            <button onclick="openWizard()" class="upload-btn-primary">
-                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                </svg>
-                Update Sales Data
-            </button>
+            <div class="section-header-actions">
+                <?php if ((int) $summary['total_sales'] > 0): ?>
+                <a href="<?php echo BASE_URL; ?>/api/export_data.php" class="export-data-btn"
+                   title="Download all your current sales data as a CSV file">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Export CSV
+                </a>
+                <?php endif; ?>
+                <button onclick="openWizard()" class="upload-btn-primary">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                    Update Sales Data
+                </button>
+            </div>
         </div>
 
         <p class="versions-help">
@@ -443,6 +457,15 @@ require_once __DIR__ . '/../includes/header.php';
                             <span class="version-rows"><?php echo number_format($v['total_rows']); ?> records</span>
                             <span class="version-date"><?php echo date('M j, Y · g:i A', strtotime($v['created_at'])); ?></span>
                         </div>
+
+                        <a class="version-download-btn"
+                           href="<?php echo BASE_URL; ?>/api/export_version.php?version_id=<?php echo $v['id']; ?>"
+                           title="Download this version's data as CSV">
+                            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                        </a>
 
                         <button class="version-restore-btn"
                                 onclick="confirmRestoreVersion(<?php echo $v['id']; ?>, <?php echo htmlspecialchars(json_encode($v['label']), ENT_QUOTES); ?>)"
@@ -571,6 +594,42 @@ require_once __DIR__ . '/../includes/header.php';
 
     </div><!-- /tab-content-profile -->
 
+
+    <!-- ════════════════════════════════════════════
+         TAB: FORECAST RANGE  (merged from the old Settings page)
+    ════════════════════════════════════════════ -->
+    <div id="tab-content-forecast" class="hidden">
+
+        <div class="settings-card">
+            <div class="settings-card-head">
+                <p class="settings-eyebrow">Forecast</p>
+                <h2 class="settings-title">Forecast Range</h2>
+                <p class="settings-sub">
+                    How many days ahead ProVendor forecasts each product. Shorter ranges forecast
+                    more accurately. Changing this re-forecasts your whole catalogue for the new window.
+                    Individual products can still be given their own range on the Forecast page.
+                </p>
+            </div>
+
+            <div class="settings-field">
+                <label class="settings-label" for="horizon-input">Days to forecast</label>
+                <div class="settings-input-row">
+                    <div class="settings-input-wrap">
+                        <input type="number" id="horizon-input" class="settings-input" min="1" max="60"
+                               value="<?php echo (int) ($profile['forecast_horizon_days'] ?? 30); ?>">
+                        <span class="settings-input-affix">days</span>
+                    </div>
+                    <button type="button" id="settings-save-btn" class="settings-save-btn" onclick="saveHorizon()">
+                        Save &amp; Re-forecast
+                    </button>
+                </div>
+                <p class="settings-hint">Between 1 and 60 days. Default is 30.</p>
+                <div id="settings-msg" class="settings-msg" style="display:none"></div>
+            </div>
+        </div>
+
+    </div><!-- /tab-content-forecast -->
+
 </main>
 
 
@@ -580,25 +639,27 @@ require_once __DIR__ . '/../includes/header.php';
 <script>
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
+var TABS = ['import', 'profile', 'forecast'];
 function switchTab(name) {
-    document.getElementById('tab-btn-import') .classList.toggle('active', name === 'import');
-    document.getElementById('tab-btn-profile').classList.toggle('active', name === 'profile');
-    document.getElementById('tab-content-import') .classList.toggle('hidden', name !== 'import');
-    document.getElementById('tab-content-profile').classList.toggle('hidden', name !== 'profile');
-
+    TABS.forEach(function (t) {
+        document.getElementById('tab-btn-' + t)    .classList.toggle('active', name === t);
+        document.getElementById('tab-content-' + t).classList.toggle('hidden', name !== t);
+    });
     window.location.hash = name;
 }
 
 // Restore the active tab on load.
-// Default is My Profile. Switch to Sales Data if:
-//   - arriving from a successful import (?imported=1), or
-//   - the URL hash explicitly requests it (#import).
+// Default is My Profile. Switch away from it if:
+//   - arriving from a successful import (?imported=1) → Sales Data, or
+//   - the URL hash explicitly requests a tab (#import / #forecast / #profile).
 document.addEventListener('DOMContentLoaded', function() {
     var fromImport = window.location.search.indexOf('imported=1') !== -1;
-    var hashImport = window.location.hash === '#import';
+    var hash       = window.location.hash.replace('#', '');
 
-    if (fromImport || hashImport) {
+    if (fromImport || hash === 'import') {
         switchTab('import');
+    } else if (hash === 'forecast' || hash === 'profile') {
+        switchTab(hash);
     }
     wRestoreState();
 });
@@ -1613,7 +1674,10 @@ async function wDoImport(mapping, replace) {
 
         if (data.success) {
             wClearState();
-            window.location = '<?php echo BASE_URL; ?>/pages/import.view.php?imported=1&rows=' + data.rows + '&replaced=' + (data.replaced || 0) + '&skipped=' + (data.skipped || 0) + '&dropped=' + (data.dropped || 0) + '&csv_rows=' + (data.csv_rows || 0);
+            // A re-import is a dataset update — re-forecast the catalogue at the
+            // saved horizon before returning to My Store.
+            var redirect = '<?php echo BASE_URL; ?>/pages/import.view.php?imported=1&rows=' + data.rows + '&replaced=' + (data.replaced || 0) + '&skipped=' + (data.skipped || 0) + '&dropped=' + (data.dropped || 0) + '&csv_rows=' + (data.csv_rows || 0);
+            reforecastAfterImport(redirect);
         } else {
             showMappingError('Import failed: ' + (data.error || 'Unknown error.'));
             btn.innerHTML = IMPORT_BTN_HTML;
@@ -1631,6 +1695,33 @@ function showMappingError(msg) {
     el.textContent = msg;
     el.classList.remove('hidden');
     setTimeout(function() { el.classList.add('hidden'); }, 6000);
+}
+
+// Re-forecast every product at the saved horizon after a re-import, then redirect.
+// Best-effort — on any failure we still continue to My Store.
+async function reforecastAfterImport(redirectUrl) {
+    var overlay = document.getElementById('af-overlay');
+    var fill    = document.getElementById('af-progress-fill');
+    var label   = document.getElementById('af-progress-label');
+    if (overlay) overlay.classList.remove('hidden');
+
+    var products = [];
+    try {
+        products = ((await (await fetch('<?php echo BASE_URL; ?>/api/catalogue_products.php')).json()).products) || [];
+    } catch (e) { products = []; }
+
+    if (products.length) {
+        await AutoForecast.run(products, USER_HORIZON, LAST_SALE_DATE, {
+            onProgress: function (done, total, name) {
+                var pct = total > 0 ? Math.round((done / total) * 100) : 0;
+                if (fill)  fill.style.width  = pct + '%';
+                if (label) label.textContent = (name && done < total)
+                    ? 'Forecasting ' + name + '… (' + (done + 1) + ' / ' + total + ')'
+                    : done + ' / ' + total + ' products forecast';
+            },
+        });
+    }
+    window.location = redirectUrl;
 }
 
 function downloadSampleCsv(e) {
@@ -1722,7 +1813,100 @@ async function deleteVersion(versionId) {
     }
 }
 
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FORECAST RANGE TAB  (merged from the old Settings page)
+// Reuses the af-overlay + AutoForecast + AUTO_BASE_URL/LAST_SALE_DATE already on
+// this page for the after-import re-forecast.
+// ══════════════════════════════════════════════════════════════════════════════
+function _settingsMsg(type, text) {
+    var msg = document.getElementById('settings-msg');
+    msg.className = 'settings-msg settings-msg-' + type;
+    msg.textContent = text;
+    msg.style.display = '';
+}
+
+function saveHorizon() {
+    var days = parseInt(document.getElementById('horizon-input').value, 10);
+    if (isNaN(days) || days < 1 || days > 60) {
+        _settingsMsg('error', 'Enter a number of days between 1 and 60.');
+        return;
+    }
+
+    var btn = document.getElementById('settings-save-btn');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    var body = new FormData();
+    body.append('forecast_horizon_days', days);
+
+    fetch('<?php echo BASE_URL; ?>/api/update_settings.php', { method: 'POST', body: body })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.error) {
+                _settingsMsg('error', data.error);
+                btn.disabled = false; btn.textContent = 'Save & Re-forecast';
+                return;
+            }
+            reforecastCatalogue(days);
+        })
+        .catch(function () {
+            _settingsMsg('error', 'Network error. Please try again.');
+            btn.disabled = false; btn.textContent = 'Save & Re-forecast';
+        });
+}
+
+// After saving, re-forecast every product at the new horizon, then reload back
+// onto this tab (products with their own per-product override keep it).
+function reforecastCatalogue(days) {
+    var overlay = document.getElementById('af-overlay');
+    var fill    = document.getElementById('af-progress-fill');
+    var label   = document.getElementById('af-progress-label');
+    if (overlay) overlay.classList.remove('hidden');
+
+    fetch('<?php echo BASE_URL; ?>/api/catalogue_products.php')
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            var products = d.products || [];
+            if (!products.length) { window.location.hash = 'forecast'; window.location.reload(); return; }
+            AutoForecast.run(products, days, LAST_SALE_DATE, {
+                onProgress: function (done, total, name) {
+                    var pct = total > 0 ? Math.round((done / total) * 100) : 0;
+                    if (fill)  fill.style.width  = pct + '%';
+                    if (label) label.textContent = (name && done < total)
+                        ? 'Forecasting ' + name + '… (' + (done + 1) + ' / ' + total + ')'
+                        : done + ' / ' + total + ' products forecast';
+                },
+                onDone: function () { window.location.hash = 'forecast'; window.location.reload(); },
+            });
+        })
+        .catch(function () {
+            if (overlay) overlay.classList.add('hidden');
+            _settingsMsg('error', 'Saved, but the re-forecast could not start. Open the Forecast page to refresh.');
+        });
+}
 </script>
+
+<!-- Re-forecast progress overlay — shown after a re-import (dataset update) -->
+<div id="af-overlay" class="af-overlay hidden">
+    <div class="af-overlay-card">
+        <svg class="af-spinner" width="30" height="30" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+        </svg>
+        <h2 class="af-title">Updating your forecasts…</h2>
+        <p class="af-sub">Re-forecasting every product with your new data. This runs once.</p>
+        <div class="af-progress-track"><div id="af-progress-fill" class="af-progress-fill"></div></div>
+        <p id="af-progress-label" class="af-progress-label">Starting…</p>
+    </div>
+</div>
+
+<script>
+const AUTO_BASE_URL  = '<?php echo BASE_URL; ?>';
+const LAST_SALE_DATE = <?php echo json_encode($summary['date_to'] ?? null); ?>;
+const USER_HORIZON   = <?php echo (int) ($profile['forecast_horizon_days'] ?? 30); ?>;
+</script>
+<script src="<?php echo BASE_URL; ?>/pages/js/autorun_forecast.js?v=<?php echo filemtime(__DIR__ . '/js/autorun_forecast.js'); ?>"></script>
 
 <?php require_once __DIR__ . '/../includes/confirm_modal.php'; ?>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

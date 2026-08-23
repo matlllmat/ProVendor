@@ -40,10 +40,26 @@ function getUserById(PDO $pdo, int $userId): array|false
 function getUserProfile(PDO $pdo, int $userId): array|false
 {
     $stmt = $pdo->prepare(
-        'SELECT id, name, store_name, email FROM users WHERE id = ? LIMIT 1'
+        'SELECT id, name, store_name, email, forecast_horizon_days FROM users WHERE id = ? LIMIT 1'
     );
     $stmt->execute([$userId]);
     return $stmt->fetch();
+}
+
+// Returns the user's global forecast horizon in days (falls back to 30).
+function getForecastHorizon(PDO $pdo, int $userId): int
+{
+    $stmt = $pdo->prepare('SELECT forecast_horizon_days FROM users WHERE id = ? LIMIT 1');
+    $stmt->execute([$userId]);
+    $days = $stmt->fetchColumn();
+    return $days !== false ? (int) $days : 30;
+}
+
+// Sets the user's global forecast horizon. Caller clamps to the 1–60 range.
+function setForecastHorizon(PDO $pdo, int $userId, int $days): void
+{
+    $pdo->prepare('UPDATE users SET forecast_horizon_days = ? WHERE id = ?')
+        ->execute([$days, $userId]);
 }
 
 // Updates display name and store name.

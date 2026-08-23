@@ -28,7 +28,7 @@ if (file_exists(__DIR__ . '/config/db.php')) {
 }
 
 if ($hasSales) {
-    header('Location: ' . BASE_URL . '/pages/forecast.view.php');
+    header('Location: ' . BASE_URL . '/pages/dashboard.view.php');
 } else {
     header('Location: ' . BASE_URL . '/pages/landing.view.php');
 }
