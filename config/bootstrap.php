@@ -8,6 +8,15 @@ if (!defined('BASE_URL')) {
     define('BASE_URL', '/ProVendor');
 }
 
+// ── Feature flag: forecast-accuracy reporting ────────────────────────────────
+// Hides the Reports page (nav item + the page itself), the Dashboard's accuracy
+// KPI tile, and the per-product "Accuracy" tab on the forecast chart.
+// Temporarily off while the accuracy work is finished; flip to true to restore
+// all three at once — no other edits needed.
+if (!defined('SHOW_ACCURACY_FEATURES')) {
+    define('SHOW_ACCURACY_FEATURES', false);
+}
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }

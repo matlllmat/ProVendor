@@ -137,3 +137,67 @@ input::placeholder {
 }
 
 .toast-close:hover { opacity: 0.85; }
+
+/* ── Background forecast progress pill (includes/forecast_progress.php) ──────
+   Fixed bottom-right so the catalogue forecast can run while the owner uses
+   the rest of the app. Non-blocking by design — it never covers the nav. */
+.fj-pill {
+    position: fixed;
+    right: 1.25rem;
+    bottom: 1.25rem;
+    z-index: 60;
+    width: 310px;
+    max-width: calc(100vw - 2.5rem);
+    background: #F0E8D0;
+    border: 1px solid #D2C8AE;
+    border-radius: 0.85rem;
+    box-shadow: 0 8px 28px rgba(38,31,14,0.18);
+    overflow: hidden;
+    animation: fj-rise 0.25s ease-out;
+}
+@keyframes fj-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+.fj-pill-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.75rem 0.85rem;
+}
+
+.fj-spinner { color: #FF5722; flex-shrink: 0; margin-top: 0.1rem; animation: spin 1s linear infinite; }
+.fj-check   { color: #1A6933; flex-shrink: 0; margin-top: 0.1rem; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.fj-pill-text { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; flex: 1; }
+.fj-title { font-size: 0.8rem; font-weight: 600; color: #261F0E; }
+.fj-sub {
+    font-size: 0.68rem;
+    color: #261F0E;
+    opacity: 0.55;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fj-close {
+    border: none;
+    background: none;
+    color: #261F0E;
+    opacity: 0.35;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 0.15rem;
+    flex-shrink: 0;
+}
+.fj-close:hover { opacity: 0.8; }
+
+.fj-track { height: 3px; background: rgba(38,31,14,0.08); }
+.fj-fill {
+    height: 100%;
+    width: 0;
+    background: #FF5722;
+    transition: width 0.4s ease;
+}
+.fj-pill.fj-done   .fj-fill { background: #1A6933; }
+.fj-pill.fj-failed .fj-fill { background: #FF1A1A; }

@@ -148,3 +148,108 @@
 .af-progress-track { width: 100%; height: 8px; background: rgba(38,31,14,0.1); border-radius: 999px; overflow: hidden; }
 .af-progress-fill  { height: 100%; width: 0; background: #1A6933; border-radius: 999px; transition: width 0.25s ease; }
 .af-progress-label { font-family: 'Lora', serif; font-size: 0.75rem; font-weight: 600; color: #261F0E; opacity: 0.6; margin-top: 0.5rem; }
+
+/* ── Forecast Range tab (redesigned) ─────────────────────────────────────── */
+
+/* States the current setting up front, before any controls */
+.settings-current {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding: 0.7rem 0.9rem;
+    margin-bottom: 1.5rem;
+    background: rgba(26,105,51,0.07);
+    border-left: 3px solid #1A6933;
+    border-radius: 0.5rem;
+}
+.settings-current-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.55;
+}
+.settings-current-value { font-size: 0.9rem; font-weight: 700; color: #1A6933; }
+
+/* Quick-pick range presets */
+.settings-presets {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.9rem;
+}
+.settings-preset {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1rem;
+    min-width: 4.6rem;
+    padding: 0.5rem 0.75rem;
+    background: #F0E8D0;
+    border: 1px solid #D2C8AE;
+    border-radius: 0.7rem;
+    font-family: 'Lora', serif;
+    color: #261F0E;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, transform 0.12s;
+}
+.settings-preset:hover { border-color: rgba(38,31,14,0.45); transform: translateY(-1px); }
+.settings-preset.is-active {
+    background: #261F0E;
+    border-color: #261F0E;
+    color: #F0E8D0;
+}
+.settings-preset-days { font-size: 1rem; font-weight: 700; line-height: 1.1; }
+.settings-preset-lbl  { font-size: 0.62rem; opacity: 0.6; white-space: nowrap; }
+.settings-preset.is-active .settings-preset-lbl { opacity: 0.75; }
+
+/* Secondary card: re-forecast the catalogue */
+.settings-card-secondary { margin-top: 1.25rem; }
+
+.settings-run-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 0.85rem 0.9rem;
+    background: rgba(38,31,14,0.035);
+    border: 1px solid #D2C8AE;
+    border-radius: 0.7rem;
+}
+.settings-run-status { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.settings-run-label {
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.5;
+}
+.settings-run-value { font-size: 0.82rem; font-weight: 600; color: #261F0E; }
+
+.settings-reforecast-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.55rem 1.1rem;
+    background: #261F0E;
+    color: #F0E8D0;
+    border: none;
+    border-radius: 0.6rem;
+    font-family: 'Lora', serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 0.15s;
+}
+.settings-reforecast-btn:hover:not(:disabled) { opacity: 0.85; }
+.settings-reforecast-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.settings-run-note {
+    font-size: 0.7rem;
+    opacity: 0.5;
+    line-height: 1.5;
+    margin-top: 0.7rem;
+}

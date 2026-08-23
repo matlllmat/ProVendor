@@ -38,8 +38,10 @@ $_navClass = function(string $keyword) use ($_navFile): string {
                    class="<?php echo $_navClass('forecast'); ?>">Forecast</a>
                 <a href="<?php echo BASE_URL; ?>/pages/events.view.php"
                    class="<?php echo $_navClass('event'); ?>">Events</a>
+                <?php if (SHOW_ACCURACY_FEATURES): ?>
                 <a href="<?php echo BASE_URL; ?>/pages/reports.view.php"
                    class="<?php echo $_navClass('reports'); ?>">Reports</a>
+                <?php endif; ?>
                 <a href="<?php echo BASE_URL; ?>/pages/import.view.php"
                    class="<?php echo $_navClass('import'); ?>">Settings</a>
             </nav>
@@ -69,3 +71,9 @@ $_navClass = function(string $keyword) use ($_navFile): string {
         </div>
     </div>
 </header>
+
+<?php
+// Background catalogue-forecast progress. Lives with the navbar so it shows on
+// every signed-in page — the forecast keeps running while the owner browses.
+require_once __DIR__ . '/forecast_progress.php';
+?>

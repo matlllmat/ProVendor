@@ -28,14 +28,47 @@ require_once __DIR__ . '/../includes/header.php';
     <!-- ── Chart Card ─────────────────────────────────────────────────────── -->
     <div class="chart-card">
 
-        <div class="flex items-center justify-between mb-0">
-            <p class="chart-title" style="margin-bottom:0">Demand Analysis</p>
-            <div id="demand-chart-btns" class="fc-chart-btns"></div>
+        <!-- Card header. Left: the title, with the selected product named right
+             beside it so the two read as one heading instead of the chip floating
+             on its own line. Right: whichever contextual control the current mode
+             owns — the events/zoom buttons in aggregate mode, the per-product
+             forecast range in product mode. -->
+        <div class="chart-head">
+            <div class="chart-head-left">
+                <p class="chart-title" style="margin-bottom:0">Demand Analysis</p>
+
+                <div id="chart-selected-product" class="chart-selected-product" style="display:none">
+                    <span class="chart-selected-dot"></span>
+                    <span id="chart-selected-name" class="chart-selected-name"></span>
+                    <button class="chart-deselect-btn" onclick="deselectProduct()" title="Back to all products">
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                        Deselect
+                    </button>
+                </div>
+            </div>
+
+            <div class="chart-head-right">
+                <div id="demand-chart-btns" class="fc-chart-btns"></div>
+
+                <div id="product-range" class="product-range" style="display:none">
+                    <span class="product-range-label">Forecast range</span>
+                    <div class="product-range-input-wrap">
+                        <input type="number" id="product-range-input" class="product-range-input" min="1" max="60">
+                        <span class="product-range-affix">days</span>
+                    </div>
+                    <button type="button" id="product-range-apply" class="product-range-btn" onclick="applyProductRange()">Apply</button>
+                    <span id="product-range-note" class="product-range-note"></span>
+                </div>
+            </div>
         </div>
 
         <!-- Controls row: view switcher (Daily/Weekly/Monthly/Yearly) + the date
-             (year) filter inline. The selected-product chip replaces them when a
-             product is selected. Category filtering lives with the product list below. -->
+             (year) filter inline. Both are hidden in product mode, where the
+             inline forecast view renders its own controls. -->
         <div class="chart-filters-row">
             <div class="view-tabs">
                 <button type="button" class="view-tab active" data-view="daily">Daily</button>
@@ -46,19 +79,6 @@ require_once __DIR__ . '/../includes/header.php';
 
             <!-- Date filter — year pills; scrolls horizontally when there are many years -->
             <div class="year-selector" id="year-selector"></div>
-
-            <div id="chart-selected-product" class="chart-selected-product" style="display:none">
-                <span class="chart-selected-dot"></span>
-                <span id="chart-selected-name" class="chart-selected-name"></span>
-                <button class="chart-deselect-btn" onclick="deselectProduct()">
-                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                         stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18"/>
-                        <line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                    Deselect
-                </button>
-            </div>
         </div>
 
         <!-- Chart canvas -->
@@ -124,16 +144,8 @@ require_once __DIR__ . '/../includes/header.php';
             <p class="insights-quality" id="ins-quality"></p>
         </div>
 
-        <!-- Per-product forecast range override — shown in product mode only. -->
-        <div id="product-range" class="product-range" style="display:none">
-            <span class="product-range-label">Forecast range</span>
-            <div class="product-range-input-wrap">
-                <input type="number" id="product-range-input" class="product-range-input" min="1" max="60">
-                <span class="product-range-affix">days</span>
-            </div>
-            <button type="button" id="product-range-apply" class="product-range-btn" onclick="applyProductRange()">Apply</button>
-            <span id="product-range-note" class="product-range-note"></span>
-        </div>
+        <!-- (The per-product forecast range now lives in the card header above,
+             beside the selected-product chip.) -->
 
         <!-- Inline forecast view — ChartModal.renderIn() target. Shown when a
              single product with a saved forecast is selected; it replaces the
@@ -177,17 +189,25 @@ require_once __DIR__ . '/../includes/header.php';
                     </svg>
                 </div>
             </div>
-            <div class="view-toggle" role="group" aria-label="Product list view">
-                <button type="button" class="view-toggle-btn active" data-view="list"
-                        aria-pressed="true" title="List view" onclick="setProductView('list')">
-                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/></svg>
-                    List
-                </button>
-                <button type="button" class="view-toggle-btn" data-view="cards"
-                        aria-pressed="false" title="Card view" onclick="setProductView('cards')">
-                    <svg viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
-                    Cards
-                </button>
+            <div class="product-toolbar-right">
+                <select id="product-sort" class="product-sort-select" aria-label="Sort products">
+                    <option value="name">Sort: Name (A&ndash;Z)</option>
+                    <option value="demand">Sort: Forecast demand</option>
+                    <option value="order">Sort: Suggested order</option>
+                    <option value="category">Sort: Category</option>
+                </select>
+                <div class="view-toggle" role="group" aria-label="Product list view">
+                    <button type="button" class="view-toggle-btn active" data-view="list"
+                            aria-pressed="true" title="List view" onclick="setProductView('list')">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/></svg>
+                        List
+                    </button>
+                    <button type="button" class="view-toggle-btn" data-view="cards"
+                            aria-pressed="false" title="Card view" onclick="setProductView('cards')">
+                        <svg viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
+                        Cards
+                    </button>
+                </div>
             </div>
         </div>
         <?php endif; ?>
@@ -207,7 +227,9 @@ require_once __DIR__ . '/../includes/header.php';
                         data-cost-price="<?php echo $product['cost_price']    !== null ? htmlspecialchars((string) $product['cost_price'])    : ''; ?>"
                         data-selling-price="<?php echo $product['selling_price'] !== null ? htmlspecialchars((string) $product['selling_price']) : ''; ?>"
                         data-orig-cost-price="<?php echo $product['orig_cost_price']    !== null ? htmlspecialchars((string) $product['orig_cost_price'])    : ''; ?>"
-                        data-orig-selling-price="<?php echo $product['orig_selling_price'] !== null ? htmlspecialchars((string) $product['orig_selling_price']) : ''; ?>">
+                        data-orig-selling-price="<?php echo $product['orig_selling_price'] !== null ? htmlspecialchars((string) $product['orig_selling_price']) : ''; ?>"
+                        data-demand="<?php echo $fc ? (float) $fc['total_predicted'] : -1; ?>"
+                        data-order-qty="<?php echo $fc ? (int) $fc['restock_qty'] : -1; ?>">
 
                     <div class="product-row-info">
                         <span class="product-row-name"><?php echo htmlspecialchars($product['name']); ?></span>
@@ -300,6 +322,10 @@ const AUTO_PRODUCTS       = <?php echo json_encode(array_map(function ($p) {
         'horizon'   => $p['forecast_horizon_days'] !== null ? (int) $p['forecast_horizon_days'] : null,
     ];
 }, $catalogue)); ?>;
+
+// Accuracy reporting toggle (SHOW_ACCURACY_FEATURES in config/bootstrap.php).
+// chart_modal.js reads this to show/hide the per-product "Accuracy" tab.
+window.PV_SHOW_ACCURACY = <?php echo SHOW_ACCURACY_FEATURES ? 'true' : 'false'; ?>;
 </script>
 <script src="<?php echo BASE_URL; ?>/pages/js/chart.shared.js?v=<?php echo filemtime(__DIR__ . '/js/chart.shared.js'); ?>"></script>
 <script src="<?php echo BASE_URL; ?>/pages/js/chart_modal.js?v=<?php echo filemtime(__DIR__ . '/js/chart_modal.js'); ?>"></script>
@@ -509,6 +535,48 @@ if (categorySelect) {
         enterAggregateMode();
         loadSalesChart(activeCategory, null);
     });
+}
+
+// ── Product sort dropdown ───────────────────────────────────────────────────────
+// Reorders the .product-row buttons in place (DOM order), so it works the same
+// whether the list is showing as List or Cards. Rows without a saved forecast
+// carry data-demand/data-order-qty = -1, which naturally sinks them to the
+// bottom of the demand/order sorts.
+var productSort = document.getElementById('product-sort');
+if (productSort) {
+    productSort.addEventListener('change', applyProductSort);
+}
+
+// NaN-safe number read — plain `|| fallback` would also catch a legitimate 0
+// (e.g. an unpriced product's order qty), sinking it to "not forecast" rank.
+function _numOr(v, fallback) {
+    var n = parseFloat(v);
+    return isNaN(n) ? fallback : n;
+}
+
+function applyProductSort() {
+    var sel = document.getElementById('product-sort');
+    var list = document.querySelector('.product-list');
+    if (!sel || !list) return;
+
+    var key  = sel.value;
+    var rows = Array.prototype.slice.call(list.querySelectorAll('.product-row[data-product-id]'));
+
+    rows.sort(function (a, b) {
+        switch (key) {
+            case 'demand':
+                return _numOr(b.dataset.demand, -1) - _numOr(a.dataset.demand, -1);
+            case 'order':
+                return _numOr(b.dataset.orderQty, -1) - _numOr(a.dataset.orderQty, -1);
+            case 'category':
+                return (a.dataset.category || '').localeCompare(b.dataset.category || '')
+                    || a.dataset.productName.localeCompare(b.dataset.productName);
+            default: // name
+                return a.dataset.productName.localeCompare(b.dataset.productName);
+        }
+    });
+
+    rows.forEach(function (row) { list.appendChild(row); });
 }
 
 // ── View tabs (Daily / Weekly / Monthly / Yearly) ─────────────────────────────
@@ -1143,6 +1211,9 @@ function enterProductMode() {
     var btns = document.getElementById('demand-chart-btns'); if (btns) btns.style.display = 'none';
     var vt   = document.querySelector('.view-tabs');          if (vt)   vt.style.display   = 'none';
     var ys   = document.getElementById('year-selector');      if (ys)   ys.style.display   = 'none';
+    // Both of that row's controls are hidden here, so hide the row itself too —
+    // otherwise it leaves an empty gap between the header and the chart.
+    var fr   = document.querySelector('.chart-filters-row');  if (fr)   fr.style.display   = 'none';
     ['chart-loading', 'chart-error', 'demand-chart', 'product-insights'].forEach(function (id) {
         var el = document.getElementById(id); if (el) el.style.display = 'none';
     });
@@ -1157,6 +1228,7 @@ function enterAggregateMode() {
     var btns = document.getElementById('demand-chart-btns');  if (btns) btns.style.display = '';
     var vt   = document.querySelector('.view-tabs');           if (vt)   vt.style.display   = '';
     var ys   = document.getElementById('year-selector');       if (ys)   ys.style.display   = '';
+    var fr   = document.querySelector('.chart-filters-row');   if (fr)   fr.style.display   = '';
     // Product insights panel stays hidden — the inline forecast view has its own
     // reasoning; chart-loading / chart-error / demand-chart are managed by showChartState().
     var pi = document.getElementById('product-insights'); if (pi) pi.style.display = 'none';
@@ -1398,15 +1470,23 @@ function updateProductCard(productId, totalPredicted, restockQty) {
     const el = document.getElementById('prf-' + productId);
     if (!el) return;
 
-    const demand = Number(totalPredicted || 0).toLocaleString();
-    const order  = Number(restockQty     || 0);
+    const demandNum = Number(totalPredicted || 0);
+    const order      = Number(restockQty     || 0);
     const orderHtml = order > 0
         ? '<span class="prf-order">Order ' + order.toLocaleString() + '</span>'
         : '<span class="prf-no-order">No price set</span>';
 
     el.innerHTML =
-        '<span class="prf-demand">' + demand + ' <span class="prf-unit">units</span></span>' +
+        '<span class="prf-demand">' + demandNum.toLocaleString() + ' <span class="prf-unit">units</span></span>' +
         orderHtml;
+
+    // Keep the sort dataset in sync so "Forecast demand" / "Suggested order"
+    // sorting reflects a forecast that just completed (auto-run or restock refine).
+    const row = el.closest('.product-row');
+    if (row) {
+        row.dataset.demand   = demandNum;
+        row.dataset.orderQty = order;
+    }
 }
 window.updateProductCard = updateProductCard;
 

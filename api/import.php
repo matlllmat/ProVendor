@@ -188,11 +188,27 @@ try {
 
     if (empty($salesBatch) && empty($updateBatch)) {
         $pdo->rollBack();
+
+        // Say WHY nothing committed, and what to do about it. The common case is
+        // rows that already exist with a different quantity: those only apply when
+        // "Replace existing values" is on (or the row was edited by hand), so a
+        // bare "No changes to apply" left the owner with no way forward.
+        $message = $skippedDupes > 0
+            ? 'These ' . number_format($skippedDupes) . ' row' . ($skippedDupes === 1 ? '' : 's')
+              . ' already exist for the same product and date, with a different quantity. '
+              . 'Turn on “Replace existing values for un-edited conflicts” to overwrite them, '
+              . 'or edit just the rows you want to change.'
+            : 'This data is already in your store — there is nothing new to import.';
+
         echo json_encode([
-            'error'           => 'No changes to apply.',
+            'error'           => $message,
             'skipped'         => $skippedDupes,
             'dropped'         => $dropped,
             'dropped_samples' => $droppedSamples,
+            // Nothing committed because these rows are already stored, so this
+            // account HAS data. Onboarding uses this to offer a way into the app
+            // instead of leaving a new owner stranded on the upload screen.
+            'has_data'        => userHasSales($pdo, (int) $_SESSION['user_id']),
         ]);
         exit;
     }

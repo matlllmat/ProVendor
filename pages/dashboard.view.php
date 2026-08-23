@@ -72,11 +72,13 @@ $units = fn($v) => number_format((int) $v);
             <span class="db-kpi-value"><span id="kpi-need"><?php echo (int) $kpi['need_restock']; ?></span><span class="db-kpi-of">/<?php echo (int) $kpi['product_count']; ?></span></span>
             <span class="db-kpi-sub">products with an order</span>
         </div>
+        <?php if (SHOW_ACCURACY_FEATURES): ?>
         <div class="db-kpi">
             <span class="db-kpi-label">Accuracy</span>
             <span class="db-kpi-value"><?php echo $accuracy['weighted_accuracy_pct'] !== null ? number_format($accuracy['weighted_accuracy_pct'], 1) . '%' : '—'; ?></span>
             <span class="db-kpi-sub"><?php echo (int) $accuracy['evaluated_count']; ?>/<?php echo (int) $accuracy['total_count']; ?> evaluated</span>
         </div>
+        <?php endif; ?>
     </section>
 
     <?php if (!$hasForecasts): ?>
@@ -102,10 +104,17 @@ $units = fn($v) => number_format((int) $v);
                     <option value="30">Next 30 days</option>
                     <option value="custom">Custom range…</option>
                 </select>
+                <?php
+                // Hard-bound the pickers to the dates the forecast actually covers,
+                // so a range outside the forecast window can't be chosen at all.
+                $rangeBounds = ($forecastFrom && $forecastTo)
+                    ? ' min="' . htmlspecialchars($forecastFrom) . '" max="' . htmlspecialchars($forecastTo) . '"'
+                    : '';
+                ?>
                 <span id="db-range" class="db-range" style="display:none">
-                    <input type="date" id="db-from" class="db-date" aria-label="From date">
+                    <input type="date" id="db-from" class="db-date" aria-label="From date"<?php echo $rangeBounds; ?>>
                     <span class="db-range-sep">→</span>
-                    <input type="date" id="db-to" class="db-date" aria-label="To date">
+                    <input type="date" id="db-to" class="db-date" aria-label="To date"<?php echo $rangeBounds; ?>>
                 </span>
                 <select id="db-cat" class="db-select" aria-label="Filter by category">
                     <option value="">All categories</option>
@@ -384,6 +393,39 @@ function goToProduct(id) {
     function isoLocal(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
     function setText(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
 
+    // ── Custom-range guards ──────────────────────────────────────────────────
+    // Two rules, enforced together:
+    //   1. Both dates must sit inside the forecast's own window (FC_BOUNDS) —
+    //      there is no forecast data outside it, so a wider range is meaningless.
+    //   2. "From" must never be after "To".
+    // The min/max attributes already grey out invalid days in the picker, but a
+    // typed or pasted value can still land out of range, so we clamp here too.
+    function clampToBounds(v) {
+        if (!v) return v;
+        if (FC_BOUNDS.from && v < FC_BOUNDS.from) return FC_BOUNDS.from;
+        if (FC_BOUNDS.to   && v > FC_BOUNDS.to)   return FC_BOUNDS.to;
+        return v;
+    }
+
+    // `changed` is whichever input the user just edited — the OTHER one gives way,
+    // so their edit is always respected rather than silently reverted.
+    function enforceRange(changed) {
+        fromInp.value = clampToBounds(fromInp.value);
+        toInp.value   = clampToBounds(toInp.value);
+
+        if (fromInp.value && toInp.value && fromInp.value > toInp.value) {
+            if (changed === 'to') fromInp.value = toInp.value;
+            else                  toInp.value   = fromInp.value;
+        }
+
+        // Narrow each picker's own limits so the crossed-over range can't even be
+        // selected next time: "to" can't go before "from", and vice versa.
+        if (FC_BOUNDS.from) fromInp.min = FC_BOUNDS.from;
+        if (FC_BOUNDS.to)   toInp.max   = FC_BOUNDS.to;
+        toInp.min   = fromInp.value || FC_BOUNDS.from || '';
+        fromInp.max = toInp.value   || FC_BOUNDS.to   || '';
+    }
+
     // [fromStr, toStr] for the window, or null for the whole forecast.
     function windowRange(mode) {
         if (mode === 'full') return null;
@@ -479,9 +521,16 @@ function goToProduct(id) {
     if (winSel) {
         if (FC_BOUNDS.from) fromInp.value = FC_BOUNDS.from;
         if (FC_BOUNDS.to)   toInp.value   = FC_BOUNDS.to;
+        enforceRange();   // seed each picker's min/max from the starting values
         winSel.addEventListener('change', applyWindow);
-        fromInp.addEventListener('change', function () { if (winSel.value === 'custom') applyWindow(); });
-        toInp.addEventListener('change',   function () { if (winSel.value === 'custom') applyWindow(); });
+        fromInp.addEventListener('change', function () {
+            enforceRange('from');
+            if (winSel.value === 'custom') applyWindow();
+        });
+        toInp.addEventListener('change', function () {
+            enforceRange('to');
+            if (winSel.value === 'custom') applyWindow();
+        });
     }
 
     // Keyboard: Enter on a focused row opens the product.

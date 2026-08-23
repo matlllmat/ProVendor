@@ -9,6 +9,14 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// Accuracy reporting is hidden (see SHOW_ACCURACY_FEATURES in config/bootstrap.php).
+// Guard the page itself, not just the nav link, so a stale tab or typed URL can't
+// reach it either.
+if (!SHOW_ACCURACY_FEATURES) {
+    header('Location: ' . BASE_URL . '/pages/dashboard.view.php');
+    exit;
+}
+
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../queries/forecast.query.php';
 require_once __DIR__ . '/../queries/user.query.php';

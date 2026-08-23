@@ -209,3 +209,25 @@ CREATE TABLE IF NOT EXISTS `user_hidden_events` (
     CONSTRAINT `fk_uhe_user`  FOREIGN KEY (`user_id`)  REFERENCES `users` (`id`)           ON DELETE CASCADE,
     CONSTRAINT `fk_uhe_event` FOREIGN KEY (`event_id`) REFERENCES `seasonal_events` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+-- ── Background forecast jobs ──────────────────────────────────────────────────
+-- Forecasting the whole catalogue can take minutes (or much longer for hundreds
+-- of products), so it runs in a detached CLI worker (cli/forecast_worker.php)
+-- instead of blocking the browser. This table is the job's state + progress,
+-- polled by the floating progress pill (includes/forecast_progress.php).
+CREATE TABLE IF NOT EXISTS `forecast_jobs` (
+    `id`              INT           NOT NULL AUTO_INCREMENT,
+    `user_id`         INT           NOT NULL,
+    `status`          ENUM('queued','running','done','failed') NOT NULL DEFAULT 'queued',
+    `horizon_days`    INT           NOT NULL DEFAULT 30,
+    `total`           INT           NOT NULL DEFAULT 0,
+    `done`            INT           NOT NULL DEFAULT 0,
+    `failed`          INT           NOT NULL DEFAULT 0,
+    `current_product` VARCHAR(150)  DEFAULT NULL,
+    `error`           TEXT          DEFAULT NULL,
+    `created_at`      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `finished_at`     TIMESTAMP     NULL DEFAULT NULL,
+    PRIMARY KEY (`id`),
+    KEY `idx_fj_user_status` (`user_id`, `status`),
+    CONSTRAINT `fk_fj_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

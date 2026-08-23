@@ -2,3 +2,6 @@ notes/
 uploads/*
 !uploads/.gitkeep
 python/pract.py
+
+# Background forecast worker log (runtime artifact)
+cli/worker.log

@@ -699,7 +699,7 @@ function renderPreviewCard(data) {
     html += filterChip('noop',    'Unchanged');
     html += '</div>';
     html += '<label class="preview-replace-label">';
-    html += '<input type="checkbox" id="replace-overlap" class="preview-replace-check">';
+    html += '<input type="checkbox" id="replace-overlap" class="preview-replace-check" onchange="refreshSummary()">';
     html += '<span>Replace existing values for un-edited conflicts</span>';
     html += '</label>';
     html += '</div>';
@@ -1023,9 +1023,17 @@ function refreshSummary() {
 
     var s   = computePreviewCounts(previewRows);
     var btn = document.getElementById('import-btn');
-    var willCommit = s.new + s.overlap + s.edited;
+
+    // Un-edited "overlap" rows (same product+date, different quantity) only commit
+    // when Replace is on — so they mustn't count toward an enabled button, or the
+    // owner clicks an import that provably applies nothing.
+    var replaceOn  = !!(document.getElementById('replace-overlap') || { checked: false }).checked;
+    var willCommit = s.new + s.edited + (replaceOn ? s.overlap : 0);
+
     if (willCommit === 0) {
-        btn.innerHTML     = 'No changes to apply';
+        btn.innerHTML     = (s.overlap > 0 && !replaceOn)
+            ? 'Turn on “Replace existing” to apply'
+            : 'No changes to apply';
         btn.disabled      = true;
         btn.style.opacity = '0.55';
     } else {
@@ -1069,6 +1077,12 @@ async function doImport(mapping, replace) {
             // catalogue before the Forecast page loads. The redirect happens
             // inside startPostImportForecast() once forecasting finishes.
             showHorizonChoice();
+        } else if (data.has_data) {
+            // Nothing to commit because this data is already stored. The account
+            // is set up, so move on to the forecast step rather than dead-ending
+            // an owner who can't otherwise get past onboarding.
+            showMappingError(data.error + ' Your data is already set up — continuing.');
+            setTimeout(showHorizonChoice, 1800);
         } else {
             showMappingError('Import failed: ' + (data.error || 'Unknown error.'));
             btn.innerHTML = IMPORT_BTN_HTML;
@@ -1089,45 +1103,39 @@ function showHorizonChoice() {
     document.getElementById('af-overlay').classList.remove('hidden');
 }
 
-// Step 2: save the chosen horizon, forecast every product for it (progress
-// overlay), then go to the Forecast page. Best-effort — if the product list or a
-// product fails, we still continue (the user can re-forecast in Settings).
+// Step 2: save the chosen horizon and hand the catalogue forecast to the
+// BACKGROUND worker, then go straight into the app. The owner never waits behind
+// this — with hundreds of products the run can take a long while, so it continues
+// server-side and the floating progress pill reports it from whatever page
+// they're on.
 async function startPostImportForecast() {
     var days = parseInt(document.getElementById('af-horizon-input').value, 10);
     if (isNaN(days) || days < 1 || days > 60) days = 30;
 
-    // Save the horizon as the user's global setting.
+    var btn = document.querySelector('.af-choose-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Starting…'; }
+
     try {
-        var sbody = new FormData();
-        sbody.append('forecast_horizon_days', days);
-        await fetch('<?php echo BASE_URL; ?>/api/update_settings.php', { method: 'POST', body: sbody });
-    } catch (e) {}
+        var body = new FormData();
+        body.append('horizon_days', days);   // start_forecast_job saves it as the global horizon
+        var res  = await fetch('<?php echo BASE_URL; ?>/api/start_forecast_job.php', { method: 'POST', body: body });
+        var data = await res.json();
 
-    document.getElementById('af-choose').style.display   = 'none';
-    document.getElementById('af-progress').style.display = '';
-
-    var fill  = document.getElementById('af-progress-fill');
-    var label = document.getElementById('af-progress-label');
-
-    var products = [];
-    try {
-        var r = await fetch('<?php echo BASE_URL; ?>/api/catalogue_products.php');
-        products = (await r.json()).products || [];
-    } catch (e) { products = []; }
-
-    if (products.length) {
-        await AutoForecast.run(products, days, null, {
-            onProgress: function (done, total, name) {
-                var pct = total > 0 ? Math.round((done / total) * 100) : 0;
-                if (fill)  fill.style.width  = pct + '%';
-                if (label) label.textContent = (name && done < total)
-                    ? 'Forecasting ' + name + '… (' + (done + 1) + ' / ' + total + ')'
-                    : done + ' / ' + total + ' products forecast';
-            },
-        });
+        if (data.error) {
+            if (btn) { btn.disabled = false; btn.textContent = 'Start forecasting →'; }
+            var errEl = document.getElementById('af-start-error');
+            if (errEl) { errEl.textContent = data.error; errEl.style.display = ''; }
+            return;
+        }
+    } catch (e) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Start forecasting →'; }
+        var errEl2 = document.getElementById('af-start-error');
+        if (errEl2) { errEl2.textContent = 'Could not start forecasting. Please try again.'; errEl2.style.display = ''; }
+        return;
     }
 
-    window.location = '<?php echo BASE_URL; ?>/pages/forecast.view.php';
+    // Into the app immediately — the pill picks the job up on the next page.
+    window.location = '<?php echo BASE_URL; ?>/pages/dashboard.view.php';
 }
 
 function showMappingError(msg) {
@@ -1157,27 +1165,14 @@ function showMappingError(msg) {
             <span>days ahead</span>
         </div>
         <p class="af-choose-hint">Between 1 and 60 days</p>
+        <p class="af-choose-note">
+            Forecasting runs in the background — you can start using ProVendor right away
+            and watch the progress from any page.
+        </p>
+        <div id="af-start-error" class="af-start-error" style="display:none"></div>
         <button type="button" class="af-choose-btn" onclick="startPostImportForecast()">Start forecasting →</button>
     </div>
-
-    <!-- Step 2 — forecasting progress -->
-    <div id="af-progress" class="af-overlay-card" style="display:none">
-        <svg class="af-spinner" width="30" height="30" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-        </svg>
-        <h2 class="af-title">Forecasting your products…</h2>
-        <p class="af-sub">
-            Projecting demand and a restock quantity for every product.
-            This runs once — your forecasts will be ready in a moment.
-        </p>
-        <div class="af-progress-track"><div id="af-progress-fill" class="af-progress-fill"></div></div>
-        <p id="af-progress-label" class="af-progress-label">Starting…</p>
-    </div>
 </div>
-
-<script>const AUTO_BASE_URL = '<?php echo BASE_URL; ?>';</script>
-<script src="<?php echo BASE_URL; ?>/pages/js/autorun_forecast.js?v=<?php echo filemtime(__DIR__ . '/js/autorun_forecast.js'); ?>"></script>
 
 <?php require_once __DIR__ . '/../includes/confirm_modal.php'; ?>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

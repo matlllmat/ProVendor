@@ -600,32 +600,104 @@ require_once __DIR__ . '/../includes/header.php';
     ════════════════════════════════════════════ -->
     <div id="tab-content-forecast" class="hidden">
 
+        <?php
+        $curHorizon = (int) ($profile['forecast_horizon_days'] ?? 30);
+        $jobRunning = $lastJob && in_array($lastJob['status'], ['queued', 'running'], true);
+        ?>
+
+        <!-- ── Forecast range ──────────────────────────────────────────────── -->
         <div class="settings-card">
             <div class="settings-card-head">
                 <p class="settings-eyebrow">Forecast</p>
                 <h2 class="settings-title">Forecast Range</h2>
                 <p class="settings-sub">
-                    How many days ahead ProVendor forecasts each product. Shorter ranges forecast
-                    more accurately. Changing this re-forecasts your whole catalogue for the new window.
-                    Individual products can still be given their own range on the Forecast page.
+                    How many days ahead ProVendor projects demand for each product. Shorter ranges
+                    are more accurate; longer ranges plan further out. Individual products can still
+                    be given their own range on the Forecast page.
                 </p>
+            </div>
+
+            <!-- Current state, stated plainly before any controls -->
+            <div class="settings-current">
+                <span class="settings-current-label">Currently forecasting</span>
+                <span class="settings-current-value" id="settings-current-days"><?php echo $curHorizon; ?> days ahead</span>
             </div>
 
             <div class="settings-field">
                 <label class="settings-label" for="horizon-input">Days to forecast</label>
+
+                <!-- Quick presets — most owners want one of these, not a spinner -->
+                <div class="settings-presets" role="group" aria-label="Quick ranges">
+                    <?php foreach ([7 => '1 week', 14 => '2 weeks', 30 => '1 month', 60 => '2 months'] as $d => $lbl): ?>
+                    <button type="button" class="settings-preset<?php echo $curHorizon === $d ? ' is-active' : ''; ?>"
+                            data-days="<?php echo $d; ?>" onclick="pickHorizon(<?php echo $d; ?>)">
+                        <span class="settings-preset-days"><?php echo $d; ?></span>
+                        <span class="settings-preset-lbl"><?php echo $lbl; ?></span>
+                    </button>
+                    <?php endforeach; ?>
+                </div>
+
                 <div class="settings-input-row">
                     <div class="settings-input-wrap">
                         <input type="number" id="horizon-input" class="settings-input" min="1" max="60"
-                               value="<?php echo (int) ($profile['forecast_horizon_days'] ?? 30); ?>">
+                               value="<?php echo $curHorizon; ?>" oninput="syncHorizonPresets()">
                         <span class="settings-input-affix">days</span>
                     </div>
                     <button type="button" id="settings-save-btn" class="settings-save-btn" onclick="saveHorizon()">
-                        Save &amp; Re-forecast
+                        Save &amp; re-forecast
                     </button>
                 </div>
-                <p class="settings-hint">Between 1 and 60 days. Default is 30.</p>
+                <p class="settings-hint">Any value from 1 to 60 days. Default is 30.</p>
                 <div id="settings-msg" class="settings-msg" style="display:none"></div>
             </div>
+        </div>
+
+        <!-- ── Re-forecast the catalogue ───────────────────────────────────── -->
+        <div class="settings-card settings-card-secondary">
+            <div class="settings-card-head">
+                <p class="settings-eyebrow">Maintenance</p>
+                <h2 class="settings-title">Re-forecast All Products</h2>
+                <p class="settings-sub">
+                    Forecasts are frozen once generated — they refresh when you import new data or
+                    change the range above. Run this to rebuild every product's forecast now, for
+                    example after editing prices or events.
+                </p>
+            </div>
+
+            <div class="settings-run-row">
+                <div class="settings-run-status">
+                    <span class="settings-run-label">Last catalogue run</span>
+                    <span class="settings-run-value" id="settings-last-run">
+                        <?php
+                        if (!$lastJob) {
+                            echo 'Never run';
+                        } elseif ($jobRunning) {
+                            echo 'Running now — ' . (int) $lastJob['done'] . ' of ' . (int) $lastJob['total'] . ' done';
+                        } elseif ($lastJob['status'] === 'failed') {
+                            echo 'Stopped before finishing';
+                        } else {
+                            $ok = (int) $lastJob['total'] - (int) $lastJob['failed'];
+                            echo $ok . ' of ' . (int) $lastJob['total'] . ' products · '
+                               . date('M j, Y g:i A', strtotime($lastJob['finished_at'] ?? $lastJob['updated_at']));
+                        }
+                        ?>
+                    </span>
+                </div>
+                <button type="button" id="reforecast-btn" class="settings-reforecast-btn"
+                        onclick="confirmReforecastAll()"<?php echo $jobRunning ? ' disabled' : ''; ?>>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56"/><polyline points="21 3 21 9 15 9"/>
+                    </svg>
+                    <?php echo $jobRunning ? 'Run in progress…' : 'Re-forecast all products'; ?>
+                </button>
+            </div>
+
+            <p class="settings-run-note">
+                Runs in the background — you can keep using ProVendor while it works, and follow
+                progress from the indicator in the corner.
+            </p>
+            <div id="reforecast-msg" class="settings-msg" style="display:none"></div>
         </div>
 
     </div><!-- /tab-content-forecast -->
@@ -1280,7 +1352,7 @@ function wRenderPreviewCard(data) {
     html += wFilterChip('noop',    'Unchanged');
     html += '</div>';
     html += '<label class="preview-replace-label">';
-    html += '<input type="checkbox" id="w-replace-overlap" class="preview-replace-check">';
+    html += '<input type="checkbox" id="w-replace-overlap" class="preview-replace-check" onchange="wRefreshSummary()">';
     html += '<span>Replace existing values for un-edited conflicts</span>';
     html += '</label>';
     html += '</div>';
@@ -1628,9 +1700,17 @@ function wRefreshSummary() {
     // Apply button gets toggled too based on whether anything would actually commit.
     var s   = computePreviewCounts(wPreviewRows);
     var btn = document.getElementById('w-import-btn');
-    var willCommit = s.new + s.overlap + s.edited; // rough upper bound
+
+    // Un-edited "overlap" rows (same product+date, different quantity) only commit
+    // when Replace is on — so they mustn't count toward an enabled button, or the
+    // owner clicks an import that provably applies nothing.
+    var replaceOn  = !!(document.getElementById('w-replace-overlap') || { checked: false }).checked;
+    var willCommit = s.new + s.edited + (replaceOn ? s.overlap : 0);
+
     if (willCommit === 0) {
-        btn.innerHTML     = 'No changes to apply';
+        btn.innerHTML     = (s.overlap > 0 && !replaceOn)
+            ? 'Turn on “Replace existing” to apply'
+            : 'No changes to apply';
         btn.disabled      = true;
         btn.style.opacity = '0.55';
     } else {
@@ -1697,30 +1777,17 @@ function showMappingError(msg) {
     setTimeout(function() { el.classList.add('hidden'); }, 6000);
 }
 
-// Re-forecast every product at the saved horizon after a re-import, then redirect.
-// Best-effort — on any failure we still continue to My Store.
+// A re-import is a dataset update, so the catalogue needs re-forecasting — but
+// that's handed to the BACKGROUND worker and we redirect straight away. The
+// progress pill reports it from wherever the owner goes next.
+// Best-effort: if the job can't be started we still continue to My Store.
 async function reforecastAfterImport(redirectUrl) {
-    var overlay = document.getElementById('af-overlay');
-    var fill    = document.getElementById('af-progress-fill');
-    var label   = document.getElementById('af-progress-label');
-    if (overlay) overlay.classList.remove('hidden');
-
-    var products = [];
     try {
-        products = ((await (await fetch('<?php echo BASE_URL; ?>/api/catalogue_products.php')).json()).products) || [];
-    } catch (e) { products = []; }
-
-    if (products.length) {
-        await AutoForecast.run(products, USER_HORIZON, LAST_SALE_DATE, {
-            onProgress: function (done, total, name) {
-                var pct = total > 0 ? Math.round((done / total) * 100) : 0;
-                if (fill)  fill.style.width  = pct + '%';
-                if (label) label.textContent = (name && done < total)
-                    ? 'Forecasting ' + name + '… (' + (done + 1) + ' / ' + total + ')'
-                    : done + ' / ' + total + ' products forecast';
-            },
+        await fetch('<?php echo BASE_URL; ?>/api/start_forecast_job.php', {
+            method: 'POST',
+            body:   new FormData(),
         });
-    }
+    } catch (e) { /* the owner can re-run it from Settings */ }
     window.location = redirectUrl;
 }
 
@@ -1816,8 +1883,8 @@ async function deleteVersion(versionId) {
 
 // ══════════════════════════════════════════════════════════════════════════════
 // FORECAST RANGE TAB  (merged from the old Settings page)
-// Reuses the af-overlay + AutoForecast + AUTO_BASE_URL/LAST_SALE_DATE already on
-// this page for the after-import re-forecast.
+// Both actions here hand the work to the background worker via
+// api/start_forecast_job.php — the floating pill reports progress.
 // ══════════════════════════════════════════════════════════════════════════════
 function _settingsMsg(type, text) {
     var msg = document.getElementById('settings-msg');
@@ -1826,6 +1893,22 @@ function _settingsMsg(type, text) {
     msg.style.display = '';
 }
 
+// Quick-pick preset → fills the number input.
+function pickHorizon(days) {
+    var inp = document.getElementById('horizon-input');
+    if (inp) inp.value = days;
+    syncHorizonPresets();
+}
+
+// Highlights whichever preset matches the current value (none, if it's custom).
+function syncHorizonPresets() {
+    var val = parseInt((document.getElementById('horizon-input') || {}).value, 10);
+    document.querySelectorAll('.settings-preset').forEach(function (b) {
+        b.classList.toggle('is-active', parseInt(b.dataset.days, 10) === val);
+    });
+}
+
+// Save the range, then hand the catalogue re-forecast to the background worker.
 function saveHorizon() {
     var days = parseInt(document.getElementById('horizon-input').value, 10);
     if (isNaN(days) || days < 1 || days > 60) {
@@ -1838,75 +1921,75 @@ function saveHorizon() {
     btn.textContent = 'Saving…';
 
     var body = new FormData();
-    body.append('forecast_horizon_days', days);
+    body.append('horizon_days', days);   // start_forecast_job saves the horizon too
 
-    fetch('<?php echo BASE_URL; ?>/api/update_settings.php', { method: 'POST', body: body })
+    fetch('<?php echo BASE_URL; ?>/api/start_forecast_job.php', { method: 'POST', body: body })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            btn.disabled = false;
+            btn.textContent = 'Save & re-forecast';
+            if (data.error) { _settingsMsg('error', data.error); return; }
+
+            var cur = document.getElementById('settings-current-days');
+            if (cur) cur.textContent = days + ' days ahead';
+
+            _settingsMsg('success', data.already
+                ? 'Range saved. A forecast run is already in progress.'
+                : 'Range saved. Re-forecasting ' + (data.total || '') + ' products in the background — you can keep working.');
+            if (window.pvWatchForecastJob) window.pvWatchForecastJob();
+        })
+        .catch(function () {
+            btn.disabled = false;
+            btn.textContent = 'Save & re-forecast';
+            _settingsMsg('error', 'Network error. Please try again.');
+        });
+}
+
+// ── Re-forecast all products ────────────────────────────────────────────────
+function confirmReforecastAll() {
+    showConfirm({
+        title:        'Re-forecast every product?',
+        message:      'ProVendor will rebuild the demand forecast and restock recommendation for every product in your catalogue, replacing the current ones. This runs in the background, so you can keep using the app while it works.',
+        confirmText:  'Re-forecast all',
+        confirmStyle: 'primary',
+        onConfirm:    doReforecastAll,
+    });
+}
+
+function doReforecastAll() {
+    var btn = document.getElementById('reforecast-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Starting…'; }
+
+    fetch('<?php echo BASE_URL; ?>/api/start_forecast_job.php', { method: 'POST', body: new FormData() })
         .then(function (r) { return r.json(); })
         .then(function (data) {
             if (data.error) {
-                _settingsMsg('error', data.error);
-                btn.disabled = false; btn.textContent = 'Save & Re-forecast';
+                if (btn) { btn.disabled = false; btn.textContent = 'Re-forecast all products'; }
+                _msg('reforecast-msg', 'error', data.error);
                 return;
             }
-            reforecastCatalogue(days);
+            if (btn) btn.textContent = 'Run in progress…';
+            var last = document.getElementById('settings-last-run');
+            if (last) last.textContent = 'Running now — 0 of ' + (data.total || 0) + ' done';
+            _msg('reforecast-msg', 'success', data.already
+                ? 'A forecast run is already in progress.'
+                : 'Re-forecasting ' + data.total + ' products in the background.');
+            if (window.pvWatchForecastJob) window.pvWatchForecastJob();
         })
         .catch(function () {
-            _settingsMsg('error', 'Network error. Please try again.');
-            btn.disabled = false; btn.textContent = 'Save & Re-forecast';
+            if (btn) { btn.disabled = false; btn.textContent = 'Re-forecast all products'; }
+            _msg('reforecast-msg', 'error', 'Network error. Please try again.');
         });
 }
 
-// After saving, re-forecast every product at the new horizon, then reload back
-// onto this tab (products with their own per-product override keep it).
-function reforecastCatalogue(days) {
-    var overlay = document.getElementById('af-overlay');
-    var fill    = document.getElementById('af-progress-fill');
-    var label   = document.getElementById('af-progress-label');
-    if (overlay) overlay.classList.remove('hidden');
-
-    fetch('<?php echo BASE_URL; ?>/api/catalogue_products.php')
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
-            var products = d.products || [];
-            if (!products.length) { window.location.hash = 'forecast'; window.location.reload(); return; }
-            AutoForecast.run(products, days, LAST_SALE_DATE, {
-                onProgress: function (done, total, name) {
-                    var pct = total > 0 ? Math.round((done / total) * 100) : 0;
-                    if (fill)  fill.style.width  = pct + '%';
-                    if (label) label.textContent = (name && done < total)
-                        ? 'Forecasting ' + name + '… (' + (done + 1) + ' / ' + total + ')'
-                        : done + ' / ' + total + ' products forecast';
-                },
-                onDone: function () { window.location.hash = 'forecast'; window.location.reload(); },
-            });
-        })
-        .catch(function () {
-            if (overlay) overlay.classList.add('hidden');
-            _settingsMsg('error', 'Saved, but the re-forecast could not start. Open the Forecast page to refresh.');
-        });
+function _msg(id, type, text) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.className = 'settings-msg settings-msg-' + type;
+    el.textContent = text;
+    el.style.display = '';
 }
 </script>
-
-<!-- Re-forecast progress overlay — shown after a re-import (dataset update) -->
-<div id="af-overlay" class="af-overlay hidden">
-    <div class="af-overlay-card">
-        <svg class="af-spinner" width="30" height="30" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-        </svg>
-        <h2 class="af-title">Updating your forecasts…</h2>
-        <p class="af-sub">Re-forecasting every product with your new data. This runs once.</p>
-        <div class="af-progress-track"><div id="af-progress-fill" class="af-progress-fill"></div></div>
-        <p id="af-progress-label" class="af-progress-label">Starting…</p>
-    </div>
-</div>
-
-<script>
-const AUTO_BASE_URL  = '<?php echo BASE_URL; ?>';
-const LAST_SALE_DATE = <?php echo json_encode($summary['date_to'] ?? null); ?>;
-const USER_HORIZON   = <?php echo (int) ($profile['forecast_horizon_days'] ?? 30); ?>;
-</script>
-<script src="<?php echo BASE_URL; ?>/pages/js/autorun_forecast.js?v=<?php echo filemtime(__DIR__ . '/js/autorun_forecast.js'); ?>"></script>
 
 <?php require_once __DIR__ . '/../includes/confirm_modal.php'; ?>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

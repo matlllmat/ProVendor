@@ -83,9 +83,22 @@ var ChartModal = (function () {
         _updateInfoTabs();
     }
 
+    // Accuracy reporting can be switched off app-wide (PV_SHOW_ACCURACY, set from
+    // SHOW_ACCURACY_FEATURES in config/bootstrap.php). Defaults to on so this
+    // module still behaves normally if the flag was never emitted.
+    function _accuracyEnabled() {
+        return (typeof window.PV_SHOW_ACCURACY === 'undefined') ? true : !!window.PV_SHOW_ACCURACY;
+    }
+
     function _loadAccuracyChip(cfg, forceRefresh) {
         var chip = document.getElementById('cm-accuracy-chip');
         if (!chip) return;
+        // Hidden: skip the chip, the panel, and the backtest request entirely.
+        if (!_accuracyEnabled()) {
+            chip.style.display = 'none';
+            _hideMetricsPanel();
+            return;
+        }
         if (!cfg.productId || !cfg.accuracyBase) {
             chip.style.display = 'none';
             _hideMetricsPanel();
@@ -808,6 +821,7 @@ var ChartModal = (function () {
         var any = false;
         ['restock', 'why', 'accuracy'].forEach(function (name) {
             var avail = !!(_st.infoAvail && _st.infoAvail[name]);
+            if (name === 'accuracy' && !_accuracyEnabled()) avail = false;
             if (avail) any = true;
             var btn = info.querySelector('.cm-info-tab[data-tab="' + name + '"]');
             if (btn) btn.style.display = avail ? '' : 'none';

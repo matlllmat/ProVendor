@@ -370,6 +370,33 @@
     margin-bottom: 0.75rem;
 }
 
+/* Groups the sort dropdown + List/Cards toggle together on the toolbar's right
+   edge, so the sort control sits immediately before the toggle regardless of
+   how wide the category selector on the left is. */
+.product-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.product-sort-select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    font-family: 'Lora', serif;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #261F0E;
+    background: rgba(38,31,14,0.05) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23261F0E' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 0.75rem center;
+    border: 1px solid #D2C8AE;
+    border-radius: 999px;
+    padding: 0.4rem 2.1rem 0.4rem 0.95rem;
+    cursor: pointer;
+    transition: border-color 0.15s, background-color 0.15s;
+}
+.product-sort-select:hover  { border-color: rgba(38,31,14,0.4); }
+.product-sort-select:focus  { outline: none; border-color: #261F0E; background-color: rgba(38,31,14,0.08); }
+
 .view-toggle {
     display: inline-flex;
     gap: 0.15rem;
@@ -486,9 +513,8 @@
     margin-bottom: 1.25rem;
     min-width: 0;                 /* let the year-selector shrink + scroll */
 }
-.chart-filters-row .view-tabs              { margin-bottom: 0; }
-.chart-filters-row .year-selector          { margin-bottom: 0; }
-.chart-filters-row .chart-selected-product { margin-left: auto; }  /* chip → right in product mode */
+.chart-filters-row .view-tabs     { margin-bottom: 0; }
+.chart-filters-row .year-selector { margin-bottom: 0; }
 
 /* ── View tabs (Daily / Weekly / Monthly / Yearly) ── */
 .view-tabs {
@@ -686,16 +712,44 @@
 .search-clear-btn:hover { opacity: 0.8; }
 
 /* ── Selected-product indicator (replaces Chart.js legend) ── */
+/* ── Chart card header ──
+   Title + selected-product chip read as one heading on the left; the mode's
+   contextual controls sit on the right. Keeps the chip anchored to what it
+   names instead of stranding it on its own row. */
+.chart-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.25rem;
+}
+
+.chart-head-left {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-width: 0;          /* lets the product name ellipsize instead of overflowing */
+    flex-wrap: wrap;
+}
+
+.chart-head-right {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
 .chart-selected-product {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.45rem 0.75rem;
+    gap: 0.45rem;
+    padding: 0.3rem 0.55rem 0.3rem 0.7rem;
     background: rgba(26,105,51,0.08);
     border: 1px solid rgba(26,105,51,0.2);
     border-radius: 999px;
-    margin-bottom: 0.875rem;
-    max-width: fit-content;
+    min-width: 0;
 }
 
 .chart-selected-dot {
@@ -1501,25 +1555,25 @@
 /* ======================================================
    PER-PRODUCT FORECAST RANGE + INLINE FORECAST VIEW
 ====================================================== */
+/* Sits inline in the card header (display toggled to flex in product mode via
+   JS), so it's a compact control rather than a full-width panel of its own. */
 .product-range {
-    /* display toggled to flex in product mode via JS */
     align-items: center;
-    gap: 0.6rem;
-    flex-wrap: wrap;
-    margin-bottom: 0.9rem;
-    padding: 0.55rem 0.85rem;
+    gap: 0.45rem;
+    padding: 0.25rem 0.3rem 0.25rem 0.7rem;
     background: rgba(38,31,14,0.03);
     border: 1px solid #D2C8AE;
-    border-radius: 0.6rem;
+    border-radius: 999px;
 }
 
 .product-range-label {
-    font-size: 0.7rem;
+    font-size: 0.66rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: #261F0E;
     opacity: 0.5;
+    white-space: nowrap;
 }
 
 .product-range-input-wrap {
@@ -1533,26 +1587,26 @@
 .product-range-input-wrap:focus-within { border-color: #261F0E; }
 
 .product-range-input {
-    width: 3.2rem;
+    width: 2.4rem;
     border: none;
     background: transparent;
-    padding: 0.35rem 0;
+    padding: 0.2rem 0;
     font-family: 'Lora', serif;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 600;
     color: #261F0E;
     outline: none;
 }
-.product-range-affix { font-size: 0.72rem; color: #261F0E; opacity: 0.5; padding-left: 0.3rem; }
+.product-range-affix { font-size: 0.68rem; color: #261F0E; opacity: 0.5; padding-left: 0.25rem; }
 
 .product-range-btn {
     background: #261F0E;
     color: #F0E8D0;
     border: none;
-    border-radius: 0.45rem;
-    padding: 0.4rem 0.9rem;
+    border-radius: 999px;
+    padding: 0.3rem 0.8rem;
     font-family: 'Lora', serif;
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 700;
     cursor: pointer;
     transition: opacity 0.15s;
@@ -1560,7 +1614,16 @@
 .product-range-btn:hover    { opacity: 0.85; }
 .product-range-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-.product-range-note { font-size: 0.72rem; color: #261F0E; opacity: 0.55; }
+/* Feedback after Apply. Sits on its own line under the header so a long message
+   can't stretch the control row. */
+.product-range-note {
+    font-size: 0.7rem;
+    color: #261F0E;
+    opacity: 0.55;
+    flex-basis: 100%;
+    text-align: right;
+}
+.product-range-note:empty { display: none; }
 .product-range-note.is-error { color: #FF1A1A; opacity: 1; }
 
 /* Inline forecast view container (ChartModal.renderIn target) */
