@@ -63,6 +63,21 @@ require_once __DIR__ . '/../includes/header.php';
                     <button type="button" id="product-range-apply" class="product-range-btn" onclick="applyProductRange()">Apply</button>
                     <span id="product-range-note" class="product-range-note"></span>
                 </div>
+
+                <!-- Graph ⇆ Calendar. Reuses the List/Cards switch styling from the
+                     product list so the two view switches look like one idea. -->
+                <div class="view-toggle" role="group" aria-label="Demand view">
+                    <button type="button" class="view-toggle-btn" data-demandview="graph"
+                            aria-pressed="false" title="Chart view" onclick="setDemandView('graph')">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 11 6 6 9 9 14 3"/></svg>
+                        Graph
+                    </button>
+                    <button type="button" class="view-toggle-btn active" data-demandview="calendar"
+                            aria-pressed="true" title="Calendar view" onclick="setDemandView('calendar')">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="11" rx="1.5"/><line x1="2" y1="6.5" x2="14" y2="6.5"/><line x1="5.5" y1="2" x2="5.5" y2="4"/><line x1="10.5" y1="2" x2="10.5" y2="4"/></svg>
+                        Calendar
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -91,6 +106,10 @@ require_once __DIR__ . '/../includes/header.php';
         </div>
         <div id="chart-error" class="chart-error" style="display:none"></div>
         <canvas id="demand-chart" style="display:none; max-height:300px;"></canvas>
+
+        <!-- Calendar view — replaces whichever graph the current mode shows.
+             Populated by DemandCalendar.renderIn(); see applyDemandView(). -->
+        <div id="demand-calendar" class="demand-calendar" style="display:none"></div>
 
         <!-- ── Product Insights ─────────────────────────────────────────
              Shown only when a single product is selected. Surfaces what
@@ -188,6 +207,17 @@ require_once __DIR__ . '/../includes/header.php';
                         <polyline points="6 9 12 15 18 9"/>
                     </svg>
                 </div>
+
+                <!-- Fill in cost / price / stock for the whole catalogue at once. -->
+                <button type="button" class="batch-edit-btn" onclick="bpOpen()"
+                        title="Set cost price, selling price and stock for all products">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                    Batch edit
+                </button>
             </div>
             <div class="product-toolbar-right">
                 <select id="product-sort" class="product-sort-select" aria-label="Sort products">
@@ -329,6 +359,7 @@ window.PV_SHOW_ACCURACY = <?php echo SHOW_ACCURACY_FEATURES ? 'true' : 'false'; 
 </script>
 <script src="<?php echo BASE_URL; ?>/pages/js/chart.shared.js?v=<?php echo filemtime(__DIR__ . '/js/chart.shared.js'); ?>"></script>
 <script src="<?php echo BASE_URL; ?>/pages/js/chart_modal.js?v=<?php echo filemtime(__DIR__ . '/js/chart_modal.js'); ?>"></script>
+<script src="<?php echo BASE_URL; ?>/pages/js/demand_calendar.js?v=<?php echo filemtime(__DIR__ . '/js/demand_calendar.js'); ?>"></script>
 <script>
 const spinStyle = document.createElement('style');
 spinStyle.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
@@ -841,11 +872,15 @@ function loadSalesChart(category, productId) {
         .catch(() => showChartState('error', 'Network error. Please refresh.'));
 }
 
+// Records which aggregate-chart state is wanted ('loading' | 'error' | 'chart').
+// applyDemandView() is what actually shows it, so the calendar can't be stomped
+// on by a chart load finishing in the background.
+var chartState = 'loading';
+
 function showChartState(state, msg) {
-    document.getElementById('chart-loading').style.display = state === 'loading' ? 'flex'  : 'none';
-    document.getElementById('chart-error').style.display   = state === 'error'   ? 'flex'  : 'none';
-    document.getElementById('demand-chart').style.display  = state === 'chart'   ? 'block' : 'none';
+    chartState = state;
     if (state === 'error') document.getElementById('chart-error').textContent = msg;
+    applyDemandView();
 }
 
 // ── Year overlay: selector pills + action buttons ─────────────────────────────
@@ -979,6 +1014,11 @@ function renderChart(historical) {
         case 'yearly':  renderYearlyView(historical);  break;
         default:        renderDailyView(historical);   break;
     }
+    // Chart.js snapshots the canvas's inline style when a chart is constructed and
+    // restores it on destroy(). A chart built while the canvas was hidden (calendar
+    // view active) therefore re-applies display:none on every later rebuild. Re-derive
+    // visibility from our own state here, after the rebuild, so it can't stick hidden.
+    applyDemandView();
 }
 
 // ── Daily view: line chart with year overlay (normalized to base year 2000) ───
@@ -1207,31 +1247,144 @@ function renderYearlyView(historical) {
 
 // Switch the Demand Analysis card between the aggregate historical chart (native
 // canvas + its controls) and the per-product forecast view rendered inline.
-function enterProductMode() {
-    var btns = document.getElementById('demand-chart-btns'); if (btns) btns.style.display = 'none';
-    var vt   = document.querySelector('.view-tabs');          if (vt)   vt.style.display   = 'none';
-    var ys   = document.getElementById('year-selector');      if (ys)   ys.style.display   = 'none';
-    // Both of that row's controls are hidden here, so hide the row itself too —
-    // otherwise it leaves an empty gap between the header and the chart.
-    var fr   = document.querySelector('.chart-filters-row');  if (fr)   fr.style.display   = 'none';
-    ['chart-loading', 'chart-error', 'demand-chart', 'product-insights'].forEach(function (id) {
-        var el = document.getElementById(id); if (el) el.style.display = 'none';
+// ── Demand view: graph ⇆ calendar ───────────────────────────────────────────
+// Two independent axes decide what the card shows:
+//   demandMode — 'aggregate' (no product) | 'product' (one selected)
+//   demandView — 'graph' | 'calendar'
+// applyDemandView() is the single place that resolves them into visibility, so
+// the mode switches and the view toggle can never fight each other.
+var demandMode = 'aggregate';
+var demandView = 'calendar';   // calendar is the default view; the graph is one click away
+try { demandView = localStorage.getItem('pv_demand_view') || 'calendar'; } catch (e) {}
+
+var calendarLoadedKey = null;   // scope the loaded data belongs to
+var calendarLoading   = false;
+
+// Identifies the current scope so the calendar refetches when it changes.
+function demandScopeKey() {
+    return activeProductId ? ('p:' + activeProductId) : ('c:' + (activeCategory || ''));
+}
+
+function setDemandView(view) {
+    demandView = (view === 'calendar') ? 'calendar' : 'graph';
+    try { localStorage.setItem('pv_demand_view', demandView); } catch (e) {}
+    applyDemandView();
+}
+
+function applyDemandView() {
+    var show = function (el, mode) { if (el) el.style.display = mode; };
+    var byId = function (id) { return document.getElementById(id); };
+
+    var calendarOn = (demandView === 'calendar');
+
+    // Toggle button state
+    document.querySelectorAll('[data-demandview]').forEach(function (b) {
+        var on = (b.dataset.demandview === demandView);
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
-    var af = document.getElementById('analysis-forecast'); if (af) af.style.display = '';
-    var pr = document.getElementById('product-range');     if (pr) pr.style.display = 'flex';
+
+    // Graph-only furniture (aggregate chart controls + the inline forecast view)
+    var isProduct = (demandMode === 'product');
+    show(byId('demand-chart-btns'), (!calendarOn && !isProduct) ? '' : 'none');
+    show(document.querySelector('.chart-filters-row'), (!calendarOn && !isProduct) ? '' : 'none');
+    // The inline forecast view holds two halves: the chart (.cm-chart-wrap) and the
+    // Restock / "Why this forecast" tabs (#cm-info). Only the chart half is redundant
+    // in calendar mode — the tabs are product information the calendar doesn't cover —
+    // so keep the container mounted in product mode and hide just the chart.
+    var af = byId('analysis-forecast');
+    show(af, isProduct ? '' : 'none');
+    if (af) af.classList.toggle('is-chart-hidden', calendarOn);
+
+    // The per-product forecast range still applies in either view — it changes the
+    // data both of them draw — so it follows the mode, not the view.
+    show(byId('product-range'), isProduct ? 'flex' : 'none');
+
+    if (calendarOn) {
+        ['chart-loading', 'chart-error', 'demand-chart', 'product-insights'].forEach(function (id) {
+            show(byId(id), 'none');
+        });
+        show(byId('demand-calendar'), '');
+        loadDemandCalendar();
+        return;
+    }
+
+    show(byId('demand-calendar'), 'none');
+
+    if (isProduct) {
+        // The inline forecast view owns the whole area in product mode.
+        ['chart-loading', 'chart-error', 'demand-chart', 'product-insights'].forEach(function (id) {
+            show(byId(id), 'none');
+        });
+        return;
+    }
+
+    // Aggregate graph — honour whatever showChartState() last recorded.
+    show(byId('chart-loading'), chartState === 'loading' ? 'flex'  : 'none');
+    show(byId('chart-error'),   chartState === 'error'   ? 'flex'  : 'none');
+    show(byId('demand-chart'),  chartState === 'chart'   ? 'block' : 'none');
+    show(byId('product-insights'), 'none');
+}
+
+// Fetches (once per scope) and renders the calendar. Read-only and Flask-free —
+// it draws saved data, so it works even when the forecast server is down.
+function loadDemandCalendar() {
+    var el = document.getElementById('demand-calendar');
+    if (!el) return;
+
+    var key = demandScopeKey();
+    if (calendarLoading || key === calendarLoadedKey) return;
+
+    calendarLoading = true;
+    // Only show a placeholder on the FIRST load. On a re-fetch (switching product
+    // or category) keep the existing grid on screen and just dim it — replacing it
+    // with a spinner collapses the card and re-expands it, which reads as a blink.
+    if (el.querySelector('.dc-grid')) {
+        DemandCalendar.setLoading(true);
+    } else {
+        el.innerHTML = '<div class="dc-empty">Loading demand…</div>';
+    }
+
+    var body = new FormData();
+    if (activeProductId) body.append('product_id', activeProductId);
+    else                 body.append('category',   activeCategory || '');
+
+    fetch('<?php echo BASE_URL; ?>/api/get_demand_calendar.php', { method: 'POST', body: body })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            calendarLoading = false;
+            if (data.error) {
+                DemandCalendar.setLoading(false);
+                el.innerHTML = '<div class="dc-empty">' + data.error + '</div>';
+                return;
+            }
+            calendarLoadedKey = key;
+            DemandCalendar.renderIn(el, data);
+        })
+        .catch(function () {
+            calendarLoading = false;
+            calendarLoadedKey = null;
+            DemandCalendar.setLoading(false);
+            el.innerHTML = '<div class="dc-empty">Could not load demand data. Please refresh.</div>';
+        });
+}
+
+// Scope changed (product picked/dropped, category switched) — drop the cached
+// data so the next render refetches for the new scope.
+function invalidateDemandCalendar() {
+    calendarLoadedKey = null;
+    if (demandView === 'calendar') loadDemandCalendar();
+}
+
+function enterProductMode() {
+    demandMode = 'product';
+    applyDemandView();
 }
 
 function enterAggregateMode() {
     ChartModal.destroyIn();
-    var af   = document.getElementById('analysis-forecast'); if (af)   af.style.display   = 'none';
-    var pr   = document.getElementById('product-range');      if (pr)   pr.style.display   = 'none';
-    var btns = document.getElementById('demand-chart-btns');  if (btns) btns.style.display = '';
-    var vt   = document.querySelector('.view-tabs');           if (vt)   vt.style.display   = '';
-    var ys   = document.getElementById('year-selector');       if (ys)   ys.style.display   = '';
-    var fr   = document.querySelector('.chart-filters-row');   if (fr)   fr.style.display   = '';
-    // Product insights panel stays hidden — the inline forecast view has its own
-    // reasoning; chart-loading / chart-error / demand-chart are managed by showChartState().
-    var pi = document.getElementById('product-insights'); if (pi) pi.style.display = 'none';
+    demandMode = 'aggregate';
+    applyDemandView();
 }
 
 // Effective forecast horizon (days) for a product: its override from AUTO_PRODUCTS
@@ -1272,6 +1425,9 @@ function applyProductRange() {
             if (data.error) { _rangeNote(data.error, true); return; }
             var p = AUTO_PRODUCTS.find(function (x) { return x.id === pid; });
             if (p) p.horizon = days;
+            // The scope is unchanged but its forecast data isn't, so the calendar's
+            // cache has to be dropped explicitly here.
+            invalidateDemandCalendar();
             generateProductForecast(pid, fullHistorical);   // re-forecast at the new range
         })
         .catch(function () {
@@ -1521,6 +1677,8 @@ const AUTO_BASE_URL = '<?php echo BASE_URL; ?>';
 </script>
 <script src="<?php echo BASE_URL; ?>/pages/js/autorun_forecast.js?v=<?php echo filemtime(__DIR__ . '/js/autorun_forecast.js'); ?>"></script>
 
+<script>const BP_BASE = '<?php echo BASE_URL; ?>';</script>
+<?php require_once __DIR__ . '/../includes/batch_pricing_modal.php'; ?>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 </body>
 </html>

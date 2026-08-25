@@ -268,3 +268,11 @@
     .db-row { cursor: default; }
     .db-row:hover { background: none; }
 }
+
+/* Batch edit is the actionable one in the restock toolbar — the others just export. */
+.db-btn-primary {
+    background: #261F0E;
+    color: #F0E8D0;
+    border-color: #261F0E;
+}
+.db-btn-primary:hover { background: #261F0E; opacity: 0.86; }

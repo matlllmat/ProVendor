@@ -201,3 +201,168 @@ input::placeholder {
 }
 .fj-pill.fj-done   .fj-fill { background: #1A6933; }
 .fj-pill.fj-failed .fj-fill { background: #FF1A1A; }
+
+/* ======================================================
+   BATCH PRICE / STOCK EDITOR  (includes/batch_pricing_modal.php)
+   Shared component: included by the forecast page AND the dashboard's
+   Suggested Restock, so it lives here rather than in one page's stylesheet.
+====================================================== */
+.bp-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+    background: rgba(38,31,14,0.45);
+    backdrop-filter: blur(2px);
+}
+.bp-overlay.hidden { display: none; }
+
+.bp-modal {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 54rem;
+    max-height: 88vh;
+    background: #F0E8D0;
+    border: 1px solid #D2C8AE;
+    border-radius: 1rem;
+    box-shadow: 0 18px 50px rgba(38,31,14,0.35);
+    overflow: hidden;
+}
+
+.bp-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.15rem 1.35rem 0.9rem;
+    border-bottom: 1px solid #D2C8AE;
+}
+.bp-title { font-size: 1.05rem; font-weight: 600; color: #261F0E; }
+.bp-sub   { font-size: 0.75rem; color: #261F0E; opacity: 0.55; margin-top: 0.25rem; line-height: 1.5; }
+.bp-sub-warn { color: #FF5722; opacity: 1; }
+.bp-close {
+    border: none; background: none; color: #261F0E;
+    opacity: 0.4; cursor: pointer; padding: 0.15rem; flex-shrink: 0;
+}
+.bp-close:hover { opacity: 0.9; }
+
+.bp-tools {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 0.7rem 1.35rem;
+    border-bottom: 1px solid rgba(210,200,174,0.6);
+}
+.bp-check { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; opacity: 0.75; cursor: pointer; }
+.bp-legend { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.68rem; opacity: 0.55; }
+.bp-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.bp-dot.is-original { background: #1A6933; }
+.bp-dot.is-custom   { background: #FF5722; margin-left: 0.6rem; }
+.bp-reset-all {
+    margin-left: auto;
+    border: none; background: none;
+    font-family: 'Lora', serif; font-size: 0.72rem; font-weight: 600;
+    color: #261F0E; opacity: 0.6; cursor: pointer;
+    text-decoration: underline; text-underline-offset: 2px;
+}
+.bp-reset-all:hover { opacity: 1; }
+
+.bp-table-wrap { overflow: auto; flex: 1; padding: 0 1.35rem; }
+.bp-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.bp-table thead th {
+    position: sticky; top: 0; z-index: 1;
+    background: #F0E8D0;
+    text-align: right;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+    opacity: 0.5;
+    padding: 0.7rem 0.5rem 0.5rem;
+    border-bottom: 1px solid #D2C8AE;
+    white-space: nowrap;
+}
+.bp-t-left  { text-align: left !important; }
+.bp-t-reset { width: 2rem; }
+
+.bp-row td { padding: 0.35rem 0.5rem; border-bottom: 1px solid rgba(210,200,174,0.5); text-align: right; }
+.bp-row.is-missing { background: rgba(255,87,34,0.05); }
+.bp-row.is-changed { background: rgba(26,105,51,0.06); }
+.bp-row.is-invalid { background: rgba(255,26,26,0.08); }
+
+.bp-name  { font-weight: 600; color: #261F0E; }
+.bp-badge {
+    margin-left: 0.4rem;
+    font-size: 0.6rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    color: #FF5722;
+    background: rgba(255,87,34,0.12);
+    border-radius: 999px;
+    padding: 0.1rem 0.4rem;
+}
+
+.bp-input-wrap {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid #D2C8AE;
+    border-radius: 0.45rem;
+    background: #F0E8D0;
+    padding: 0 0.45rem;
+}
+.bp-input-wrap:focus-within { border-color: #261F0E; }
+.bp-affix { font-size: 0.7rem; opacity: 0.45; }
+.bp-affix-right { padding-left: 0.25rem; }
+.bp-input {
+    width: 4.6rem;
+    border: none; background: transparent; outline: none;
+    padding: 0.3rem 0.25rem;
+    font-family: 'Lora', serif; font-size: 0.78rem; font-weight: 600;
+    color: #261F0E;
+    text-align: right;
+}
+/* Same language as the per-product control: green = imported, orange = customized */
+.bp-input.is-original { color: #1A6933; }
+.bp-input.is-custom   { color: #FF5722; }
+
+.bp-row-reset {
+    border: none; background: none;
+    font-size: 0.9rem; line-height: 1;
+    color: #261F0E; opacity: 0.3;
+    cursor: pointer; padding: 0.2rem;
+}
+.bp-row-reset:hover { opacity: 0.9; }
+
+.bp-empty { padding: 2.5rem; text-align: center; opacity: 0.4; font-size: 0.85rem; }
+
+.bp-msg { margin: 0 1.35rem 0.25rem; font-size: 0.75rem; font-weight: 600; padding: 0.5rem 0.7rem; border-radius: 0.5rem; }
+.bp-msg-info    { color: #261F0E; background: rgba(38,31,14,0.06); }
+.bp-msg-success { color: #1A6933; background: rgba(26,105,51,0.1); }
+.bp-msg-error   { color: #FF1A1A; background: rgba(255,26,26,0.08); }
+
+.bp-foot {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; flex-wrap: wrap;
+    padding: 0.9rem 1.35rem;
+    border-top: 1px solid #D2C8AE;
+}
+.bp-count { font-size: 0.75rem; opacity: 0.6; }
+.bp-foot-actions { display: flex; gap: 0.5rem; margin-left: auto; }
+.bp-btn-cancel {
+    padding: 0.5rem 1rem; border: 1px solid #D2C8AE; border-radius: 0.6rem;
+    background: transparent; font-family: 'Lora', serif; font-size: 0.8rem;
+    color: #261F0E; cursor: pointer;
+}
+.bp-btn-cancel:hover { background: rgba(38,31,14,0.06); }
+.bp-btn-save {
+    padding: 0.5rem 1.2rem; border: none; border-radius: 0.6rem;
+    background: #261F0E; color: #F0E8D0;
+    font-family: 'Lora', serif; font-size: 0.8rem; font-weight: 700;
+    cursor: pointer; transition: opacity 0.15s;
+}
+.bp-btn-save:hover:not(:disabled) { opacity: 0.86; }
+.bp-btn-save:disabled { opacity: 0.35; cursor: not-allowed; }

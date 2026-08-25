@@ -131,6 +131,9 @@ $units = fn($v) => number_format((int) $v);
                 <label class="db-check"><input type="checkbox" id="db-needs"> Needs restock only</label>
                 <a class="db-btn" href="<?php echo BASE_URL; ?>/api/export_restock.php">Export CSV</a>
                 <button type="button" class="db-btn" onclick="window.print()">Print</button>
+                <!-- Fill in cost / price / stock for every product without leaving the dashboard. -->
+                <button type="button" class="db-btn db-btn-primary" onclick="bpOpen()"
+                        title="Set cost price, selling price and stock for all products">Batch edit</button>
             </div>
         </div>
 
@@ -315,6 +318,8 @@ $units = fn($v) => number_format((int) $v);
 
 </main>
 
+<script>const BP_BASE = '<?php echo BASE_URL; ?>';</script>
+<?php require_once __DIR__ . '/../includes/batch_pricing_modal.php'; ?>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 
 <script>

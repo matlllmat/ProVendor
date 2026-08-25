@@ -1650,3 +1650,295 @@
 
 /* Right side of the filters row: view switcher (aggregate) OR the selected
    product chip (product mode) — mutually exclusive, share the slot. */
+
+/* ======================================================
+   DEMAND CALENDAR VIEW  (pages/js/demand_calendar.js)
+   Plain-DOM alternative to the line chart: one cell per day,
+   shaded by volume. Green = actual sales, orange = forecast.
+====================================================== */
+.demand-calendar { margin-top: 0.5rem; }
+
+.dc-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+
+.dc-pillgroup {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    background: rgba(38,31,14,0.05);
+    border: 1px solid #D2C8AE;
+    border-radius: 999px;
+}
+
+.dc-pill {
+    padding: 0.28rem 0.8rem;
+    font-family: 'Lora', serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #261F0E;
+    background: transparent;
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    opacity: 0.55;
+    transition: background 0.15s, color 0.15s, opacity 0.15s;
+}
+.dc-pill:hover  { opacity: 0.85; }
+.dc-pill.is-on  { background: #261F0E; color: #F0E8D0; opacity: 1; }
+
+/* Period stepper sits at the far right of the toolbar */
+.dc-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: auto;
+}
+.dc-nav-btn {
+    width: 1.6rem;
+    height: 1.6rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #D2C8AE;
+    border-radius: 999px;
+    background: #F0E8D0;
+    color: #261F0E;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.dc-nav-btn:hover:not(:disabled) { background: #D2C8AE; }
+.dc-nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.dc-period {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #261F0E;
+    min-width: 8.5rem;
+    text-align: center;
+}
+
+.dc-legend {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.6rem;
+    font-size: 0.7rem;
+    color: #261F0E;
+    opacity: 0.6;
+}
+.dc-legend-item { display: inline-flex; align-items: center; gap: 0.35rem; }
+.dc-swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.dc-swatch.is-actual   { background: rgba(26,105,51,0.55); }
+.dc-swatch.is-forecast { background: rgba(255,87,34,0.55); }
+.dc-legend-hint { margin-left: auto; font-style: italic; opacity: 0.75; }
+
+/* ── Grids ── */
+.dc-grid { display: grid; gap: 4px; }
+.dc-grid-day   { grid-template-columns: repeat(7, 1fr); }
+.dc-grid-month { grid-template-columns: repeat(4, 1fr); }
+.dc-grid-year  { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+
+.dc-dow {
+    text-align: center;
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #261F0E;
+    opacity: 0.4;
+    padding-bottom: 0.15rem;
+}
+
+.dc-cell {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.1rem;
+    min-height: 3.1rem;
+    padding: 0.3rem 0.2rem;
+    border: 1px solid #D2C8AE;
+    border-radius: 0.5rem;
+    background: #F0E8D0;
+}
+.dc-grid-month .dc-cell,
+.dc-grid-year  .dc-cell { min-height: 4.2rem; }
+
+.dc-cell.is-blank { border: none; background: transparent; }
+
+.dc-label {
+    font-size: 0.6rem;
+    font-weight: 600;
+    color: #261F0E;
+    opacity: 0.45;
+    line-height: 1;
+}
+.dc-grid-month .dc-label,
+.dc-grid-year  .dc-label { font-size: 0.7rem; opacity: 0.6; }
+
+.dc-val {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #261F0E;
+    line-height: 1.1;
+}
+.dc-grid-month .dc-val,
+.dc-grid-year  .dc-val { font-size: 1rem; }
+
+.dc-cell.is-empty { background: rgba(38,31,14,0.02); }
+.dc-cell.is-empty .dc-label { opacity: 0.25; }
+
+/* Today gets a ring so "now" is findable at a glance */
+.dc-cell.is-today {
+    border-color: #261F0E;
+    box-shadow: 0 0 0 1px #261F0E inset;
+}
+
+/* Heat shading — 5 steps against the busiest cell currently on screen.
+   Text flips to light on the darkest steps to stay readable. */
+.dc-cell.is-actual.is-heat-1 { background: rgba(26,105,51,0.08); }
+.dc-cell.is-actual.is-heat-2 { background: rgba(26,105,51,0.20); }
+.dc-cell.is-actual.is-heat-3 { background: rgba(26,105,51,0.36); }
+.dc-cell.is-actual.is-heat-4 { background: rgba(26,105,51,0.58); }
+.dc-cell.is-actual.is-heat-5 { background: rgba(26,105,51,0.82); }
+.dc-cell.is-actual.is-heat-4 .dc-val,
+.dc-cell.is-actual.is-heat-5 .dc-val { color: #F0E8D0; }
+.dc-cell.is-actual.is-heat-4 .dc-label,
+.dc-cell.is-actual.is-heat-5 .dc-label { color: #F0E8D0; opacity: 0.7; }
+
+.dc-cell.is-forecast.is-heat-1 { background: rgba(255,87,34,0.08); }
+.dc-cell.is-forecast.is-heat-2 { background: rgba(255,87,34,0.20); }
+.dc-cell.is-forecast.is-heat-3 { background: rgba(255,87,34,0.36); }
+.dc-cell.is-forecast.is-heat-4 { background: rgba(255,87,34,0.56); }
+.dc-cell.is-forecast.is-heat-5 { background: rgba(255,87,34,0.78); }
+.dc-cell.is-forecast.is-heat-5 .dc-val { color: #F0E8D0; }
+
+.dc-caption {
+    margin-top: 0.6rem;
+    font-size: 0.68rem;
+    color: #261F0E;
+    opacity: 0.45;
+}
+
+.dc-empty {
+    padding: 3rem 1rem;
+    text-align: center;
+    font-size: 0.85rem;
+    color: #261F0E;
+    opacity: 0.4;
+}
+
+@media (max-width: 640px) {
+    .dc-cell { min-height: 2.6rem; }
+    .dc-val  { font-size: 0.72rem; }
+    .dc-nav  { margin-left: 0; }
+    .dc-grid-month { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* Re-fetching for a new product/category: dim the existing grid in place rather
+   than tearing it down, so the card keeps its height and doesn't blink. */
+.demand-calendar.is-loading {
+    opacity: 0.45;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+}
+
+/* Calendar view keeps the inline forecast's Restock / "Why this forecast" tabs —
+   they describe the product, not the chart — and hides only the chart half. */
+.analysis-forecast.is-chart-hidden .cm-chart-wrap { display: none; }
+.analysis-forecast.is-chart-hidden { margin-top: 1.25rem; }
+
+/* ── Event marker + "why this number" hover panel ── */
+.demand-calendar { position: relative; }   /* anchors the hover panel */
+
+.dc-cell.has-event { border-color: rgba(38,31,14,0.55); }
+.dc-eventdot {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #261F0E;
+    box-shadow: 0 0 0 2px rgba(240,232,208,0.85);
+}
+
+.dc-cell[data-date] { cursor: help; }
+
+.dc-tip {
+    position: absolute;
+    z-index: 40;
+    min-width: 15rem;
+    max-width: 19rem;
+    padding: 0.6rem 0.7rem;
+    background: #261F0E;
+    color: #F0E8D0;
+    border-radius: 0.6rem;
+    box-shadow: 0 8px 26px rgba(38,31,14,0.3);
+    font-size: 0.72rem;
+    line-height: 1.45;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(3px);
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    pointer-events: none;   /* never steals the hover from the cell beneath */
+}
+.dc-tip.is-on { opacity: 1; visibility: visible; transform: none; }
+
+.dc-tip-head {
+    font-size: 0.75rem;
+    padding-bottom: 0.4rem;
+    margin-bottom: 0.4rem;
+    border-bottom: 1px solid rgba(210,200,174,0.25);
+}
+.dc-tip-kind { opacity: 0.55; font-style: italic; }
+
+.dc-tip-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+}
+.dc-tip-row span:first-child  { opacity: 0.7; }
+.dc-tip-row span:last-child   { font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Events are the interesting line — that's usually what the spike is */
+.dc-tip-row.is-event span:first-child { opacity: 1; font-weight: 600; color: #FFB59A; }
+.dc-tip-row.is-event span:last-child  { font-weight: 700; color: #FFB59A; }
+
+.dc-tip-total {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 0.4rem;
+    padding-top: 0.4rem;
+    border-top: 1px solid rgba(210,200,174,0.25);
+    font-weight: 700;
+}
+
+/* Batch edit trigger (the modal itself is a shared component — its styles live
+   in assets/global_css/app.css so every page that includes it is styled). */
+.batch-edit-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.85rem;
+    background: rgba(38,31,14,0.05);
+    border: 1px solid #D2C8AE;
+    border-radius: 999px;
+    font-family: 'Lora', serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #261F0E;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s;
+}
+.batch-edit-btn:hover { background: #D2C8AE; border-color: rgba(38,31,14,0.4); }

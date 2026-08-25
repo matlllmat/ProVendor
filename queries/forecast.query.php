@@ -381,3 +381,138 @@ function getProductForecast(PDO $pdo, int $userId, int $productId): ?array
 
     return ['forecast' => $forecast, 'meta' => $meta];
 }
+
+// ── Calendar view data ───────────────────────────────────────────────────────
+// Daily demand for the calendar view, merged into ONE date-keyed map so each
+// calendar cell is a single O(1) lookup:
+//     [ 'YYYY-MM-DD' => ['a' => actual|null, 'p' => predicted|null], ... ]
+//
+// Actuals come from `sales`, the forecast from `forecasts` — different tables,
+// and in the aggregate scopes the forecast has to be summed across products.
+// Doing that merge here (rather than reconciling two arrays in the browser)
+// keeps the client simple.
+//
+// Scope mirrors api/get_sales_chart.php exactly: a single product, else a
+// category, else every product the user owns. Ownership is enforced by the
+// p.user_id filter in both queries.
+function getDemandCalendarData(PDO $pdo, int $userId, ?int $productId = null, string $category = ''): array
+{
+    if ($productId !== null) {
+        $where  = 'p.user_id = ? AND p.id = ?';
+        $params = [$userId, $productId];
+    } elseif ($category !== '') {
+        $where  = 'p.user_id = ? AND p.category = ?';
+        $params = [$userId, $category];
+    } else {
+        $where  = 'p.user_id = ?';
+        $params = [$userId];
+    }
+
+    $days = [];
+
+    // Actual sales per day.
+    $stmt = $pdo->prepare(
+        "SELECT s.sale_date AS date, SUM(s.quantity_sold) AS total
+         FROM sales s
+         JOIN products p ON p.id = s.product_id
+         WHERE $where
+         GROUP BY s.sale_date"
+    );
+    $stmt->execute($params);
+    foreach ($stmt->fetchAll() as $row) {
+        $days[$row['date']] = ['a' => (float) $row['total'], 'p' => null];
+    }
+
+    // Forecast demand per day. In the aggregate scopes this sums every product
+    // that has a forecast covering the day (see forecast_products below — the
+    // view captions the count so a partly-covered day isn't read as a real dip).
+    $stmt = $pdo->prepare(
+        "SELECT f.forecast_date AS date,
+                SUM(f.predicted_demand)      AS total,
+                COUNT(DISTINCT f.product_id) AS products
+         FROM forecasts f
+         JOIN products p ON p.id = f.product_id
+         WHERE $where
+         GROUP BY f.forecast_date"
+    );
+    $stmt->execute($params);
+    $forecastProducts = 0;
+    foreach ($stmt->fetchAll() as $row) {
+        $d = $row['date'];
+        if (!isset($days[$d])) $days[$d] = ['a' => null, 'p' => null];
+        $days[$d]['p'] = (float) $row['total'];
+        $forecastProducts = max($forecastProducts, (int) $row['products']);
+    }
+
+    // ── Per-day "why this number" breakdown + event contributions ────────────
+    // Prophet stores each forecast day as trend + weekly + yearly + Σ events in
+    // forecasts.components. Summing those across products is only valid when a
+    // row's own components actually add up to its predicted value: Prophet clips
+    // yhat at 0, so a degenerate product (hugely negative trend) would otherwise
+    // poison the whole day's breakdown. Non-reconciling rows are excluded and
+    // reported via `bt` (the total the breakdown actually accounts for), which the
+    // UI compares against the day's real total before showing a decomposition.
+    $stmt = $pdo->prepare(
+        "SELECT f.forecast_date AS date, f.predicted_demand AS predicted, f.components
+         FROM forecasts f
+         JOIN products p ON p.id = f.product_id
+         WHERE $where AND f.components IS NOT NULL"
+    );
+    $stmt->execute($params);
+
+    $parts = [];   // date => ['t'=>,'w'=>,'y'=>,'ev'=>[name=>value],'bt'=>]
+    foreach ($stmt->fetchAll() as $row) {
+        $c = json_decode($row['components'], true);
+        if (!is_array($c)) continue;
+
+        $trend  = (float) ($c['trend']  ?? 0);
+        $weekly = (float) ($c['weekly'] ?? 0);
+        $yearly = (float) ($c['yearly'] ?? 0);
+        $events = is_array($c['events'] ?? null) ? $c['events'] : [];
+
+        $sum = $trend + $weekly + $yearly;
+        foreach ($events as $e) $sum += (float) ($e['value'] ?? 0);
+
+        $predicted = (float) $row['predicted'];
+        // Skip rows whose decomposition doesn't match what was actually predicted.
+        if (abs($sum - $predicted) > max(1.0, $predicted * 0.02)) continue;
+
+        $d = $row['date'];
+        if (!isset($parts[$d])) $parts[$d] = ['t' => 0.0, 'w' => 0.0, 'y' => 0.0, 'ev' => [], 'bt' => 0.0];
+        $parts[$d]['t']  += $trend;
+        $parts[$d]['w']  += $weekly;
+        $parts[$d]['y']  += $yearly;
+        $parts[$d]['bt'] += $predicted;
+        foreach ($events as $e) {
+            $name = (string) ($e['name'] ?? 'Event');
+            $parts[$d]['ev'][$name] = ($parts[$d]['ev'][$name] ?? 0) + (float) ($e['value'] ?? 0);
+        }
+    }
+
+    foreach ($parts as $d => $pt) {
+        if (!isset($days[$d])) continue;
+        $ev = [];
+        foreach ($pt['ev'] as $name => $val) $ev[] = [$name, round($val, 2)];
+        $days[$d]['c'] = [
+            't'  => round($pt['t'], 2),
+            'w'  => round($pt['w'], 2),
+            'y'  => round($pt['y'], 2),
+            'bt' => round($pt['bt'], 2),
+            'ev' => $ev,
+        ];
+    }
+
+    if (empty($days)) {
+        return ['days' => (object) [], 'min_date' => null, 'max_date' => null, 'forecast_products' => 0];
+    }
+
+    $dates = array_keys($days);
+    sort($dates);
+
+    return [
+        'days'              => $days,
+        'min_date'          => $dates[0],
+        'max_date'          => $dates[count($dates) - 1],
+        'forecast_products' => $forecastProducts,
+    ];
+}
