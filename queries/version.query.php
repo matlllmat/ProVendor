@@ -132,7 +132,8 @@ function getVersionSalesForExport(PDO $pdo, int $userId, int $versionId): array
          JOIN dataset_versions v ON v.id = ss.version_id
          JOIN products p ON p.id = ss.product_id
          WHERE ss.version_id = ? AND v.user_id = ?
-         ORDER BY p.name, ss.sale_date'
+         -- Same ordering as the live export (newest first) so both downloads read alike.
+         ORDER BY ss.sale_date DESC, p.name'
     );
     $stmt->execute([$versionId, $userId]);
     return $stmt->fetchAll();

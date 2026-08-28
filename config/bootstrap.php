@@ -8,6 +8,13 @@ if (!defined('BASE_URL')) {
     define('BASE_URL', '/ProVendor');
 }
 
+// Pin the app clock to the store's timezone. Without this PHP falls back to its
+// ini default (Europe/Berlin on this XAMPP build), which put date() up to a full
+// day behind the machine and MySQL — silently shifting forecast window starts,
+// the "days ahead" figures and every "today" comparison, while browser-side dates
+// stayed correct. Everything date-based depends on this being right.
+date_default_timezone_set('Asia/Manila');
+
 // ── Feature flag: forecast-accuracy reporting ────────────────────────────────
 // Hides the Reports page (nav item + the page itself), the Dashboard's accuracy
 // KPI tile, and the per-product "Accuracy" tab on the forecast chart.

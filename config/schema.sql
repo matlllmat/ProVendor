@@ -12,6 +12,9 @@ CREATE TABLE IF NOT EXISTS `users` (
     -- the Settings page. Every product forecasts this many days out unless it has
     -- its own products.forecast_horizon_days override.
     `forecast_horizon_days` INT NOT NULL DEFAULT 30,
+    -- 'manual' = the owner presses "Re-forecast all"; 'auto' = the app tops the
+    -- window back up to forecast_horizon_days by itself as days elapse.
+    `forecast_mode`         ENUM('manual','auto') NOT NULL DEFAULT 'manual',
     `created_at` TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `users_email_unique` (`email`)
@@ -219,6 +222,9 @@ CREATE TABLE IF NOT EXISTS `forecast_jobs` (
     `user_id`         INT           NOT NULL,
     `status`          ENUM('queued','running','done','failed') NOT NULL DEFAULT 'queued',
     `horizon_days`    INT           NOT NULL DEFAULT 30,
+    -- 'full'   = refit Prophet for every product (import / horizon change)
+    -- 'extend' = only forecast the days the saved window is missing
+    `mode`            ENUM('full','extend') NOT NULL DEFAULT 'full',
     `total`           INT           NOT NULL DEFAULT 0,
     `done`            INT           NOT NULL DEFAULT 0,
     `failed`          INT           NOT NULL DEFAULT 0,

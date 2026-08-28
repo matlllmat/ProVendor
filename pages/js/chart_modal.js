@@ -191,6 +191,7 @@ var ChartModal = (function () {
         fcStart:      null,
         disabledIds:  new Set(),
         nvOpen:       true,
+        refineOpen:   false,  // "Adjust price & stock" fold inside the Restock tab
         view:         'daily',   // 'daily' | 'weekly' | 'monthly' | 'yearly'
         cfg:          null,      // last config (kept so view-switch can re-render)
         meta:         null,      // newsvendor result; null until user requests insight
@@ -324,75 +325,114 @@ var ChartModal = (function () {
             : '';
 
         return '<div class="cm-chart-wrap">' +
-                '<div class="cm-chart-controls">' +
-                    '<div class="cm-legend">' +
-                        '<span class="cm-legend-item">' +
-                            '<svg width="18" height="10" viewBox="0 0 18 10"><line x1="0" y1="5" x2="18" y2="5" stroke="#1A6933" stroke-width="2"/></svg>' +
-                            ' Historical ' +
-                            '<span class="cm-legend-info" data-tip="Actual units sold each day before this forecast — the real demand pattern the model learned from.">ⓘ</span>' +
-                        '</span>' +
-                        '<span id="cm-pd-legend" class="cm-legend-item">' +
-                            '<svg width="18" height="10" viewBox="0 0 18 10"><line x1="0" y1="5" x2="18" y2="5" stroke="#FF5722" stroke-width="2" stroke-dasharray="5 3"/></svg>' +
-                            ' Projected Demand ' +
-                            '<span class="cm-legend-info" data-tip="Units the model predicts will be needed each day. This drives the recommended order quantity.">ⓘ</span>' +
-                        '</span>' +
-                        '<span id="cm-band-legend" class="cm-legend-item">' +
-                            '<span style="display:inline-block;width:18px;height:10px;border-radius:3px;background:rgba(255,87,34,0.2)"></span>' +
-                            ' Confidence band ' +
-                            '<span class="cm-legend-info" data-tip="The likely range around each day&rsquo;s projected demand — the model is about 95% confident actual sales land inside this band. A wider band means more uncertainty for that day.">ⓘ</span>' +
-                        '</span>' +
-                        '<span id="cm-nv-legend" class="cm-legend-item" style="display:none">' +
-                            '<svg width="18" height="10" viewBox="0 0 18 10"><line x1="0" y1="5" x2="18" y2="5" stroke="#FF1493" stroke-width="2.5" stroke-dasharray="3 3"/></svg>' +
-                            ' Newsvendor Order ' +
-                            '<span class="cm-legend-info" data-tip="Prophet&rsquo;s forecast scaled to the Newsvendor-optimal order quantity for your margin. Above the forecast = order extra (safety stock); below = order less (accept some stockout risk).">ⓘ</span>' +
-                        '</span>' +
-                    '</div>' +
-                    '<div class="cm-chart-btns">' +
-                        '<div class="cm-view-tabs">' +
-                            '<button type="button" class="cm-view-tab cm-view-tab-on" data-view="daily">Daily</button>' +
-                            '<button type="button" class="cm-view-tab"                data-view="weekly">Weekly</button>' +
-                            '<button type="button" class="cm-view-tab"                data-view="monthly">Monthly</button>' +
-                            '<button type="button" class="cm-view-tab"                data-view="yearly">Yearly</button>' +
-                        '</div>' +
-                        '<div class="event-btn-group">' +
-                            '<button id="cm-events-btn" class="cm-toggle-btn" style="border-radius:999px 0 0 999px;border-right:none">' +
-                                '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' +
-                                ' Events' +
-                            '</button>' +
-                            '<button id="cm-events-filter" class="event-filter-trigger" title="Filter events">' +
-                                '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>' +
-                            '</button>' +
-                        '</div>' +
-                        '<button id="cm-fo-btn" class="cm-toggle-btn" title="Show or hide the historical year lines">History</button>' +
-                        '<button id="cm-fc-line-btn" class="cm-toggle-btn" title="Show or hide the forecast (projected demand) line + band">' +
-                            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 7"/></svg>' +
-                            ' Forecast' +
-                        '</button>' +
-                        '<button id="cm-nv-overlay-btn" class="cm-toggle-btn cm-nv-toggle" style="display:none" title="Overlay the Newsvendor-recommended order quantity on the chart">' +
-                            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-                                '<circle cx="12" cy="12" r="10"/>' +
-                                '<circle cx="12" cy="12" r="6"/>' +
-                                '<circle cx="12" cy="12" r="2"/>' +
-                            '</svg>' +
-                            ' Newsvendor' +
-                        '</button>' +
-                        '<button id="cm-zoom-btn" class="cm-ghost-btn">' +
-                            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>' +
-                            ' Reset Zoom' +
-                        '</button>' +
-                    '</div>' +
+                // The legend gets its own line ABOVE the controls: it is a read-out of
+                // what the chart is drawing, not something you operate, so it belongs with
+                // the chart rather than in among the buttons.
+                '<div class="cm-legend">' +
+                    '<span id="cm-hist-legend" class="cm-legend-item">' +
+                        '<svg width="18" height="10" viewBox="0 0 18 10"><line x1="0" y1="5" x2="18" y2="5" stroke="#1A6933" stroke-width="2"/></svg>' +
+                        ' Historical ' +
+                        '<span class="cm-legend-info" data-tip="Actual units sold each day before this forecast.">i</span>' +
+                    '</span>' +
+                    '<span id="cm-pd-legend" class="cm-legend-item">' +
+                        '<svg width="18" height="10" viewBox="0 0 18 10"><line x1="0" y1="5" x2="18" y2="5" stroke="#FF5722" stroke-width="2" stroke-dasharray="5 3"/></svg>' +
+                        ' Projected Demand ' +
+                        '<span class="cm-legend-info" data-tip="Units the model predicts will be needed each day. This drives the recommended order quantity.">i</span>' +
+                    '</span>' +
+                    '<span id="cm-band-legend" class="cm-legend-item">' +
+                        '<span style="display:inline-block;width:18px;height:10px;border-radius:3px;background:rgba(255,87,34,0.2)"></span>' +
+                        ' Confidence band ' +
+                        '<span class="cm-legend-info" data-tip="The likely range around each day&rsquo;s projected demand. A wider band means more uncertainty.">i</span>' +
+                    '</span>' +
+                    '<span id="cm-nv-legend" class="cm-legend-item">' +
+                        '<svg width="18" height="10" viewBox="0 0 18 10"><line x1="0" y1="5" x2="18" y2="5" stroke="#FF1493" stroke-width="2.5" stroke-dasharray="3 3"/></svg>' +
+                        ' Newsvendor Order ' +
+                        '<span class="cm-legend-info" data-tip="The forecast scaled to the Newsvendor-optimal order quantity for your margin.">i</span>' +
+                    '</span>' +
                 '</div>' +
+
+                '<div class="cm-chart-controls">' +
+                    // The controls line: the view tabs on the left (what you are looking
+                    // AT) and the Options menu pinned to the far right for everything
+                    // that merely refines the view.
+                    '<div class="cm-view-tabs">' +
+                        '<button type="button" class="cm-view-tab cm-view-tab-on" data-view="daily">Daily</button>' +
+                        '<button type="button" class="cm-view-tab"                data-view="weekly">Weekly</button>' +
+                        '<button type="button" class="cm-view-tab"                data-view="monthly">Monthly</button>' +
+                        '<button type="button" class="cm-view-tab"                data-view="yearly">Yearly</button>' +
+                    '</div>' +
+
+                    // Right-hand action group. Reset zoom lives OUTSIDE the menu — it is
+                    // an action, not a setting, and it is needed exactly when you are
+                    // deep in a zoom and least want to go hunting through a popover.
+                    // It stays put whether or not the chart is zoomed: a control that
+                    // comes and goes is harder to rely on than one that is simply there.
+                    '<div class="cm-chart-actions">' +
+                    '<button type="button" id="cm-zoom-btn" class="cm-zoom-btn">' +
+                        '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>' +
+                        ' Reset zoom' +
+                    '</button>' +
+
+                    '<div class="cm-opt-wrap">' +
+                        '<button type="button" id="cm-opt-btn" class="cm-opt-btn" aria-expanded="false">' +
+                            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="9" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="8" cy="18" r="2" fill="currentColor" stroke="none"/></svg>' +
+                            ' Options' +
+                        '</button>' +
+
+                        '<div id="cm-opt-panel" class="cm-opt-panel" hidden>' +
+                            '<p class="cm-opt-title">Show on chart</p>' +
+                            '<label class="cm-opt-row" id="cm-opt-row-history">' +
+                                '<input type="checkbox" id="cm-opt-history">' +
+                                '<span class="cm-opt-swatch is-history"></span>' +
+                                '<span class="cm-opt-label">Historical years</span>' +
+                            '</label>' +
+                            '<label class="cm-opt-row">' +
+                                '<input type="checkbox" id="cm-opt-forecast" checked>' +
+                                '<span class="cm-opt-swatch is-forecast"></span>' +
+                                '<span class="cm-opt-label">Forecast + band</span>' +
+                            '</label>' +
+                            '<label class="cm-opt-row" id="cm-opt-row-nv" hidden>' +
+                                '<input type="checkbox" id="cm-opt-nv">' +
+                                '<span class="cm-opt-swatch is-nv"></span>' +
+                                '<span class="cm-opt-label">Newsvendor order</span>' +
+                            '</label>' +
+                            '<label class="cm-opt-row" id="cm-opt-row-events">' +
+                                '<input type="checkbox" id="cm-opt-events">' +
+                                '<span class="cm-opt-swatch is-events"></span>' +
+                                '<span class="cm-opt-label">Event markers</span>' +
+                                '<button type="button" id="cm-events-filter" class="cm-opt-sub" title="Choose which events">Filter</button>' +
+                            '</label>' +
+
+                            '<div class="cm-opt-sep"></div>' +
+                            '<div id="cm-opt-extra"></div>' +
+                        '</div>' +
+                    '</div>' +
+                    '</div>' +   // /.cm-chart-actions
+
+                '</div>' +   // /.cm-chart-controls — must close here, or the canvas
+                             // and #cm-info get absorbed into the control row and the
+                             // detail tabs disappear whenever the chart is hidden.
                 '<div id="cm-year-sel" class="cm-year-selector"></div>' +
                 '<canvas id="cm-canvas" style="max-height:280px"></canvas>' +
-            '</div>' +
+            '</div>' +   // /.cm-chart-wrap — #cm-info is its SIBLING, not its child
 
             // ── Detail organizer: tabs, collapsed by default so the chart stays clean.
             //    Each tab reveals one panel; clicking the active tab collapses it. ──
             '<div id="cm-info" class="cm-info" style="display:none">' +
                 '<div class="cm-info-tabs">' +
-                    '<button type="button" class="cm-info-tab" data-tab="restock">Restock</button>' +
-                    '<button type="button" class="cm-info-tab" data-tab="why">Why this forecast</button>' +
-                    '<button type="button" class="cm-info-tab" data-tab="accuracy">Accuracy</button>' +
+                    // The selected-product tag leads the row; the tabs follow on the right.
+                    '<div id="cm-info-slot" class="cm-info-slot"></div>' +
+                    '<div class="cm-info-tabgroup">' +
+                        '<button type="button" class="cm-info-tab" data-tab="restock">' +
+                            'Restock<span class="cm-info-caret" aria-hidden="true"></span>' +
+                        '</button>' +
+                        '<button type="button" class="cm-info-tab" data-tab="why">' +
+                            'Why this forecast<span class="cm-info-caret" aria-hidden="true"></span>' +
+                        '</button>' +
+                        '<button type="button" class="cm-info-tab" data-tab="accuracy">' +
+                            'Accuracy<span class="cm-info-caret" aria-hidden="true"></span>' +
+                        '</button>' +
+                    '</div>' +
                 '</div>' +
 
             // Forecast reasoning — populated by _renderReasoning() from per-day components.
@@ -413,7 +453,11 @@ var ChartModal = (function () {
                     // accurate; the edit sticks (persisted by the forecast page).
                     // "Reset to imported price" restores the value the dataset provided.
                     '<div class="cm-refine">' +
-                        '<p class="cm-refine-title">Adjust price &amp; stock</p>' +
+                        '<button type="button" id="cm-refine-toggle" class="cm-refine-head">' +
+                            '<span class="cm-refine-title">Adjust price &amp; stock</span>' +
+                            '<svg id="cm-refine-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform 0.2s;flex-shrink:0;transform:rotate(-90deg)"><polyline points="6 9 12 15 18 9"/></svg>' +
+                        '</button>' +
+                        '<div id="cm-refine-body" class="cm-refine-body" style="display:none">' +
                         '<div class="cm-refine-fields">' +
                             '<div class="cm-refine-field">' +
                                 '<label class="cm-refine-label" for="cm-refine-cost">Cost Price</label>' +
@@ -442,6 +486,7 @@ var ChartModal = (function () {
                             '<button type="button" id="cm-refine-reset" class="cm-refine-reset" style="display:none"></button>' +
                         '</div>' +
                         '<p id="cm-refine-msg" class="cm-msg" style="display:none;margin-top:0.5rem"></p>' +
+                        '</div>' +   // /#cm-refine-body
                     '</div>' +
                     '<div class="cm-nv-section">' +
                         '<button id="cm-nv-toggle" class="cm-nv-header">' +
@@ -515,20 +560,28 @@ var ChartModal = (function () {
 
     // ── wire interactive elements ─────────────────────────────────────────────
     function _wire(cfg) {
-        document.getElementById('cm-events-btn').addEventListener('click', _toggleEvents);
+        document.getElementById('cm-opt-events').addEventListener('change', _toggleEvents);
         var filterBtn = document.getElementById('cm-events-filter');
         if (filterBtn) {
             filterBtn.addEventListener('click', function (e) {
+                // "Filter" only opens the event checklist. It must not switch the markers
+                // on as a side effect: choosing WHICH events matter is a separate decision
+                // from whether they are drawn, and flipping the checkbox for the owner
+                // makes the control lie about its own state.
+                // preventDefault() as well as stopPropagation() because this button sits
+                // inside the checkbox's <label> — without it, the click can reach the
+                // label and toggle the very checkbox we are avoiding.
+                e.preventDefault();
                 e.stopPropagation();
-                var opened = toggleEventsChecklist(filterBtn, _st.disabledIds, function () { _applyAnnotations(); });
-                if (opened && !_st.eventsOn) _toggleEvents();
+                toggleEventsChecklist(filterBtn, _st.disabledIds, function () { _applyAnnotations(); });
             });
         }
-        document.getElementById('cm-fo-btn').addEventListener('click', _toggleForecastOnly);
-        document.getElementById('cm-fc-line-btn').addEventListener('click', _toggleForecast);
+        document.getElementById('cm-opt-history').addEventListener('change', _toggleForecastOnly);
+        document.getElementById('cm-opt-forecast').addEventListener('change', _toggleForecast);
+        _wireOptionsMenu();
         document.getElementById('cm-zoom-btn').addEventListener('click', function () { if (_chart) _chart.resetZoom(); });
 
-        var nvOverlayBtn = document.getElementById('cm-nv-overlay-btn');
+        var nvOverlayBtn = document.getElementById('cm-opt-nv');
         if (nvOverlayBtn) nvOverlayBtn.addEventListener('click', _toggleNvOverlay);
 
         // View tabs (Daily / Weekly / Monthly / Yearly)
@@ -564,6 +617,8 @@ var ChartModal = (function () {
         // Wire newsvendor toggle once results panel exists (it's there but hidden)
         var nvToggle = document.getElementById('cm-nv-toggle');
         if (nvToggle) nvToggle.addEventListener('click', _toggleNv);
+        var refineToggle = document.getElementById('cm-refine-toggle');
+        if (refineToggle) refineToggle.addEventListener('click', _toggleRefine);
 
         // Detail tabs (Restock / Why this forecast / Accuracy) — collapsed by default.
         document.querySelectorAll('#cm-info .cm-info-tab').forEach(function (btn) {
@@ -667,11 +722,10 @@ var ChartModal = (function () {
         // default chart shows only the forecasted demand. The user turns on the
         // Newsvendor overlay from the button when they want to see it.
         _st.showOptimal = false;
-        var nvBtn = document.getElementById('cm-nv-overlay-btn');
-        if (nvBtn) {
-            nvBtn.style.display = '';
-            nvBtn.classList.remove('cm-btn-on');
-        }
+        var nvRow = document.getElementById('cm-opt-row-nv');
+        if (nvRow) nvRow.hidden = false;                       // only meaningful once a restock exists
+        var nvBox = document.getElementById('cm-opt-nv');
+        if (nvBox) nvBox.checked = false;
         _applyNvOverlayState();
         _renderView();
     }
@@ -779,10 +833,12 @@ var ChartModal = (function () {
     function _toggleNvOverlay() {
         if (!_st.meta) return;             // shouldn't happen — button is hidden until restock generates
         _st.showOptimal = !_st.showOptimal;
-        var btn = document.getElementById('cm-nv-overlay-btn');
-        if (btn) btn.classList.toggle('cm-btn-on', _st.showOptimal);
+        var box = document.getElementById('cm-opt-nv');
+        if (box) box.checked = _st.showOptimal;
         _applyNvOverlayState();
-        _renderView();
+        // Needs the rebuild: each view builder adds the Newsvendor dataset only when
+        // the overlay is on. Zoom is carried across.
+        _renderView(true);
     }
 
     // Shows/hides the Newsvendor legend item + chart tint based on whether the
@@ -792,7 +848,8 @@ var ChartModal = (function () {
         var legend = document.getElementById('cm-nv-legend');
         var wrap   = document.querySelector('.cm-chart-wrap');
         var active = _st.showOptimal && _st.meta;
-        if (legend) legend.style.display = active ? '' : 'none';
+        // Dimmed rather than hidden, so the legend row never changes shape.
+        if (legend) legend.classList.toggle('is-off', !active);
         if (wrap)   wrap.classList.toggle('cm-chart-wrap-nv-active', !!active);
     }
 
@@ -839,6 +896,7 @@ var ChartModal = (function () {
         _st.fcStart      = null;
         _st.disabledIds  = cfg.disabledEventIds || new Set();
         _st.nvOpen       = false;
+        _st.refineOpen   = false;   // the stat cards lead; editing folds behind them
         _st.view         = 'daily';
         _st.cfg          = cfg;
         _st.meta         = null;
@@ -884,6 +942,12 @@ var ChartModal = (function () {
         }
 
         _updateInfoTabs();
+
+        // Restock opens by default — the suggested order is the answer the owner came
+        // for, so making them click to reach it buries the point of the page. Set here
+        // rather than in the initial state because the tab only becomes available once
+        // _st.infoAvail.restock is known, a few lines above.
+        if (_st.infoAvail.restock) _setInfoTab('restock');
     }
 
     // ── public: standalone modal (reports) ───────────────────────────────────
@@ -944,38 +1008,71 @@ var ChartModal = (function () {
     }
 
     // ── view dispatcher + control visibility ──────────────────────────────────
-    function _renderView() {
+    // Rebuilds the chart from scratch. `preserveZoom` carries the owner's current
+    // viewport across the rebuild — see _capturedRange() for when that applies.
+    function _renderView(preserveZoom) {
         var cfg = _st.cfg;
         if (!cfg) return;
+
+        var keep = preserveZoom ? _capturedRange() : null;
 
         if (_chart) { _chart.destroy(); _chart = null; }
         _st.fcBucketComponents = {};  // each view repopulates this for its own bucket scheme
 
-        switch (_st.view) {
-            case 'weekly':  _renderWeeklyView(cfg.historical, cfg.forecast); break;
-            case 'monthly': _renderMonthlyView(cfg.historical, cfg.forecast); break;
-            case 'yearly':  _renderYearlyView(cfg.historical, cfg.forecast); break;
-            default:        _renderDailyView(cfg.historical, cfg.forecast, cfg.hasBand); break;
+        // Every Show-on-chart rebuild lands instantly, zoomed or not: it is only
+        // changing which series are drawn, and re-animating that reads as a reload.
+        // (The viewport carry-over below is narrower - it additionally requires that
+        // the owner actually chose a viewport - so these two are not the same test.)
+        _instantBuild = !!preserveZoom;
+        try {
+            switch (_st.view) {
+                case 'weekly':  _renderWeeklyView(cfg.historical, cfg.forecast); break;
+                case 'monthly': _renderMonthlyView(cfg.historical, cfg.forecast); break;
+                case 'yearly':  _renderYearlyView(cfg.historical, cfg.forecast); break;
+                default:        _renderDailyView(cfg.historical, cfg.forecast, cfg.hasBand); break;
+            }
+        } finally {
+            _instantBuild = false;
         }
+
+        _syncViewControls();
+        _restoreRange(keep);
+    }
+
+    // Reflects the current toggle state onto whatever chart already exists: which
+    // series are drawn, which controls apply to this view, and how the legend reads.
+    // Deliberately does NOT rebuild, so anything that only changes visibility can
+    // call this alone and leave the owner's zoom/pan untouched.
+    function _syncViewControls() {
+        var cfg = _st.cfg;
+        if (!cfg) return;
 
         // Toggle controls relevant to the active view.
         var yearSel    = document.getElementById('cm-year-sel');
-        var eventsGrp  = document.querySelector('.cm-chart-controls .event-btn-group');
-        var foBtn      = document.getElementById('cm-fo-btn');
-        var zoomBtn    = document.getElementById('cm-zoom-btn');
+        var histRow    = document.getElementById('cm-opt-row-history');
         var bandLeg    = document.getElementById('cm-band-legend');
 
         // Year pills make sense everywhere except the single-bar Yearly view — and
         // are moot in forecast-only mode (all year series are hidden).
         if (yearSel)   yearSel.style.display   = (_st.view === 'yearly' || (_st.view === 'daily' && _st.forecastOnly)) ? 'none' : '';
-        if (eventsGrp) eventsGrp.style.display = _st.view === 'daily'  ? '' : 'none';
-        if (foBtn) {
-            foBtn.style.display = _st.view === 'daily' ? '' : 'none';
-            foBtn.classList.toggle('cm-btn-on', !_st.forecastOnly);  // "History" is on when year lines show
+        var evRow = document.getElementById('cm-opt-row-events');
+        if (evRow) evRow.hidden = (_st.view !== 'daily');
+        // Legend entries are never added or removed — an inactive series is just
+        // faded. That keeps the row's geometry identical whatever is switched on,
+        // and doubles as an at-a-glance read-out of what the chart is showing.
+        // Function DECLARATION so it can be called from anywhere in this function.
+        function dim(el, active) {
+            if (!el) return;
+            el.classList.toggle('is-off', !active);
         }
-        if (bandLeg)   bandLeg.style.display   = (_st.view === 'daily' && cfg.hasBand && _st.showForecast) ? '' : 'none';
-        // Reset Zoom is useful in every view now — bar charts support zoom too.
-        if (zoomBtn)   zoomBtn.style.display   = '';
+
+        // Historical year lines only exist in the daily view.
+        if (histRow) histRow.hidden = (_st.view !== 'daily');
+        var histBox = document.getElementById('cm-opt-history');
+        if (histBox) histBox.checked = !_st.forecastOnly;
+
+        dim(bandLeg, _st.view === 'daily' && cfg.hasBand && _st.showForecast);
+        dim(document.getElementById('cm-hist-legend'), _st.view === 'daily' && !_st.forecastOnly);
 
         // ── Forecast line/band visibility — an independent toggle, like Newsvendor.
         // Hide the projected datasets by label (works across all view builders)
@@ -987,10 +1084,45 @@ var ChartModal = (function () {
             });
             _chart.update('none');
         }
-        var pdLeg = document.getElementById('cm-pd-legend');
-        if (pdLeg) pdLeg.style.display = _st.showForecast ? '' : 'none';
-        var fcBtn = document.getElementById('cm-fc-line-btn');
-        if (fcBtn) fcBtn.classList.toggle('cm-btn-on', _st.showForecast);
+        dim(document.getElementById('cm-pd-legend'), _st.showForecast);
+        var fcBox = document.getElementById('cm-opt-forecast');
+        if (fcBox) fcBox.checked = _st.showForecast;
+
+    }
+
+    // True only while a rebuild triggered by a Show-on-chart toggle is running.
+    var _instantBuild = false;
+
+    // Chart.js replays its full 1s entry animation on every construction, so a
+    // rebuild made the whole chart visibly redraw itself — which reads as "it reset"
+    // even though the viewport never moved (measured: x stayed put frame for frame,
+    // but every line swept back in over a second). A toggle should look like a series
+    // appearing, not like the chart reloading, so toggle-driven rebuilds land instantly.
+    // A genuinely fresh render — new product, new view — still animates.
+    function _entryAnimation() {
+        return _instantBuild ? false : Chart.defaults.animation;
+    }
+
+    // ── viewport preservation ────────────────────────────────────────────────
+    // Destroying a chart throws away its zoom/pan, so toggling a series used to snap
+    // the owner back to the full window — losing the exact stretch of days they had
+    // zoomed in to read. These carry the viewport across a rebuild.
+    //
+    // An UNTOUCHED chart returns null on purpose: it has no viewport the owner chose,
+    // so it should still get the fresh fit its new set of series deserves (turning the
+    // historical years on is supposed to widen the axis back out to the full span).
+    function _capturedRange() {
+        if (!_chart || !_chart.scales || !_chart.scales.x) return null;
+        if (typeof _chart.isZoomedOrPanned === 'function' && !_chart.isZoomedOrPanned()) return null;
+        return { min: _chart.scales.x.min, max: _chart.scales.x.max };
+    }
+
+    function _restoreRange(range) {
+        if (!range || !_chart || typeof _chart.zoomScale !== 'function') return;
+        _chart.zoomScale('x', { min: range.min, max: range.max }, 'none');
+        // Event markers are drawn for the visible window only, and a programmatic
+        // zoom doesn't fire onZoomComplete, so they need re-deriving by hand.
+        if (_st.eventsOn) _applyAnnotations();
     }
 
     // Custom HTML tooltip handler. The actual implementation lives in
@@ -1098,6 +1230,7 @@ var ChartModal = (function () {
             data: { datasets: datasets },
             options: {
                 responsive: true,
+                animation: _entryAnimation(),
                 interaction: { mode: 'nearest', axis: 'x', intersect: false },
                 plugins: {
                     legend: { display: false },
@@ -1316,6 +1449,7 @@ var ChartModal = (function () {
             data: { labels: labels, datasets: datasets },
             options: {
                 responsive: true,
+                animation: _entryAnimation(),
                 // Without this, Chart.js reserves a slot in every category for
                 // each dataset even when the value is null — leaving visible
                 // gaps where one year had no data but another did.
@@ -1384,20 +1518,64 @@ var ChartModal = (function () {
     // forecast window; turning it off restores the full historical span.
     function _toggleForecastOnly() {
         _st.forecastOnly = !_st.forecastOnly;
-        _renderView();
+        // Needs the rebuild: this toggle refits the x-axis (see _renderDailyView),
+        // which is baked in at build time. Zoom is carried across.
+        _renderView(true);
     }
 
     // Show / hide the forecast (projected demand line + confidence band). Independent
     // of the Newsvendor overlay — either, both, or neither can be shown.
     function _toggleForecast() {
         _st.showForecast = !_st.showForecast;
-        _renderView();
+        // Pure visibility change — the forecast datasets are already in the chart and
+        // the fitted axis doesn't depend on them, so there is nothing to rebuild.
+        _syncViewControls();
     }
 
     // ── events toggle ─────────────────────────────────────────────────────────
+    // ── Options menu ─────────────────────────────────────────────────────────
+    // Everything that merely refines the chart lives in here, so the card itself
+    // only ever shows the two controls that change WHAT you are looking at.
+    function _wireOptionsMenu() {
+        var btn   = document.getElementById('cm-opt-btn');
+        var panel = document.getElementById('cm-opt-panel');
+        if (!btn || !panel) return;
+
+        function close() {
+            panel.hidden = true;
+            btn.setAttribute('aria-expanded', 'false');
+            btn.classList.remove('is-open');
+        }
+        function open() {
+            panel.hidden = false;
+            btn.setAttribute('aria-expanded', 'true');
+            btn.classList.add('is-open');
+        }
+
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            panel.hidden ? open() : close();
+        });
+
+        // Clicks inside the panel must not close it (they are the whole point),
+        // but anywhere else should.
+        panel.addEventListener('click', function (e) { e.stopPropagation(); });
+        document.addEventListener('click', function (e) {
+            // The event checklist that "Filter" opens is rendered OUTSIDE this panel,
+            // so its clicks reach the document like any outside click would. Closing
+            // on those would pull the menu out from under a checklist the owner opened
+            // from it and is actively using.
+            if (e.target && e.target.closest && e.target.closest('.event-filter-panel')) return;
+            close();
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') close();
+        });
+    }
+
     function _toggleEvents() {
         _st.eventsOn = !_st.eventsOn;
-        var btn = document.getElementById('cm-events-btn');
+        var btn = document.getElementById('cm-opt-events');
         if (btn) btn.classList.toggle('cm-btn-on', _st.eventsOn);
         _applyAnnotations();
     }
@@ -1417,6 +1595,17 @@ var ChartModal = (function () {
     }
 
     // ── newsvendor toggle ─────────────────────────────────────────────────────
+    // "Adjust price & stock" folds the same way the Newsvendor explainer below it
+    // does. The four stat cards answer the question on their own; editing price or
+    // stock is a follow-up action, so it should not be the first thing in view.
+    function _toggleRefine() {
+        _st.refineOpen = !_st.refineOpen;
+        var body = document.getElementById('cm-refine-body');
+        var chev = document.getElementById('cm-refine-chev');
+        if (body) body.style.display   = _st.refineOpen ? '' : 'none';
+        if (chev) chev.style.transform = _st.refineOpen ? 'rotate(0deg)' : 'rotate(-90deg)';
+    }
+
     function _toggleNv() {
         _st.nvOpen = !_st.nvOpen;
         var body = document.getElementById('cm-nv-body');

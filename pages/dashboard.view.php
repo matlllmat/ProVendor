@@ -40,45 +40,77 @@ $units = fn($v) => number_format((int) $v);
     </div>
     <?php else: ?>
 
-    <!-- ── 1. KPI cards ─────────────────────────────────────────────────────── -->
-    <section class="db-kpis">
-        <div class="db-kpi">
-            <span class="db-kpi-label">Forecast window</span>
-            <span class="db-kpi-value db-kpi-window"><?php echo htmlspecialchars($windowLabel); ?></span>
-            <span class="db-kpi-sub"><?php echo htmlspecialchars($windowSub); ?></span>
+    <!-- ── 1. Store summary ─────────────────────────────────────────────────
+         One card rather than six tiles. The six figures were never peers: the
+         forecast window is context for the others, and the rest form a sentence —
+         this much demand is coming, so order this much, at this cost, for this
+         profit. Six identically-styled boxes flattened all of that into a wall of
+         equal-weight numbers where nothing led.
+    -->
+    <section class="db-summary">
+
+        <!-- Context strip: what window these figures describe, and how much of the
+             catalogue they touch. Framing, not metrics, so it is sized as prose. -->
+        <div class="db-sum-context">
+            <span class="db-ctx-item">
+                <span class="db-ctx-label">Forecast window</span>
+                <span class="db-ctx-value"><?php echo htmlspecialchars($windowLabel); ?></span>
+            </span>
+            <span class="db-ctx-dot">·</span>
+            <span class="db-ctx-note"><?php echo htmlspecialchars($windowSub); ?></span>
+
+            <span class="db-ctx-fill"></span>
+
+            <span class="db-ctx-note db-ctx-need">
+                <strong id="kpi-need"><?php echo (int) $kpi['need_restock']; ?></strong>
+                of <?php echo (int) $kpi['product_count']; ?> products need restocking
+            </span>
+            <?php if (SHOW_ACCURACY_FEATURES): ?>
+            <span class="db-ctx-dot">·</span>
+            <span class="db-ctx-note">
+                <?php echo $accuracy['weighted_accuracy_pct'] !== null ? number_format($accuracy['weighted_accuracy_pct'], 1) . '%' : '—'; ?>
+                accurate (<?php echo (int) $accuracy['evaluated_count']; ?>/<?php echo (int) $accuracy['total_count']; ?> evaluated)
+            </span>
+            <?php endif; ?>
         </div>
-        <div class="db-kpi">
-            <span class="db-kpi-label">Forecast demand</span>
-            <span class="db-kpi-value" id="kpi-demand"><?php echo $units($kpi['total_demand']); ?></span>
-            <span class="db-kpi-sub" id="kpi-demand-sub">units · next <?php echo (int) $horizon; ?> days</span>
+
+        <div class="db-sum-body">
+
+            <!-- What is coming -->
+            <div class="db-sum-group">
+                <p class="db-sum-label">Expected demand</p>
+                <div class="db-sum-figs">
+                    <div class="db-fig">
+                        <span class="db-fig-value" id="kpi-demand"><?php echo $units($kpi['total_demand']); ?></span>
+                        <span class="db-fig-sub" id="kpi-demand-sub">units · next <?php echo (int) $horizon; ?> days</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- What to do about it. Cost and profit are shown as a pair because that
+                 is the decision: spend this, get back that. -->
+            <div class="db-sum-group db-sum-plan">
+                <p class="db-sum-label">Suggested restock plan</p>
+                <div class="db-sum-figs">
+                    <div class="db-fig">
+                        <span class="db-fig-value" id="kpi-restock"><?php echo $units($kpi['total_order_qty']); ?></span>
+                        <span class="db-fig-sub" id="kpi-restock-sub">across <?php echo (int) $kpi['need_restock']; ?> products</span>
+                    </div>
+                    <div class="db-money">
+                        <div class="db-fig">
+                            <span class="db-fig-value db-accent" id="kpi-spend"><?php echo $peso($kpi['total_order_cost'], 0); ?></span>
+                            <span class="db-fig-sub">to spend</span>
+                        </div>
+                        <span class="db-fig-arrow" aria-hidden="true">&rarr;</span>
+                        <div class="db-fig">
+                            <span class="db-fig-value db-green" id="kpi-profit"><?php echo $peso($kpi['total_profit'], 0); ?></span>
+                            <span class="db-fig-sub">est. profit</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
-        <div class="db-kpi">
-            <span class="db-kpi-label">Units to restock</span>
-            <span class="db-kpi-value" id="kpi-restock"><?php echo $units($kpi['total_order_qty']); ?></span>
-            <span class="db-kpi-sub" id="kpi-restock-sub">across <?php echo (int) $kpi['need_restock']; ?> products</span>
-        </div>
-        <div class="db-kpi">
-            <span class="db-kpi-label">To spend</span>
-            <span class="db-kpi-value db-accent" id="kpi-spend"><?php echo $peso($kpi['total_order_cost'], 0); ?></span>
-            <span class="db-kpi-sub">estimated order cost</span>
-        </div>
-        <div class="db-kpi">
-            <span class="db-kpi-label">Est. profit</span>
-            <span class="db-kpi-value db-green" id="kpi-profit"><?php echo $peso($kpi['total_profit'], 0); ?></span>
-            <span class="db-kpi-sub">at forecast demand</span>
-        </div>
-        <div class="db-kpi">
-            <span class="db-kpi-label">Needs restock</span>
-            <span class="db-kpi-value"><span id="kpi-need"><?php echo (int) $kpi['need_restock']; ?></span><span class="db-kpi-of">/<?php echo (int) $kpi['product_count']; ?></span></span>
-            <span class="db-kpi-sub">products with an order</span>
-        </div>
-        <?php if (SHOW_ACCURACY_FEATURES): ?>
-        <div class="db-kpi">
-            <span class="db-kpi-label">Accuracy</span>
-            <span class="db-kpi-value"><?php echo $accuracy['weighted_accuracy_pct'] !== null ? number_format($accuracy['weighted_accuracy_pct'], 1) . '%' : '—'; ?></span>
-            <span class="db-kpi-sub"><?php echo (int) $accuracy['evaluated_count']; ?>/<?php echo (int) $accuracy['total_count']; ?> evaluated</span>
-        </div>
-        <?php endif; ?>
     </section>
 
     <?php if (!$hasForecasts): ?>

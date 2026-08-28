@@ -107,5 +107,33 @@
     };
 
     start();
+
+    // ── Automatic window upkeep ─────────────────────────────────────────────
+    // Once per browser-day, ask the server whether the forecast still reaches the
+    // owner's chosen horizon. In AUTO mode the server tops it up (extend mode —
+    // only the missing days), in manual mode it just reports. Throttled by date so
+    // browsing around doesn't re-check on every page.
+    (function autoUpkeep() {
+        // Local date, not toISOString() — that returns UTC, which would roll the
+        // "once a day" key over at the wrong hour for a store east of Greenwich.
+        var n = new Date();
+        var todayKey = n.getFullYear() + '-' +
+                       String(n.getMonth() + 1).padStart(2, '0') + '-' +
+                       String(n.getDate()).padStart(2, '0');
+        try {
+            if (localStorage.getItem('pv_fc_checked') === todayKey) return;
+        } catch (e) {}
+
+        fetch(BASE + '/api/forecast_coverage.php', { method: 'POST', credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (d && !d.error) {
+                    try { localStorage.setItem('pv_fc_checked', todayKey); } catch (e) {}
+                    // A top-up was kicked off — surface it in the pill straight away.
+                    if (d.started) start();
+                }
+            })
+            .catch(function () { /* try again next page load */ });
+    }());
 }());
 </script>

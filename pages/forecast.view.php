@@ -38,7 +38,8 @@ require_once __DIR__ . '/../includes/header.php';
                 <p class="chart-title" style="margin-bottom:0">Demand Analysis</p>
 
                 <div id="chart-selected-product" class="chart-selected-product" style="display:none">
-                    <span class="chart-selected-dot"></span>
+                    <!-- A coloured dot alone never said WHAT was selected; the word does. -->
+                    <span class="chart-selected-label">Selected</span>
                     <span id="chart-selected-name" class="chart-selected-name"></span>
                     <button class="chart-deselect-btn" onclick="deselectProduct()" title="Back to all products">
                         <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -847,11 +848,11 @@ function updateChartContext() {
     const nameEl    = document.getElementById('chart-selected-name');
     if (!indicator || !nameEl) return;
     if (activeProductId) {
-        nameEl.textContent      = productDisplayLabel();
-        indicator.style.display = 'flex';
-    } else {
-        indicator.style.display = 'none';
+        nameEl.textContent = productDisplayLabel();
     }
+    // Visibility and placement are owned by placeChartMovables() - setting display
+    // here as well would fight it and un-hide the chip mid-rebuild.
+    placeChartMovables(demandView === 'calendar');
 }
 
 // ── Load sales data ───────────────────────────────────────────────────────────
@@ -1296,9 +1297,10 @@ function applyDemandView() {
     show(af, isProduct ? '' : 'none');
     if (af) af.classList.toggle('is-chart-hidden', calendarOn);
 
-    // The per-product forecast range still applies in either view — it changes the
-    // data both of them draw — so it follows the mode, not the view.
-    show(byId('product-range'), isProduct ? 'flex' : 'none');
+    // The forecast range and the selected-product chip are relocated rather than
+    // just shown/hidden, so their placement AND visibility both belong to
+    // placeChartMovables(). Setting display for them here as well would fight it.
+    placeChartMovables(calendarOn);
 
     if (calendarOn) {
         ['chart-loading', 'chart-error', 'demand-chart', 'product-insights'].forEach(function (id) {
@@ -1324,6 +1326,88 @@ function applyDemandView() {
     show(byId('chart-error'),   chartState === 'error'   ? 'flex'  : 'none');
     show(byId('demand-chart'),  chartState === 'chart'   ? 'block' : 'none');
     show(byId('product-insights'), 'none');
+}
+
+// Two controls are single live elements with two possible homes each:
+//
+//   #product-range           -> the chart's Options menu (Graph view), else the header
+//   #chart-selected-product  -> the detail-tabs row, far right (whenever those tabs
+//                               are rendered), else the header beside the title
+//
+// Both preferred homes sit INSIDE #analysis-forecast, and that whole subtree is
+// replaced on every re-render. So anything that rewrites #analysis-forecast must
+// park them back in the header FIRST, or the re-render deletes them outright and
+// they are gone for the rest of the session.
+//
+// They are parked hidden: the chart area is mid-rebuild at that point, and showing
+// them in the header for those few frames only to move them back reads as a flicker.
+// placeChartMovables() restores visibility once the rebuild lands.
+function parkChartMovables() {
+    var range = document.getElementById('product-range');
+    var right = document.querySelector('.chart-head-right');
+    if (range && right && range.parentElement !== right) {
+        range.classList.remove('in-options');
+        range.style.display = 'none';
+        right.insertBefore(range, right.firstChild);
+    }
+
+    var chip = document.getElementById('chart-selected-product');
+    var left = document.querySelector('.chart-head-left');
+    if (chip && left && chip.parentElement !== left) {
+        chip.classList.remove('in-info-row');
+        chip.style.display = 'none';
+        left.appendChild(chip);
+    }
+}
+
+// Puts both controls wherever the current view wants them. Called after every
+// render, so it has to cope with the target slots not existing yet - in which case
+// the element simply stays parked in the header rather than dropping out of the page.
+function placeChartMovables(calendarOn) {
+    var isProduct = (demandMode === 'product');
+
+    // -- forecast range --
+    // It applies to BOTH views (it changes the data each of them draws) so it follows
+    // the mode, not the view. Only where it SITS depends on the view: the Options menu
+    // exists in Graph view only, so Calendar view keeps it in the header.
+    var range = document.getElementById('product-range');
+    if (range) {
+        if (calendarOn) {
+            parkChartMovables();
+        } else {
+            var optSlot = document.getElementById('cm-opt-extra');
+            if (optSlot && range.parentElement !== optSlot) {
+                range.classList.add('in-options');   // a labelled field, not a header pill
+                optSlot.appendChild(range);
+            }
+        }
+        range.style.display = isProduct ? 'flex' : 'none';
+    }
+
+    // -- selected-product chip --
+    // It belongs on the same line as the product's own detail tabs, not up in the card
+    // title: those tabs are all about the selected product, so naming it there is what
+    // makes the row self-explanatory. The slot exists in both views (the detail tabs
+    // survive the calendar), so there is no view-dependent branch here.
+    var chip = document.getElementById('chart-selected-product');
+    if (chip) {
+        // The whole detail block hides itself when a product has neither a restock nor
+        // a reasoning breakdown to show. Parking the chip in an invisible row would
+        // silently lose it, so fall back to the header whenever that block is hidden.
+        var info     = document.getElementById('cm-info');
+        var infoOpen = info && info.style.display !== 'none';
+        var infoSlot = infoOpen ? document.getElementById('cm-info-slot') : null;
+
+        if (isProduct && infoSlot) {
+            if (chip.parentElement !== infoSlot) {
+                chip.classList.add('in-info-row');
+                infoSlot.appendChild(chip);
+            }
+        } else {
+            parkChartMovables();
+        }
+        chip.style.display = isProduct ? 'flex' : 'none';
+    }
 }
 
 // Fetches (once per scope) and renders the calendar. Read-only and Flask-free —
@@ -1382,6 +1466,7 @@ function enterProductMode() {
 }
 
 function enterAggregateMode() {
+    parkChartMovables();   // destroyIn() tears down the Options menu the range may be sitting in
     ChartModal.destroyIn();
     demandMode = 'aggregate';
     applyDemandView();
@@ -1448,6 +1533,7 @@ function showProductAnalysis() {
     if (rangeInput) rangeInput.value = productHorizon(pid);
     _rangeNote('', false);
 
+    parkChartMovables();   // the Options menu is about to be wiped; rescue the range control
     var af = document.getElementById('analysis-forecast');
     if (af) af.innerHTML =
         '<div class="af-inline-loading">' +
@@ -1483,6 +1569,7 @@ function showProductAnalysis() {
 // also saves it), then render it inline. current_stock defaults to 0; the user
 // can refine it from the Restock tab. Prices come from the selected product.
 function generateProductForecast(pid, hist) {
+    parkChartMovables();   // the Options menu is about to be wiped; rescue the range control
     var af = document.getElementById('analysis-forecast');
     if (af) af.innerHTML =
         '<div class="af-inline-loading">' +
@@ -1548,14 +1635,21 @@ function generateProductForecast(pid, hist) {
 }
 
 function _showInlineForecastError(msg) {
+    parkChartMovables();   // the Options menu is about to be wiped; rescue the range control
     var af = document.getElementById('analysis-forecast');
     if (af) af.innerHTML = '<div class="af-inline-error">' + msg + '</div>';
+
+    // There is no Options menu to move back into now, so the control stays parked in
+    // the header — but it was parked hidden, and the range is still worth offering
+    // (a shorter one is often what makes a failing forecast succeed).
+    placeChartMovables(true);
 }
 
 // Render the forecast-projection view inline via the shared chart modal renderer.
 function renderInlineForecast(historical, forecast, meta) {
     enterProductMode();
 
+    parkChartMovables();   // ChartModal replaces this subtree, Options menu included
     ChartModal.renderIn(document.getElementById('analysis-forecast'), {
         label:               'Demand Forecast',
         title:               productDisplayLabel(),
@@ -1615,6 +1709,10 @@ function renderInlineForecast(historical, forecast, meta) {
                 .catch(function () { done({ error: 'Network error. Please try again.' }); });
         },
     });
+
+    // The Options menu only exists once ChartModal has rendered, so this is the
+    // point at which the forecast-range control can be tucked into it.
+    placeChartMovables(demandView === 'calendar');
 }
 
 // ── Update a product card's forecast summary ──────────────────────────────────

@@ -25,3 +25,12 @@ $summary  = getImportSummary($pdo, $_SESSION['user_id']);
 // Last background forecast run — the Forecast Range tab shows when the catalogue
 // was last forecast and whether a run is in flight right now.
 $lastJob = getLatestForecastJob($pdo, (int) $_SESSION['user_id']);
+
+// How the window is kept current (manual / auto) and how far ahead it currently
+// reaches — drives the mode switch and the "up to date" indicator.
+require_once __DIR__ . '/../queries/forecast.query.php';
+$forecastMode     = getForecastMode($pdo, (int) $_SESSION['user_id']);
+$forecastCoverage = getForecastCoverage(
+    $pdo, (int) $_SESSION['user_id'],
+    (int) ($profile['forecast_horizon_days'] ?? 30)
+);

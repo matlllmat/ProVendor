@@ -10,13 +10,15 @@
 const FORECAST_JOB_STALE_SECONDS = 300;
 
 // Creates a queued job and returns its id.
-function createForecastJob(PDO $pdo, int $userId, int $horizonDays, int $total): int
+// $mode: 'full' refits every product; 'extend' only forecasts the days each
+// product's saved window is missing (see cli/forecast_worker.php).
+function createForecastJob(PDO $pdo, int $userId, int $horizonDays, int $total, string $mode = 'full'): int
 {
     $stmt = $pdo->prepare(
-        'INSERT INTO forecast_jobs (user_id, status, horizon_days, total, done, failed)
-         VALUES (?, "queued", ?, ?, 0, 0)'
+        'INSERT INTO forecast_jobs (user_id, status, horizon_days, mode, total, done, failed)
+         VALUES (?, "queued", ?, ?, ?, 0, 0)'
     );
-    $stmt->execute([$userId, $horizonDays, $total]);
+    $stmt->execute([$userId, $horizonDays, $mode === 'extend' ? 'extend' : 'full', $total]);
     return (int) $pdo->lastInsertId();
 }
 

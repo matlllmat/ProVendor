@@ -253,3 +253,60 @@
     line-height: 1.5;
     margin-top: 0.7rem;
 }
+
+/* ── Manual / automatic window upkeep ── */
+.settings-modes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+}
+.settings-mode {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+    padding: 0.75rem 0.9rem;
+    background: #F0E8D0;
+    border: 1px solid #D2C8AE;
+    border-radius: 0.7rem;
+    font-family: 'Lora', serif;
+    text-align: left;
+    color: #261F0E;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+.settings-mode:hover { border-color: rgba(38,31,14,0.45); }
+.settings-mode.is-on { background: #261F0E; border-color: #261F0E; color: #F0E8D0; }
+.settings-mode-name { font-size: 0.85rem; font-weight: 700; }
+.settings-mode-desc { font-size: 0.68rem; opacity: 0.6; }
+.settings-mode.is-on .settings-mode-desc { opacity: 0.75; }
+
+.settings-status {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.8rem 0.9rem;
+    border-radius: 0.7rem;
+    border-left: 3px solid #D2C8AE;
+    background: rgba(38,31,14,0.035);
+}
+.settings-status.is-ok     { border-left-color: #1A6933; background: rgba(26,105,51,0.07); }
+.settings-status.is-behind { border-left-color: #FF5722; background: rgba(255,87,34,0.07); }
+
+.settings-status-dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    margin-top: 0.35rem; flex-shrink: 0;
+    background: #D2C8AE;
+}
+.settings-status.is-ok     .settings-status-dot { background: #1A6933; }
+.settings-status.is-behind .settings-status-dot { background: #FF5722; }
+
+.settings-status-text  { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; flex: 1; }
+.settings-status-title { font-size: 0.85rem; font-weight: 700; }
+.settings-status-sub   { font-size: 0.7rem; opacity: 0.6; line-height: 1.45; }
+.settings-status-refresh {
+    border: none; background: none; cursor: pointer;
+    font-size: 1rem; color: #261F0E; opacity: 0.4; flex-shrink: 0; padding: 0.1rem 0.2rem;
+}
+.settings-status-refresh:hover { opacity: 0.9; }

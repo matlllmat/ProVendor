@@ -516,3 +516,66 @@ function getDemandCalendarData(PDO $pdo, int $userId, ?int $productId = null, st
         'forecast_products' => $forecastProducts,
     ];
 }
+
+// ── Forecast coverage ────────────────────────────────────────────────────────
+// How far ahead each product is actually forecast, versus how far it should be.
+// Drives the "up to date" indicator and tells the extend worker which products
+// have nothing to do — a product whose window already reaches the required end
+// is skipped entirely, so no Prophet call is made for it.
+//
+// Returns:
+//   required_end  — the last day the window should cover (today + horizon - 1)
+//   covered       — products already reaching required_end
+//   behind        — products whose window stops short (includes never-forecast)
+//   never         — products with no saved forecast at all
+//   products      — [product_id => ['name','last_date'|null]] for the behind ones
+function getForecastCoverage(PDO $pdo, int $userId, int $horizonDays): array
+{
+    $requiredEnd = date('Y-m-d', strtotime('+' . max(0, $horizonDays - 1) . ' days'));
+
+    $stmt = $pdo->prepare(
+        'SELECT p.id, p.name, p.forecast_horizon_days, MAX(f.forecast_date) AS last_date
+         FROM products p
+         LEFT JOIN forecasts f ON f.product_id = p.id
+         WHERE p.user_id = ?
+         GROUP BY p.id, p.name, p.forecast_horizon_days
+         ORDER BY p.name'
+    );
+    $stmt->execute([$userId]);
+
+    $covered = 0; $behind = 0; $never = 0; $products = [];
+
+    foreach ($stmt->fetchAll() as $row) {
+        // A product with its own horizon override is measured against that.
+        $end = $row['forecast_horizon_days'] !== null
+            ? date('Y-m-d', strtotime('+' . max(0, (int) $row['forecast_horizon_days'] - 1) . ' days'))
+            : $requiredEnd;
+
+        $last = $row['last_date'];
+
+        if ($last === null) {
+            // Never forecast. Deliberately NOT counted as "behind": in practice
+            // these are products Prophet can't fit (too little sales history), and
+            // counting them would leave the catalogue permanently "not up to date"
+            // AND make automatic upkeep retry them every single day forever. They
+            // are reported separately so the UI can still mention them, and a full
+            // run (import / manual re-forecast) is what gives them a first forecast.
+            $never++;
+        } elseif ($last < $end) {
+            $behind++;
+            $products[(int) $row['id']] = ['name' => $row['name'], 'last_date' => $last];
+        } else {
+            $covered++;
+        }
+    }
+
+    return [
+        'required_end' => $requiredEnd,
+        'covered'      => $covered,
+        'behind'       => $behind,      // extendable: has a forecast, window too short
+        'never'        => $never,       // informational only
+        'total'        => $covered + $behind,
+        'products'     => $products,
+        'up_to_date'   => $behind === 0,
+    ];
+}

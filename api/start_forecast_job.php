@@ -51,7 +51,9 @@ if ($total === 0) {
     exit;
 }
 
-$jobId = createForecastJob($pdo, $userId, $horizon, $total);
+// 'extend' only fills in the days each window is missing; 'full' refits everything.
+$mode  = (($_POST['mode'] ?? 'full') === 'extend') ? 'extend' : 'full';
+$jobId = createForecastJob($pdo, $userId, $horizon, $total, $mode);
 
 // Everything from the session has been read. Release the session lock before
 // spawning: PHP holds it for the whole request, so any hiccup in the spawn would
@@ -110,4 +112,5 @@ echo json_encode([
     'job_id'  => $jobId,
     'total'   => $total,
     'horizon' => $horizon,
+    'mode'    => $mode,
 ]);

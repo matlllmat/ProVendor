@@ -56,6 +56,23 @@ function getForecastHorizon(PDO $pdo, int $userId): int
 }
 
 // Sets the user's global forecast horizon. Caller clamps to the 1–60 range.
+// How the forecast window is kept current:
+//   'manual' — it only moves when the owner re-forecasts
+//   'auto'   — the app tops it back up to the horizon as days elapse
+function getForecastMode(PDO $pdo, int $userId): string
+{
+    $stmt = $pdo->prepare('SELECT forecast_mode FROM users WHERE id = ? LIMIT 1');
+    $stmt->execute([$userId]);
+    $mode = $stmt->fetchColumn();
+    return $mode === 'auto' ? 'auto' : 'manual';
+}
+
+function setForecastMode(PDO $pdo, int $userId, string $mode): void
+{
+    $pdo->prepare('UPDATE users SET forecast_mode = ? WHERE id = ?')
+        ->execute([$mode === 'auto' ? 'auto' : 'manual', $userId]);
+}
+
 function setForecastHorizon(PDO $pdo, int $userId, int $days): void
 {
     $pdo->prepare('UPDATE users SET forecast_horizon_days = ? WHERE id = ?')

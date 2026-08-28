@@ -44,28 +44,102 @@
 .db-muted-msg{ opacity: 0.45; font-size: 0.8rem; padding: 0.4rem 0; }
 
 /* ── 1. KPI cards ── */
-.db-kpis {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
-    gap: 0.6rem;
-    margin-bottom: 1.25rem;
-}
-.db-kpi {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-    padding: 0.9rem 1rem;
+/* ── Store summary ────────────────────────────────────────────────────────
+   One card, three bands: a context strip saying which window the figures cover,
+   then demand (what is coming) and the restock plan (what to do about it),
+   separated so the eye reads them as cause and response rather than as a row of
+   interchangeable numbers. */
+.db-summary {
     background: #F0E8D0;
     border: 1px solid #D2C8AE;
     border-radius: 0.85rem;
+    margin-bottom: 1.25rem;
+    overflow: hidden;
 }
-.db-kpi-label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; opacity: 0.5; }
-.db-kpi-value { font-size: 1.5rem; font-weight: 700; color: #261F0E; line-height: 1.1; }
-.db-kpi-window { font-size: 1.05rem; line-height: 1.2; }   /* a date range, not a number */
-.db-kpi-of    { font-size: 0.9rem; font-weight: 600; opacity: 0.4; }
-.db-kpi-sub   { font-size: 0.66rem; opacity: 0.45; }
+
+.db-sum-context {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    padding: 0.6rem 1.15rem;
+    background: rgba(38,31,14,0.04);
+    border-bottom: 1px solid #D2C8AE;
+    font-size: 0.72rem;
+    color: #261F0E;
+}
+.db-ctx-item  { display: inline-flex; align-items: baseline; gap: 0.45rem; }
+.db-ctx-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; opacity: 0.45; }
+.db-ctx-value { font-weight: 700; }
+.db-ctx-note  { opacity: 0.55; }
+.db-ctx-need strong { font-weight: 700; opacity: 1; }
+.db-ctx-dot   { opacity: 0.3; }
+.db-ctx-fill  { flex: 1 1 auto; }   /* pushes the catalogue note to the far edge */
+
+.db-sum-body {
+    display: flex;
+    align-items: stretch;
+    flex-wrap: wrap;
+}
+
+.db-sum-group {
+    padding: 0.95rem 1.15rem 1.05rem;
+    min-width: 0;
+}
+/* The plan is the larger half and carries the divider between the two. */
+.db-sum-plan {
+    flex: 1 1 auto;
+    border-left: 1px solid #D2C8AE;
+}
+
+.db-sum-label {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    opacity: 0.45;
+    margin-bottom: 0.55rem;
+}
+
+.db-sum-figs {
+    display: flex;
+    align-items: baseline;
+    gap: 1.6rem;
+    flex-wrap: wrap;
+}
+/* In the plan group the quantity sits left and the money outcome right, rather than
+   all three bunching at the left edge and leaving the card lopsided. */
+.db-sum-plan .db-sum-figs { justify-content: space-between; }
+
+/* Cost and profit travel together: they are one decision (spend this, get that), so
+   space-between must not be allowed to prise them apart. */
+.db-money {
+    display: flex;
+    align-items: baseline;
+    gap: 1.6rem;
+}
+
+.db-fig { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.db-fig-value { font-size: 1.5rem; font-weight: 700; color: #261F0E; line-height: 1.1; }
+.db-fig-sub   { font-size: 0.66rem; opacity: 0.45; }
+
+/* Sits between "to spend" and "est. profit" — the two are one decision, not two
+   unrelated figures, and the arrow is what says so. */
+.db-fig-arrow {
+    font-size: 0.95rem;
+    opacity: 0.3;
+    margin: 0 -0.7rem;
+    align-self: center;
+}
+
 .db-accent    { color: #FF5722; }
 .db-green     { color: #1A6933; }
+
+@media (max-width: 640px) {
+    /* Stacked, so the divider belongs on top rather than at the side. */
+    .db-sum-plan { border-left: 0; border-top: 1px solid #D2C8AE; flex-basis: 100%; }
+    .db-fig-arrow { display: none; }
+}
 
 /* ── Banner (forecasts not run) ── */
 .db-banner {
@@ -261,7 +335,7 @@
 /* ── Print: isolate the restock table as a shopping list ── */
 @media print {
     body { background: #fff; }
-    header, footer, .db-head, .db-kpis, .db-banner, .db-lower, .db-breakdown, .db-restock-tools { display: none !important; }
+    header, footer, .db-head, .db-summary, .db-banner, .db-lower, .db-breakdown, .db-restock-tools { display: none !important; }
     main { padding: 0 !important; max-width: none !important; }
     .db-card { border: none; box-shadow: none; padding: 0; }
     .db-print-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.75rem; font-size: 0.9rem; }

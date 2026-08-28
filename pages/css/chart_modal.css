@@ -91,7 +91,6 @@
 .cm-chart-controls {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 0.75rem;
     margin-bottom: 0.75rem;
     flex-wrap: wrap;
@@ -1429,21 +1428,45 @@
 .cm-ghost-btn-lg:hover { background: rgba(38,31,14,0.06); }
 
 /* ── Stock refine (inline, under the restock stats) ── */
+/* A fold, shaped like the Newsvendor explainer below it, so the two read as the
+   same kind of thing: detail you open when you want it. The padding moved onto the
+   body since the header now supplies its own. */
 .cm-refine {
     margin: 0 1.5rem 1rem;
-    padding: 0.9rem 1rem 1rem;
-    background: rgba(38,31,14,0.03);
     border: 1px solid #D2C8AE;
     border-radius: 0.6rem;
+    overflow: hidden;
 }
-.cm-refine-title {
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+
+.cm-refine-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.65rem 1rem;
+    background: rgba(38,31,14,0.03);
+    border: none;
     color: #261F0E;
-    opacity: 0.5;
-    margin-bottom: 0.7rem;
+    cursor: pointer;
+    font-family: 'Lora', serif;
+    text-align: left;
+}
+.cm-refine-head:hover { background: rgba(38,31,14,0.06); }
+
+.cm-refine-body {
+    padding: 0.9rem 1rem 1rem;
+    background: rgba(38,31,14,0.03);
+    border-top: 1px solid #D2C8AE;
+}
+/* Matches .cm-nv-title exactly: the two folds now sit as siblings, so they have to
+   read as the same kind of control. (It was uppercase small-caps when it was a
+   heading stacked above the fields rather than a fold label.) */
+.cm-refine-title {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #261F0E;
+    opacity: 0.7;
 }
 .cm-refine-fields {
     display: flex;
@@ -1509,33 +1532,75 @@
     margin-top: 0.25rem;
 }
 
+/* The detail row: the tab group on the left, the selected-product chip parked on
+   the far right. Two lone pills floating in whitespace read as leftovers, so the
+   tabs are grouped into one segmented control — the same shape as the Daily/Weekly
+   control above them, which makes the card speak one visual language. */
 .cm-info-tabs {
     display: flex;
-    gap: 0.4rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
     flex-wrap: wrap;
     margin: 0 1.5rem;
 }
 
-.cm-info-tab {
-    padding: 0.4rem 1rem;
-    font-family: 'Lora', serif;
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: #261F0E;
+.cm-info-tabgroup {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
     background: rgba(38,31,14,0.05);
     border: 1px solid #D2C8AE;
     border-radius: 999px;
+    flex-shrink: 0;
+}
+
+.cm-info-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.32rem 0.85rem;
+    font-family: 'Lora', serif;
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: #261F0E;
+    background: transparent;
+    border: 0;
+    border-radius: 999px;
     cursor: pointer;
-    opacity: 0.65;
+    opacity: 0.6;
     transition: background 0.15s, color 0.15s, opacity 0.15s;
 }
-.cm-info-tab:hover { opacity: 0.9; }
+.cm-info-tab:hover { opacity: 0.95; background: rgba(38,31,14,0.06); }
 .cm-info-tab.cm-info-tab-on {
     background: #261F0E;
     color: #F0E8D0;
-    border-color: #261F0E;
     opacity: 1;
 }
+.cm-info-tab.cm-info-tab-on:hover { background: #261F0E; }
+
+/* A caret is the only thing that tells you these OPEN something rather than just
+   filtering the chart — without it they were indistinguishable from the view tabs. */
+.cm-info-caret {
+    width: 0;
+    height: 0;
+    border-left: 3.5px solid transparent;
+    border-right: 3.5px solid transparent;
+    border-top: 4px solid currentColor;
+    opacity: 0.75;
+    transition: transform 0.15s ease;
+}
+.cm-info-tab.cm-info-tab-on .cm-info-caret { transform: rotate(180deg); }
+
+/* Right-hand slot for the selected-product chip. margin-left:auto pins it to the
+   far edge; it collapses to nothing when empty, so the row is unchanged in
+   aggregate mode where there is no product to name. */
+.cm-info-slot {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+.cm-info-slot:empty { display: none; }
 
 /* Uniform small gap above whichever panel is open (overrides each panel's
    own top margin without touching its horizontal inset). */
@@ -1544,3 +1609,148 @@
 /* The accuracy panel lost its inner collapsible wrapper (which held the
    padding), so give the panel its own padding now that content is direct. */
 .cm-info .cm-metrics-panel { padding: 1.1rem 1.25rem 1.25rem; }
+
+/* ══════════════════════════════════════════════════════════
+   OPTIONS MENU  — everything that refines the chart lives here,
+   so the card only shows the controls that change WHAT you see.
+══════════════════════════════════════════════════════════ */
+/* margin-left:auto on the GROUP is what pins these to the far-right corner of the
+   row. Keeping it on the group rather than on Options itself means Reset zoom can
+   appear and disappear without Options moving. */
+.cm-chart-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.cm-opt-wrap {
+    position: relative;      /* the panel opens against this, with right:0 */
+    flex-shrink: 0;
+}
+
+/* Sits beside Options as its quieter sibling: same pill, but borderless until
+   hovered, so it reads as a transient action rather than a permanent control. */
+.cm-zoom-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.32rem 0.7rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font-family: 'Lora', serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #261F0E;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.15s, background 0.15s, border-color 0.15s;
+}
+.cm-zoom-btn:hover   { opacity: 1; background: rgba(38,31,14,0.05); border-color: #D2C8AE; }
+
+.cm-opt-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.32rem 0.85rem;
+    background: transparent;
+    border: 1px solid #D2C8AE;
+    border-radius: 999px;
+    font-family: 'Lora', serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #261F0E;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.15s, background 0.15s, border-color 0.15s;
+}
+.cm-opt-btn:hover        { opacity: 1; background: rgba(38,31,14,0.05); }
+.cm-opt-btn.is-open      { opacity: 1; background: #261F0E; border-color: #261F0E; color: #F0E8D0; }
+
+.cm-opt-panel {
+    position: absolute;
+    top: calc(100% + 0.4rem);
+    right: 0;
+    z-index: 30;
+    min-width: 15rem;
+    padding: 0.7rem 0.8rem;
+    background: #F0E8D0;
+    border: 1px solid #D2C8AE;
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 30px rgba(38,31,14,0.18);
+}
+.cm-opt-panel[hidden] { display: none; }
+
+.cm-opt-title {
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    opacity: 0.4;
+    margin-bottom: 0.45rem;
+}
+
+.cm-opt-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0;
+    font-size: 0.78rem;
+    color: #261F0E;
+    cursor: pointer;
+    user-select: none;
+}
+.cm-opt-row[hidden] { display: none; }
+.cm-opt-row input[type=checkbox] {
+    accent-color: #261F0E;
+    width: 14px; height: 14px;
+    cursor: pointer; flex-shrink: 0;
+}
+.cm-opt-label { flex: 1; }
+
+/* Colour key so the menu reads against the chart without a second legend */
+.cm-opt-swatch { width: 14px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+.cm-opt-swatch.is-history  { background: #1A6933; }
+.cm-opt-swatch.is-forecast { background: #FF5722; }
+.cm-opt-swatch.is-nv       { background: #FF1493; }
+.cm-opt-swatch.is-events   { background: #261F0E; opacity: 0.45; }
+
+.cm-opt-sub {
+    border: none;
+    background: none;
+    font-family: 'Lora', serif;
+    font-size: 0.66rem;
+    font-weight: 600;
+    color: #1A6933;
+    cursor: pointer;
+    padding: 0 0.1rem;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.cm-opt-sub:hover { opacity: 0.75; }
+
+.cm-opt-sep { height: 1px; background: #D2C8AE; margin: 0.55rem 0; opacity: 0.7; }
+
+/* The per-product forecast range is moved into the menu by forecast.view.php */
+#cm-opt-extra:empty { display: none; }
+
+/* ── Legend: quieter, and inactive series fade instead of disappearing ── */
+.cm-legend {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.55rem;
+    font-size: 0.68rem;
+}
+.cm-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    opacity: 0.75;
+    transition: opacity 0.15s;
+}
+/* Switched off: still listed (so the row never reflows) but clearly inactive. */
+.cm-legend-item.is-off { opacity: 0.22; }

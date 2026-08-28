@@ -652,15 +652,76 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
         </div>
 
-        <!-- ── Re-forecast the catalogue ───────────────────────────────────── -->
+        <!-- ── Keeping the window current ──────────────────────────────────── -->
+        <?php
+        $cov      = $forecastCoverage;
+        $isAuto   = ($forecastMode === 'auto');
+        $upToDate = $cov['up_to_date'];
+        ?>
         <div class="settings-card settings-card-secondary">
+            <div class="settings-card-head">
+                <p class="settings-eyebrow">Keeping up to date</p>
+                <h2 class="settings-title">Forecast Updates</h2>
+                <p class="settings-sub">
+                    A forecast covers a fixed set of dates, so its reach shrinks by a day every day.
+                    Choose whether ProVendor tops it back up on its own, or waits for you.
+                </p>
+            </div>
+
+            <div class="settings-modes" role="radiogroup" aria-label="Forecast update mode">
+                <button type="button" class="settings-mode<?php echo $isAuto ? '' : ' is-on'; ?>"
+                        data-mode="manual" role="radio" aria-checked="<?php echo $isAuto ? 'false' : 'true'; ?>"
+                        onclick="setForecastMode('manual')">
+                    <span class="settings-mode-name">Manual</span>
+                    <span class="settings-mode-desc">You decide when to re-forecast.</span>
+                </button>
+                <button type="button" class="settings-mode<?php echo $isAuto ? ' is-on' : ''; ?>"
+                        data-mode="auto" role="radio" aria-checked="<?php echo $isAuto ? 'true' : 'false'; ?>"
+                        onclick="setForecastMode('auto')">
+                    <span class="settings-mode-name">Automatic</span>
+                    <span class="settings-mode-desc">Kept at <?php echo (int) $curHorizon; ?> days for you.</span>
+                </button>
+            </div>
+
+            <!-- AUTO: status indicator -->
+            <div id="mode-auto-panel" class="settings-status<?php echo $upToDate ? ' is-ok' : ' is-behind'; ?>"
+                 style="<?php echo $isAuto ? '' : 'display:none'; ?>">
+                <span class="settings-status-dot"></span>
+                <div class="settings-status-text">
+                    <span class="settings-status-title" id="cov-title">
+                        <?php echo $upToDate ? 'Everything is up to date' : 'Catching up…'; ?>
+                    </span>
+                    <span class="settings-status-sub" id="cov-sub">
+                        <?php
+                        if ($upToDate) {
+                            echo (int) $cov['covered'] . ' of ' . (int) $cov['total']
+                               . ' products forecast through ' . date('M j, Y', strtotime($cov['required_end'])) . '.';
+                        } else {
+                            echo (int) $cov['behind'] . ' product' . ($cov['behind'] === 1 ? '' : 's')
+                               . ' need topping up to ' . date('M j, Y', strtotime($cov['required_end']))
+                               . ' — this runs in the background.';
+                        }
+                        ?>
+                    </span>
+                </div>
+                <button type="button" class="settings-status-refresh" onclick="checkCoverage(true)" title="Check now">↻</button>
+            </div>
+
+            <p class="settings-run-note" id="mode-auto-note" style="<?php echo $isAuto ? '' : 'display:none'; ?>">
+                Only the missing days are forecast — days already predicted are reused, so this
+                stays cheap and never re-runs the whole catalogue without reason.
+            </p>
+        </div>
+
+        <!-- ── Re-forecast the catalogue (manual action) ────────────────────── -->
+        <div class="settings-card settings-card-secondary" id="mode-manual-panel"
+             style="<?php echo $isAuto ? 'display:none' : ''; ?>">
             <div class="settings-card-head">
                 <p class="settings-eyebrow">Maintenance</p>
                 <h2 class="settings-title">Re-forecast All Products</h2>
                 <p class="settings-sub">
-                    Forecasts are frozen once generated — they refresh when you import new data or
-                    change the range above. Run this to rebuild every product's forecast now, for
-                    example after editing prices or events.
+                    Rebuild every product's forecast now — for example after editing prices or events,
+                    or to push the window back out to the full <?php echo (int) $curHorizon; ?> days.
                 </p>
             </div>
 
@@ -1943,6 +2004,66 @@ function saveHorizon() {
             btn.textContent = 'Save & re-forecast';
             _settingsMsg('error', 'Network error. Please try again.');
         });
+}
+
+// ── Manual vs automatic window upkeep ───────────────────────────────────────
+function setForecastMode(mode) {
+    var body = new FormData();
+    body.append('mode', mode);
+
+    fetch('<?php echo BASE_URL; ?>/api/update_forecast_mode.php', { method: 'POST', body: body })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.error) { _settingsMsg('error', data.error); return; }
+
+            document.querySelectorAll('.settings-mode').forEach(function (b) {
+                var on = (b.dataset.mode === mode);
+                b.classList.toggle('is-on', on);
+                b.setAttribute('aria-checked', on ? 'true' : 'false');
+            });
+            var auto = (mode === 'auto');
+            document.getElementById('mode-auto-panel').style.display   = auto ? '' : 'none';
+            document.getElementById('mode-auto-note').style.display    = auto ? '' : 'none';
+            document.getElementById('mode-manual-panel').style.display = auto ? 'none' : '';
+
+            // Switching to automatic should act immediately, not next page load.
+            if (auto) checkCoverage(true);
+        })
+        .catch(function () { _settingsMsg('error', 'Network error. Please try again.'); });
+}
+
+// Reads coverage and, in auto mode, lets the server top the window up if it has
+// fallen behind. Safe to call repeatedly — nothing starts unless something is short.
+function checkCoverage(showBusy) {
+    var title = document.getElementById('cov-title');
+    var sub   = document.getElementById('cov-sub');
+    var panel = document.getElementById('mode-auto-panel');
+    if (!panel) return;
+    if (showBusy && title) title.textContent = 'Checking…';
+
+    fetch('<?php echo BASE_URL; ?>/api/forecast_coverage.php', { method: 'POST' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (d.error) return;
+            var endTxt = d.required_end || '';
+            panel.classList.toggle('is-ok',     !!d.up_to_date);
+            panel.classList.toggle('is-behind', !d.up_to_date);
+
+            if (d.up_to_date) {
+                title.textContent = 'Everything is up to date';
+                sub.textContent   = d.covered + ' of ' + d.total + ' products forecast through ' + endTxt + '.';
+            } else if (d.started) {
+                title.textContent = 'Catching up…';
+                sub.textContent   = 'Topping up ' + d.behind + ' product' + (d.behind === 1 ? '' : 's')
+                                  + ' to ' + endTxt + ' in the background.';
+                if (window.pvWatchForecastJob) window.pvWatchForecastJob();
+            } else {
+                title.textContent = 'Catching up…';
+                sub.textContent   = d.behind + ' product' + (d.behind === 1 ? '' : 's')
+                                  + ' still short of ' + endTxt + '.';
+            }
+        })
+        .catch(function () { /* transient — the next check retries */ });
 }
 
 // ── Re-forecast all products ────────────────────────────────────────────────

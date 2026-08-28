@@ -218,7 +218,9 @@ function getSalesForExport(PDO $pdo, int $userId): array
          FROM sales s
          JOIN products p ON p.id = s.product_id
          WHERE p.user_id = ?
-         ORDER BY p.name, s.sale_date'
+         -- Newest sales first: an owner opening the file wants the most recent
+         -- days at the top. Product name is only a tie-break within a day.
+         ORDER BY s.sale_date DESC, p.name'
     );
     $stmt->execute([$userId]);
     return $stmt->fetchAll();

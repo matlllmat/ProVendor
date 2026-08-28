@@ -29,6 +29,11 @@ if ($jobId <= 0) {
 set_time_limit(0);
 ignore_user_abort(true);
 
+// The worker doesn't load bootstrap.php, so it pins the same clock itself —
+// otherwise it would compute window starts in PHP's ini timezone and disagree
+// with the rest of the app about which day "today" is.
+date_default_timezone_set('Asia/Manila');
+
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../queries/forecast.query.php';
 require_once __DIR__ . '/../queries/events.query.php';
@@ -62,6 +67,11 @@ if (!in_array($job['status'], ['queued', 'running'], true)) {
 
 $userId        = (int) $job['user_id'];
 $globalHorizon = (int) $job['horizon_days'];
+// 'full'   — refit Prophet for every product (import / horizon change / manual run)
+// 'extend' — only forecast the days the saved window is missing, reusing the days
+//            already stored. Nothing is recomputed, and a product whose window
+//            already reaches far enough is skipped without touching Flask at all.
+$jobMode       = ($job['mode'] ?? 'full') === 'extend' ? 'extend' : 'full';
 
 markForecastJobRunning($pdo, $jobId);
 
@@ -104,7 +114,20 @@ try {
 
             [$fromDate, $toDate] = computeForecastWindow($horizon, $lastSaleDate);
 
-            $forecastRows = runProphet($pdo, $userId, $productId, $fromDate, $toDate);
+            if ($jobMode === 'extend') {
+                $forecastRows = extendForecast($pdo, $userId, $productId, $fromDate, $toDate);
+                // Already covers the window (or isn't extendable) — nothing to do.
+                // Progress is written here too, otherwise skipping the last product
+                // would leave the job showing one short of its total.
+                if ($forecastRows === null) {
+                    $done++;
+                    updateForecastJobProgress($pdo, $jobId, $done, $failed, $product['name']);
+                    continue;
+                }
+            } else {
+                $forecastRows = runProphet($pdo, $userId, $productId, $fromDate, $toDate);
+            }
+
             runNewsvendorAndSave($pdo, $userId, $productId, $product, $forecastRows);
         } catch (Throwable $e) {
             $failed++;
@@ -181,6 +204,50 @@ function flaskPost(string $path, array $payload, int $timeout): array
     if (!empty($data['error'])) throw new RuntimeException((string) $data['error']);
 
     return $data;
+}
+
+// Rolls one product's window forward to [$fromDate, $toDate] WITHOUT recomputing
+// days it already has:
+//   • keeps every saved day that still falls inside the window (elapsed days drop
+//     off naturally, which is what keeps the window a constant length),
+//   • asks Prophet only for the days the window is missing at the end,
+//   • returns the merged series for re-optimization.
+// Returns null when the saved window already covers the whole range — the caller
+// then skips the product entirely, so an up-to-date catalogue costs zero Flask calls.
+function extendForecast(PDO $pdo, int $userId, int $productId, string $fromDate, string $toDate): ?array
+{
+    $saved = getProductForecast($pdo, $userId, $productId);
+    $existing = ($saved !== null && !empty($saved['forecast'])) ? $saved['forecast'] : [];
+
+    // Days still inside the wanted window, in order.
+    $keep = array_values(array_filter($existing, function ($r) use ($fromDate, $toDate) {
+        return $r['date'] >= $fromDate && $r['date'] <= $toDate;
+    }));
+
+    $haveEnd = null;
+    foreach ($keep as $r) {
+        if ($haveEnd === null || $r['date'] > $haveEnd) $haveEnd = $r['date'];
+    }
+
+    // Nothing usable saved for this window. If the product has NO forecast at all,
+    // skip it: extend runs happen daily, and retrying a product Prophet can't fit
+    // (too little history) would burn a failed Flask call every day forever. A full
+    // run — import, horizon change, or the manual button — is what gives a product
+    // its first forecast.
+    if ($haveEnd === null) {
+        if (empty($existing)) return null;
+        // It has a forecast, but entirely outside the wanted window (e.g. the
+        // horizon moved) — rebuild the window from scratch.
+        return runProphet($pdo, $userId, $productId, $fromDate, $toDate);
+    }
+
+    // Already reaches the end → nothing to do.
+    if ($haveEnd >= $toDate) return null;
+
+    $tailFrom = date('Y-m-d', strtotime($haveEnd . ' +1 day'));
+    $tail     = runProphet($pdo, $userId, $productId, $tailFrom, $toDate);
+
+    return array_merge($keep, $tail);
 }
 
 // Prophet forecast for one product; also persists its event regressor
