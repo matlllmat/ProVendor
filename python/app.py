@@ -13,8 +13,12 @@ from prophet import Prophet
 from prophet.utilities import regressor_coefficients
 from scipy.stats import norm
 from datetime import date as date_cls
+from sheets import sheets_bp
 
 app = Flask(__name__)
+
+# Google Sheets reader (/sheets/read, /sheets/account) — see python/sheets.py
+app.register_blueprint(sheets_bp)
 
 # Suppress Prophet's verbose Stan output and optional Plotly import notice
 logging.getLogger('prophet').setLevel(logging.WARNING)

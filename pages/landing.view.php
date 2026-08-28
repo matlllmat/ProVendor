@@ -192,6 +192,27 @@ require_once __DIR__ . '/../includes/header.php';
                     </button>
                 </div>
 
+                <!-- Alternative route in: keep the sales log in a spreadsheet and
+                     let ProVendor read it, instead of exporting a CSV each time. -->
+                <div class="gs-alt">
+                    <div class="gs-alt-text">
+                        <p class="gs-alt-title">Or connect a Google Sheet</p>
+                        <p class="gs-alt-desc">
+                            Already track your sales in a spreadsheet? Link it once and ProVendor
+                            keeps itself up to date — no exporting.
+                        </p>
+                    </div>
+                    <button type="button" class="sheets-btn" onclick="openSheetsDialog()">
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="8" y1="13" x2="16" y2="13"/>
+                            <line x1="8" y1="17" x2="16" y2="17"/>
+                        </svg>
+                        Google Sheets
+                    </button>
+                </div>
+
             </div>
         </div>
     </div><!-- /step-2 -->
@@ -1068,28 +1089,34 @@ async function doImport(mapping, replace) {
     formData.append('csv_rows', colRowCount);
     formData.append('replace',  replace ? '1' : '0');
 
+    // Only the request itself is guarded here. Wrapping the code BELOW in the
+    // same try meant any rendering slip after a perfectly good import surfaced
+    // to the owner as "Network error. Please try again." — pointing at the
+    // network while the rows sat safely committed in the database.
+    var data;
     try {
-        var res  = await fetch('<?php echo BASE_URL; ?>/api/import.php', { method: 'POST', body: formData });
-        var data = await res.json();
-
-        if (data.success) {
-            // Ask the owner how far ahead to forecast, then forecast the whole
-            // catalogue before the Forecast page loads. The redirect happens
-            // inside startPostImportForecast() once forecasting finishes.
-            showHorizonChoice();
-        } else if (data.has_data) {
-            // Nothing to commit because this data is already stored. The account
-            // is set up, so move on to the forecast step rather than dead-ending
-            // an owner who can't otherwise get past onboarding.
-            showMappingError(data.error + ' Your data is already set up — continuing.');
-            setTimeout(showHorizonChoice, 1800);
-        } else {
-            showMappingError('Import failed: ' + (data.error || 'Unknown error.'));
-            btn.innerHTML = IMPORT_BTN_HTML;
-            btn.disabled  = false;
-        }
-    } catch(e) {
+        var res = await fetch('<?php echo BASE_URL; ?>/api/import.php', { method: 'POST', body: formData });
+        data    = await res.json();
+    } catch (e) {
         showMappingError('Network error. Please try again.');
+        btn.innerHTML = IMPORT_BTN_HTML;
+        btn.disabled  = false;
+        return;
+    }
+
+    if (data.success) {
+        // Ask the owner how far ahead to forecast, then forecast the whole
+        // catalogue before the Forecast page loads. The redirect happens
+        // inside startPostImportForecast() once forecasting finishes.
+        showHorizonChoice();
+    } else if (data.has_data) {
+        // Nothing to commit because this data is already stored. The account
+        // is set up, so move on to the forecast step rather than dead-ending
+        // an owner who can't otherwise get past onboarding.
+        showMappingError(data.error + ' Your data is already set up — continuing.');
+        setTimeout(showHorizonChoice, 1800);
+    } else {
+        showMappingError('Import failed: ' + (data.error || 'Unknown error.'));
         btn.innerHTML = IMPORT_BTN_HTML;
         btn.disabled  = false;
     }
@@ -1098,8 +1125,7 @@ async function doImport(mapping, replace) {
 // Step 1 after import: show the horizon-choice overlay. The forecast + redirect
 // happen when the owner confirms (startPostImportForecast).
 function showHorizonChoice() {
-    document.getElementById('af-choose').style.display   = '';
-    document.getElementById('af-progress').style.display = 'none';
+    document.getElementById('af-choose').style.display = '';
     document.getElementById('af-overlay').classList.remove('hidden');
 }
 
@@ -1145,6 +1171,23 @@ function showMappingError(msg) {
     setTimeout(function() { el.classList.add('hidden'); }, 6000);
 }
 
+// ── Google Sheets ────────────────────────────────────────────────────────────
+// The dialog (includes/sheets_modal.php) validates the link and returns the same
+// payload shape api/detect.php gives back, so a sheet import joins this wizard
+// at step 2 and finishes through the identical mapping → preview → commit path.
+window.pvSheetsOnValidated = function (data) {
+    populateMappingUI(data);
+
+    // populateMappingUI writes a "columns · rows" summary into the file line —
+    // name the sheet instead, so it's obvious where these rows came from.
+    if (data.sheet) {
+        document.getElementById('file-name-display').textContent =
+            data.sheet.title + ' — ' + data.sheet.worksheet;
+    }
+
+    goToStep(2);
+};
+
 // ── Scroll-reveal (connector animates in naturally via CSS) ──────────────────
 // Initial state is handled by CSS .reveal-line
 </script>
@@ -1174,6 +1217,7 @@ function showMappingError(msg) {
     </div>
 </div>
 
+<?php require_once __DIR__ . '/../includes/sheets_modal.php'; ?>
 <?php require_once __DIR__ . '/../includes/confirm_modal.php'; ?>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 </body>

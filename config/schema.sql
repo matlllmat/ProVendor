@@ -237,3 +237,36 @@ CREATE TABLE IF NOT EXISTS `forecast_jobs` (
     KEY `idx_fj_user_status` (`user_id`, `status`),
     CONSTRAINT `fk_fj_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ── Linked Google Sheet ───────────────────────────────────────────────────────
+-- A store owner can link one Google Sheet as the live source of their daily
+-- sales instead of re-uploading CSVs. The sheet is read through a service
+-- account (creds/service-account.json) by the Flask server's /sheets/read.
+-- While a link exists, CSV import is disabled for that owner — two writers into
+-- the same sales table would fight over the same (product, date) rows.
+CREATE TABLE IF NOT EXISTS `sheet_links` (
+    `id`                INT          NOT NULL AUTO_INCREMENT,
+    `user_id`           INT          NOT NULL,
+    `spreadsheet_id`    VARCHAR(120) NOT NULL,
+    `sheet_url`         VARCHAR(500) NOT NULL,
+    `sheet_title`       VARCHAR(255) DEFAULT NULL,
+    `worksheet_title`   VARCHAR(255) DEFAULT NULL,
+    -- The column mapping the owner confirmed at link time, as JSON
+    -- ({"date":"Date","product":"Item",...}). Re-used verbatim by every sync so
+    -- the 5-minute refresh never has to re-guess which column means what.
+    `column_mapping`    TEXT         NOT NULL,
+    `date_format`       VARCHAR(20)  DEFAULT NULL,
+    -- 1 = the browser heartbeat may re-sync every 5 minutes; 0 = the owner
+    -- refreshes by hand with the "Update Data" button.
+    `auto_sync`         TINYINT(1)   NOT NULL DEFAULT 1,
+    `last_synced_at`    DATETIME     DEFAULT NULL,
+    `last_sync_status`  ENUM('ok','error') DEFAULT NULL,
+    `last_sync_error`   VARCHAR(500) DEFAULT NULL,
+    `last_sync_added`   INT          NOT NULL DEFAULT 0,
+    `last_sync_updated` INT          NOT NULL DEFAULT 0,
+    `created_at`        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    -- One linked sheet per owner: the whole feature is "this sheet is my data".
+    UNIQUE KEY `sheet_links_user_unique` (`user_id`),
+    CONSTRAINT `fk_sl_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

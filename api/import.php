@@ -230,12 +230,33 @@ try {
 
     $pdo->commit();
 
+    // These rows came from a Google Sheet — now that they're committed, record
+    // the link so the 5-minute refresh can keep them current. Saved after the
+    // commit on purpose: a link whose first import failed would auto-sync data
+    // the owner never approved.
+    $linkedSheet = null;
+    if (!empty($_SESSION['pending_sheet'])) {
+        require_once __DIR__ . '/../queries/sheets.query.php';
+
+        saveSheetLink($pdo, (int) $_SESSION['user_id'], $_SESSION['pending_sheet'] + [
+            'column_mapping' => $_SESSION['temp_csv_mapping'] ?? [],
+            'date_format'    => $dateFormat,
+            'added'          => count($salesBatch),
+            'updated'        => $replacedCount,
+        ]);
+
+        $linkedSheet = $_SESSION['pending_sheet'];
+        unset($_SESSION['pending_sheet']);
+    }
+
     // Best-effort cleanup of the temp CSV (only matters in the upload-driven flow).
     if ($tempPath && file_exists($tempPath)) @unlink($tempPath);
-    unset($_SESSION['temp_csv'], $_SESSION['temp_csv_name'], $_SESSION['temp_csv_date_format']);
+    unset($_SESSION['temp_csv'], $_SESSION['temp_csv_name'],
+          $_SESSION['temp_csv_date_format'], $_SESSION['temp_csv_mapping']);
 
     echo json_encode([
         'success'         => true,
+        'linked_sheet'    => $linkedSheet,
         'rows'            => count($salesBatch),
         'replaced'        => $replacedCount,
         'skipped'         => $skippedDupes,

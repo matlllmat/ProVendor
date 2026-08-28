@@ -93,6 +93,12 @@ if ($userFormat !== 'auto' && $userFormat !== '') {
 
 $_SESSION['temp_csv_date_format'] = $dateFormat;
 
+// Kept for import.php: a Google Sheet import saves this mapping with the link so
+// the 5-minute refresh can re-read the sheet without re-asking which column is
+// which. Held server-side rather than posted back, so a page reload mid-wizard
+// can't lose it.
+$_SESSION['temp_csv_mapping'] = $mapping;
+
 // ── Classify ──────────────────────────────────────────────────────────────────
 // Invalid rows: collected individually (we can't aggregate without a valid key).
 // Valid rows:   aggregated by "<product>|<date>" so preview matches what would

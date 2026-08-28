@@ -22,6 +22,11 @@ $userName = $profile ? $profile['name'] : 'Store Owner';
 $versions = listDatasetVersions($pdo, $_SESSION['user_id']);
 $summary  = getImportSummary($pdo, $_SESSION['user_id']);
 
+// A linked Google Sheet replaces CSV upload as the way sales data arrives, so
+// the Sales Data tab renders quite differently depending on this. null = no link.
+require_once __DIR__ . '/../queries/sheets.query.php';
+$sheetLink = getSheetLink($pdo, (int) $_SESSION['user_id']);
+
 // Last background forecast run — the Forecast Range tab shows when the catalogue
 // was last forecast and whether a run is in flight right now.
 $lastJob = getLatestForecastJob($pdo, (int) $_SESSION['user_id']);

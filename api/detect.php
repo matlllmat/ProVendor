@@ -12,6 +12,22 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// A linked Google Sheet owns this store's sales data — it rewrites the same
+// (product, date) rows every five minutes, so a CSV imported alongside it would
+// be quietly reverted on the next refresh. The UI hides the upload button while
+// a sheet is linked; this is the matching server-side rule.
+require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../queries/sheets.query.php';
+
+if (getSheetLink($pdo, (int) $_SESSION['user_id'])) {
+    echo json_encode([
+        'error' => 'CSV import is turned off while a Google Sheet is linked to your store. '
+                 . 'Disconnect the sheet on the Sales Data tab first.',
+        'code'  => 'sheet_linked',
+    ]);
+    exit;
+}
+
 if (empty($_FILES['csv']) || $_FILES['csv']['error'] !== UPLOAD_ERR_OK) {
     echo json_encode(['error' => 'No file uploaded or upload error.']);
     exit;
@@ -42,6 +58,11 @@ if (!move_uploaded_file($file['tmp_name'], $tempPath)) {
 
 $_SESSION['temp_csv']      = $tempPath;
 $_SESSION['temp_csv_name'] = $file['name'];
+
+// The owner validated a sheet and then chose to upload a CSV instead. Drop the
+// half-finished link, or import.php would attach it to these CSV rows and start
+// syncing a sheet they walked away from.
+unset($_SESSION['pending_sheet']);
 
 // ── Read headers + sample rows ────────────────────────────────────────────────
 $handle = fopen($tempPath, 'r');
@@ -101,134 +122,3 @@ echo json_encode([
     'row_count'   => $rowCount,
     'date_format' => $dateFormat,
 ]);
-
-// ── Helper: suggest which CSV column maps to which required field ─────────────
-function detectColumnMapping(array $headers, array $rows): array
-{
-    $suggestions = [
-        'date'        => null,
-        'product'     => null,
-        'quantity'    => null,
-        'sku'         => null,
-        'category'    => null,
-        'subcategory' => null,
-        'cost'        => null,
-        'price'       => null,
-    ];
-
-    foreach ($headers as $col) {
-        $lower  = strtolower(trim($col));
-        $sample = array_column($rows, $col);
-
-        // Date
-        if ($suggestions['date'] === null
-            && (str_contains($lower, 'date') || str_contains($lower, 'day') || str_contains($lower, 'time'))
-            && isDateColumn($sample)
-        ) {
-            $suggestions['date'] = $col;
-            continue;
-        }
-
-        // Product
-        if ($suggestions['product'] === null
-            && (str_contains($lower, 'product') || str_contains($lower, 'item')
-                || str_contains($lower, 'name') || str_contains($lower, 'desc'))
-        ) {
-            $suggestions['product'] = $col;
-            continue;
-        }
-
-        // Quantity
-        if ($suggestions['quantity'] === null
-            && (str_contains($lower, 'qty') || str_contains($lower, 'quantity')
-                || str_contains($lower, 'sold') || str_contains($lower, 'units')
-                || str_contains($lower, 'amount'))
-            && isNumericColumn($sample)
-        ) {
-            $suggestions['quantity'] = $col;
-            continue;
-        }
-
-        // SKU / Product code
-        if ($suggestions['sku'] === null
-            && (str_contains($lower, 'sku') || str_contains($lower, 'code')
-                || str_contains($lower, 'barcode') || str_contains($lower, 'ref'))
-        ) {
-            $suggestions['sku'] = $col;
-            continue;
-        }
-
-        // Category
-        if ($suggestions['category'] === null
-            && (str_contains($lower, 'category') || str_contains($lower, 'group')
-                || str_contains($lower, 'dept') || str_contains($lower, 'type'))
-        ) {
-            $suggestions['category'] = $col;
-            continue;
-        }
-
-        // Subcategory
-        if ($suggestions['subcategory'] === null
-            && (str_contains($lower, 'sub') || str_contains($lower, 'variant')
-                || str_contains($lower, 'packaging') || str_contains($lower, 'pack')
-                || str_contains($lower, 'size') || str_contains($lower, 'segment'))
-        ) {
-            $suggestions['subcategory'] = $col;
-            continue;
-        }
-
-        // Cost
-        if ($suggestions['cost'] === null
-            && (str_contains($lower, 'cost') || str_contains($lower, 'purchase')
-                || str_contains($lower, 'buy'))
-            && isNumericColumn($sample)
-        ) {
-            $suggestions['cost'] = $col;
-            continue;
-        }
-
-        // Selling price
-        if ($suggestions['price'] === null
-            && (str_contains($lower, 'price') || str_contains($lower, 'selling')
-                || str_contains($lower, 'retail'))
-            && isNumericColumn($sample)
-        ) {
-            $suggestions['price'] = $col;
-        }
-    }
-
-    // Fallback: if date not found by name, find first column where values parse as dates
-    if ($suggestions['date'] === null) {
-        foreach ($headers as $col) {
-            $sample = array_column($rows, $col);
-            if (isDateColumn($sample)) {
-                $suggestions['date'] = $col;
-                break;
-            }
-        }
-    }
-
-    return $suggestions;
-}
-
-function isDateColumn(array $values): bool
-{
-    $valid = 0;
-    foreach (array_slice($values, 0, 10) as $v) {
-        $v = trim((string) $v);
-        if ($v === '') continue;
-        if (strtotime($v) !== false) $valid++;
-    }
-    return $valid >= 3;
-}
-
-function isNumericColumn(array $values): bool
-{
-    $valid = 0;
-    foreach (array_slice($values, 0, 10) as $v) {
-        $v = trim((string) $v);
-        if ($v === '') continue;
-        if (is_numeric($v)) $valid++;
-    }
-    return $valid >= 3;
-}

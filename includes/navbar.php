@@ -76,4 +76,8 @@ $_navClass = function(string $keyword) use ($_navFile): string {
 // Background catalogue-forecast progress. Lives with the navbar so it shows on
 // every signed-in page — the forecast keeps running while the owner browses.
 require_once __DIR__ . '/forecast_progress.php';
+
+// 5-minute refresh for a linked Google Sheet. Also here so it runs wherever the
+// owner is; emits nothing when no sheet is linked.
+require_once __DIR__ . '/sheets_autosync.php';
 ?>

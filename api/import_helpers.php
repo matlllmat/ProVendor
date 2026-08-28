@@ -1,6 +1,6 @@
 <?php
 // api/import_helpers.php
-// Shared helpers used by detect.php, preflight.php, and import.php.
+// Shared helpers used by detect.php, sheets_link.php, preflight.php, and import.php.
 // Kept in one place so preflight and import always agree on what a "valid date" is —
 // otherwise preflight could green-light rows that import then silently drops.
 
@@ -129,4 +129,135 @@ function recoverUnambiguousDate(string $raw): ?string
     }
 
     return null;
+}
+
+// ── Helper: suggest which CSV column maps to which required field ─────────────
+function detectColumnMapping(array $headers, array $rows): array
+{
+    $suggestions = [
+        'date'        => null,
+        'product'     => null,
+        'quantity'    => null,
+        'sku'         => null,
+        'category'    => null,
+        'subcategory' => null,
+        'cost'        => null,
+        'price'       => null,
+    ];
+
+    foreach ($headers as $col) {
+        $lower  = strtolower(trim($col));
+        $sample = array_column($rows, $col);
+
+        // Date
+        if ($suggestions['date'] === null
+            && (str_contains($lower, 'date') || str_contains($lower, 'day') || str_contains($lower, 'time'))
+            && isDateColumn($sample)
+        ) {
+            $suggestions['date'] = $col;
+            continue;
+        }
+
+        // Product
+        if ($suggestions['product'] === null
+            && (str_contains($lower, 'product') || str_contains($lower, 'item')
+                || str_contains($lower, 'name') || str_contains($lower, 'desc'))
+        ) {
+            $suggestions['product'] = $col;
+            continue;
+        }
+
+        // Quantity
+        if ($suggestions['quantity'] === null
+            && (str_contains($lower, 'qty') || str_contains($lower, 'quantity')
+                || str_contains($lower, 'sold') || str_contains($lower, 'units')
+                || str_contains($lower, 'amount'))
+            && isNumericColumn($sample)
+        ) {
+            $suggestions['quantity'] = $col;
+            continue;
+        }
+
+        // SKU / Product code
+        if ($suggestions['sku'] === null
+            && (str_contains($lower, 'sku') || str_contains($lower, 'code')
+                || str_contains($lower, 'barcode') || str_contains($lower, 'ref'))
+        ) {
+            $suggestions['sku'] = $col;
+            continue;
+        }
+
+        // Category
+        if ($suggestions['category'] === null
+            && (str_contains($lower, 'category') || str_contains($lower, 'group')
+                || str_contains($lower, 'dept') || str_contains($lower, 'type'))
+        ) {
+            $suggestions['category'] = $col;
+            continue;
+        }
+
+        // Subcategory
+        if ($suggestions['subcategory'] === null
+            && (str_contains($lower, 'sub') || str_contains($lower, 'variant')
+                || str_contains($lower, 'packaging') || str_contains($lower, 'pack')
+                || str_contains($lower, 'size') || str_contains($lower, 'segment'))
+        ) {
+            $suggestions['subcategory'] = $col;
+            continue;
+        }
+
+        // Cost
+        if ($suggestions['cost'] === null
+            && (str_contains($lower, 'cost') || str_contains($lower, 'purchase')
+                || str_contains($lower, 'buy'))
+            && isNumericColumn($sample)
+        ) {
+            $suggestions['cost'] = $col;
+            continue;
+        }
+
+        // Selling price
+        if ($suggestions['price'] === null
+            && (str_contains($lower, 'price') || str_contains($lower, 'selling')
+                || str_contains($lower, 'retail'))
+            && isNumericColumn($sample)
+        ) {
+            $suggestions['price'] = $col;
+        }
+    }
+
+    // Fallback: if date not found by name, find first column where values parse as dates
+    if ($suggestions['date'] === null) {
+        foreach ($headers as $col) {
+            $sample = array_column($rows, $col);
+            if (isDateColumn($sample)) {
+                $suggestions['date'] = $col;
+                break;
+            }
+        }
+    }
+
+    return $suggestions;
+}
+
+function isDateColumn(array $values): bool
+{
+    $valid = 0;
+    foreach (array_slice($values, 0, 10) as $v) {
+        $v = trim((string) $v);
+        if ($v === '') continue;
+        if (strtotime($v) !== false) $valid++;
+    }
+    return $valid >= 3;
+}
+
+function isNumericColumn(array $values): bool
+{
+    $valid = 0;
+    foreach (array_slice($values, 0, 10) as $v) {
+        $v = trim((string) $v);
+        if ($v === '') continue;
+        if (is_numeric($v)) $valid++;
+    }
+    return $valid >= 3;
 }

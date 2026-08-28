@@ -7,6 +7,32 @@ require_once __DIR__ . '/login.logic.php';
 $pageTitle = 'ProVendor — Login';
 $pageCss   = 'login.css';
 $bodyClass = 'bg-[#261F0E]';
+
+// Renders a password input with a show/hide toggle sitting inside the field.
+// Defined once because this page has five of them (login, signup + confirm,
+// reset + confirm) and each would otherwise repeat both icon SVGs.
+// $attrs is emitted verbatim — used for the strength-meter's oninput hook.
+$_passwordField = function (string $id, string $name, string $attrs = '') {
+    ?>
+    <div class="password-field">
+        <input type="password" id="<?php echo $id; ?>" name="<?php echo $name; ?>"
+               class="form-input" required placeholder="••••••••" <?php echo $attrs; ?>>
+        <button type="button" class="password-toggle" onclick="togglePassword(this)"
+                aria-controls="<?php echo $id; ?>" aria-pressed="false" aria-label="Show password">
+            <svg class="icon-show" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/>
+                <line x1="1" y1="1" x2="23" y2="23"/>
+            </svg>
+            <svg class="icon-hide" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+            </svg>
+        </button>
+    </div>
+    <?php
+};
+
 require_once __DIR__ . '/../includes/header.php';
 ?>
     <style>
@@ -108,7 +134,7 @@ require_once __DIR__ . '/../includes/header.php';
 
                         <div class="form-group">
                             <label for="login-password" class="form-label">Password</label>
-                            <input type="password" id="login-password" name="password" class="form-input" required placeholder="••••••••">
+                            <?php $_passwordField('login-password', 'password'); ?>
                             <a href="#" onclick="switchTab('forgot'); return false;" class="form-link mt-1">Forgot Password?</a>
                         </div>
 
@@ -136,14 +162,14 @@ require_once __DIR__ . '/../includes/header.php';
 
                         <div class="form-group">
                             <label for="signup-password" class="form-label">Password</label>
-                            <input type="password" id="signup-password" name="password" class="form-input" required placeholder="••••••••" oninput="checkStrength(this, 'signup-meter')">
+                            <?php $_passwordField('signup-password', 'password', 'oninput="checkStrength(this, \'signup-meter\')"'); ?>
                             <div class="strength-meter-container"><div id="signup-meter" class="strength-meter-fill"></div></div>
                             <span class="text-xs-muted">Requires 1 uppercase, 1 lowercase, 1 number, 1 special char (min 8 chars)</span>
                         </div>
 
                         <div class="form-group">
                             <label for="signup-confirm" class="form-label">Confirm Password</label>
-                            <input type="password" id="signup-confirm" name="confirm_password" class="form-input" required placeholder="••••••••">
+                            <?php $_passwordField('signup-confirm', 'confirm_password'); ?>
                         </div>
 
                         <button type="submit" class="btn-submit">Create Account</button>
@@ -180,14 +206,14 @@ require_once __DIR__ . '/../includes/header.php';
                         
                         <div class="form-group">
                             <label for="reset-password" class="form-label">New Password</label>
-                            <input type="password" id="reset-password" name="password" class="form-input" required placeholder="••••••••" oninput="checkStrength(this, 'reset-meter')">
+                            <?php $_passwordField('reset-password', 'password', 'oninput="checkStrength(this, \'reset-meter\')"'); ?>
                             <div class="strength-meter-container"><div id="reset-meter" class="strength-meter-fill"></div></div>
                             <span class="text-xs-muted">Requires 1 uppercase, 1 lowercase, 1 number, 1 special char (min 8 chars)</span>
                         </div>
 
                         <div class="form-group">
                             <label for="reset-confirm" class="form-label">Confirm New Password</label>
-                            <input type="password" id="reset-confirm" name="confirm_password" class="form-input" required placeholder="••••••••">
+                            <?php $_passwordField('reset-confirm', 'confirm_password'); ?>
                         </div>
 
                         <button type="submit" class="btn-submit">Save New Password</button>
@@ -623,6 +649,25 @@ require_once __DIR__ . '/../includes/header.php';
                 document.getElementById('form-signup').submit();
             }
             return false;
+        }
+
+        // Show/hide the password sitting next to the clicked toggle.
+        function togglePassword(btn) {
+            const input = document.getElementById(btn.getAttribute('aria-controls'));
+            if (!input) return;
+
+            const reveal = input.type === 'password';
+            input.type   = reveal ? 'text' : 'password';
+
+            btn.classList.toggle('is-showing', reveal);
+            btn.setAttribute('aria-pressed', reveal ? 'true' : 'false');
+            btn.setAttribute('aria-label', reveal ? 'Hide password' : 'Show password');
+
+            // Clicking the button moved focus off the field — put it back with the
+            // caret at the end so the owner can keep typing without re-clicking.
+            input.focus();
+            const end = input.value.length;
+            try { input.setSelectionRange(end, end); } catch (e) {}
         }
 
         // Dynamic Password Strength Meter

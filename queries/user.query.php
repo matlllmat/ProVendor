@@ -123,4 +123,11 @@ function clearUserData(PDO $pdo, int $userId): void
     // before products so the snapshot FK doesn't block the delete.
     $pdo->prepare('DELETE FROM dataset_versions WHERE user_id = ?')->execute([$userId]);
     $pdo->prepare('DELETE FROM products WHERE user_id = ?')->execute([$userId]);
+
+    // A linked Google Sheet is a LIVE source of exactly the data being deleted.
+    // Left behind, the 5-minute refresh puts every deleted row straight back
+    // within minutes — while CSV import stays disabled, so the owner can neither
+    // clear their data nor re-import it. Deleting the data means disconnecting
+    // the sheet that feeds it.
+    $pdo->prepare('DELETE FROM sheet_links WHERE user_id = ?')->execute([$userId]);
 }

@@ -127,3 +127,56 @@
 
 .btn-submit:hover  { opacity: 0.9; }
 .btn-submit:active { opacity: 0.8; }
+
+/* ── Show/hide password toggle ────────────────────────────────────────────────
+   Wraps a .form-input so the button can sit inside the field's right edge. The
+   input gets extra right padding so a long password never runs under the icon. */
+.password-field {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.password-field .form-input {
+    padding-right: 2.75rem;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    border: none;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: #261F0E;
+    opacity: 0.4;
+    cursor: pointer;
+    transition: opacity 0.15s, background 0.15s;
+}
+
+.password-toggle:hover {
+    opacity: 0.8;
+    background: rgba(38,31,14,0.07);
+}
+
+.password-toggle:focus-visible {
+    outline: 2px solid rgba(38,31,14,0.5);
+    outline-offset: 1px;
+    opacity: 0.8;
+}
+
+/* Only one of the two icons is ever shown; JS flips which. */
+.password-toggle .icon-hide { display: none; }
+.password-toggle.is-showing .icon-show { display: none; }
+.password-toggle.is-showing .icon-hide { display: block; }
+
+/* Edge/IE reveal control would sit next to ours — suppress the duplicate. */
+.password-field .form-input::-ms-reveal,
+.password-field .form-input::-ms-clear {
+    display: none;
+}

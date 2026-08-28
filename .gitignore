@@ -3,5 +3,9 @@ uploads/*
 !uploads/.gitkeep
 python/pract.py
 
+#Service account credentials
+creds/service-account.json
+
 # Background forecast worker log (runtime artifact)
 cli/worker.log
+

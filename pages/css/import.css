@@ -1962,3 +1962,506 @@ tr:hover .qty-edit-btn { opacity: 0.45; }
     border-radius: 0.6rem;
     padding: 0.5rem 0.75rem;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   GOOGLE SHEETS IMPORT
+   Dialog (includes/sheets_modal.php) + the connected-sheet card and its trigger
+   button on the Sales Data tab.
+══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Trigger button ── */
+/* Ghost styling on purpose: CSV upload stays the primary green action, and this
+   sits beside it as the second way in. */
+.sheets-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: transparent;
+    color: #261F0E;
+    border: 1px solid #D2C8AE;
+    border-radius: 0.625rem;
+    padding: 0.55rem 1rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+.sheets-btn:hover {
+    border-color: #1A6933;
+    background: rgba(26,105,51,0.06);
+}
+.sheets-btn svg { color: #1A6933; flex-shrink: 0; }
+
+/* ── Dialog shell ── */
+/* Sits below confirm_modal's z-2000 so the second confirmation stacks on top. */
+.gs-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+}
+.gs-overlay.hidden { display: none; }
+
+.gs-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(38,31,14,0.55);
+}
+
+.gs-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 34rem;
+    max-height: 90vh;
+    background: #F0E8D0;
+    border: 1px solid #D2C8AE;
+    border-radius: 1rem;
+    box-shadow: 0 24px 64px rgba(38,31,14,0.3);
+    overflow: hidden;
+}
+
+.gs-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.5rem 1.75rem 1.25rem;
+    border-bottom: 1px solid #D2C8AE;
+}
+.gs-eyebrow {
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #1A6933;
+    margin-bottom: 0.35rem;
+}
+.gs-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #261F0E;
+    letter-spacing: -0.01em;
+}
+.gs-sub {
+    font-size: 0.8rem;
+    color: #261F0E;
+    opacity: 0.5;
+    line-height: 1.5;
+    margin-top: 0.35rem;
+}
+.gs-close {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: #261F0E;
+    opacity: 0.35;
+    cursor: pointer;
+    padding: 0.25rem;
+    transition: opacity 0.15s;
+}
+.gs-close:hover { opacity: 0.8; }
+
+.gs-body {
+    padding: 1.5rem 1.75rem;
+    overflow-y: auto;
+}
+
+/* ── Setup steps ── */
+.gs-steps { list-style: none; display: flex; flex-direction: column; gap: 1.5rem; }
+
+.gs-step { display: flex; gap: 0.875rem; }
+
+.gs-step-num {
+    flex-shrink: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 999px;
+    background: #261F0E;
+    color: #F0E8D0;
+    font-size: 0.7rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.gs-step-body { flex: 1; min-width: 0; }
+
+.gs-step-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #261F0E;
+    margin-bottom: 0.2rem;
+}
+.gs-step-desc {
+    font-size: 0.78rem;
+    color: #261F0E;
+    opacity: 0.6;
+    line-height: 1.55;
+}
+.gs-step-note {
+    font-size: 0.7rem;
+    color: #261F0E;
+    opacity: 0.42;
+    line-height: 1.5;
+    margin-top: 0.5rem;
+}
+
+/* Miniature of the expected layout — faster to grasp than a sentence. */
+.gs-example {
+    margin-top: 0.7rem;
+    border: 1px solid #D2C8AE;
+    border-radius: 0.6rem;
+    overflow: hidden;
+}
+.gs-example-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.7rem;
+}
+.gs-example-table th {
+    text-align: left;
+    padding: 0.4rem 0.65rem;
+    background: rgba(38,31,14,0.06);
+    color: #261F0E;
+    font-weight: 600;
+    border-bottom: 1px solid #D2C8AE;
+}
+.gs-example-table td {
+    padding: 0.35rem 0.65rem;
+    color: #261F0E;
+    opacity: 0.62;
+    border-bottom: 1px solid rgba(210,200,174,0.5);
+}
+.gs-example-table tr:last-child td { border-bottom: none; }
+
+/* ── Service account address ── */
+.gs-email-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0.4rem;
+    margin-top: 0.7rem;
+}
+.gs-email {
+    flex: 1;
+    min-width: 0;
+    background: rgba(38,31,14,0.05);
+    border: 1px solid #D2C8AE;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.65rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.7rem;
+    color: #261F0E;
+    overflow-wrap: anywhere;
+    line-height: 1.4;
+}
+.gs-copy-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: #261F0E;
+    color: #F0E8D0;
+    border: none;
+    border-radius: 0.5rem;
+    padding: 0 0.75rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s, background 0.15s;
+}
+.gs-copy-btn:hover { opacity: 0.85; }
+.gs-copy-btn-done { background: #1A6933; }
+
+/* ── Link input ── */
+.gs-input {
+    width: 100%;
+    margin-top: 0.7rem;
+    background: #FFFDF7;
+    border: 1px solid #D2C8AE;
+    border-radius: 0.6rem;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.78rem;
+    color: #261F0E;
+    outline: none;
+    transition: border-color 0.15s;
+}
+.gs-input::placeholder { color: rgba(38,31,14,0.3); }
+.gs-input:focus { border-color: #261F0E; }
+.gs-input:disabled { opacity: 0.55; cursor: wait; }
+
+/* ── Errors ── */
+.gs-error {
+    display: none;
+    margin-top: 1.25rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    line-height: 1.55;
+    color: #b91c1c;
+    background: rgba(185,28,28,0.07);
+    border: 1px solid rgba(185,28,28,0.2);
+    border-radius: 0.6rem;
+    padding: 0.7rem 0.9rem;
+}
+.gs-error code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.72rem;
+}
+
+/* ── Footer ── */
+.gs-footer {
+    display: flex;
+    gap: 0.6rem;
+    padding: 1rem 1.75rem 1.25rem;
+    border-top: 1px solid #D2C8AE;
+}
+.gs-btn-cancel {
+    flex: 1;
+    border: 1px solid #D2C8AE;
+    border-radius: 0.7rem;
+    padding: 0.65rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #261F0E;
+    background: transparent;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.gs-btn-cancel:hover { background: #D2C8AE; }
+
+.gs-btn-confirm {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    background: #1A6933;
+    color: #F0E8D0;
+    border: none;
+    border-radius: 0.7rem;
+    padding: 0.65rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+.gs-btn-confirm:hover:not(:disabled) { opacity: 0.88; }
+.gs-btn-confirm:disabled { opacity: 0.6; cursor: wait; }
+
+.gs-spinner {
+    width: 0.8rem;
+    height: 0.8rem;
+    border: 2px solid rgba(240,232,208,0.35);
+    border-top-color: #F0E8D0;
+    border-radius: 999px;
+    animation: gs-spin 0.7s linear infinite;
+}
+@keyframes gs-spin { to { transform: rotate(360deg); } }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   CONNECTED SHEET CARD  (Sales Data tab)
+══════════════════════════════════════════════════════════════════════════════ */
+
+.sheet-card {
+    background: #F0E8D0;
+    border: 1px solid #D2C8AE;
+    border-left: 3px solid #1A6933;
+    border-radius: 1rem;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 24px rgba(38,31,14,0.07);
+}
+
+.sheet-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.sheet-card-id { min-width: 0; }
+
+.sheet-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #1A6933;
+    margin-bottom: 0.3rem;
+}
+.sheet-eyebrow svg { flex-shrink: 0; }
+
+.sheet-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #261F0E;
+    overflow-wrap: anywhere;
+}
+.sheet-tab {
+    font-size: 0.75rem;
+    color: #261F0E;
+    opacity: 0.45;
+    margin-top: 0.15rem;
+}
+
+.sheet-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.sheet-open-btn,
+.sheet-update-btn,
+.sheet-unlink-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 0.6rem;
+    padding: 0.5rem 0.85rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: opacity 0.15s, background 0.15s, border-color 0.15s;
+}
+.sheet-open-btn {
+    background: transparent;
+    color: #261F0E;
+    border: 1px solid #D2C8AE;
+}
+.sheet-open-btn:hover { border-color: #261F0E; background: rgba(38,31,14,0.05); }
+
+.sheet-update-btn {
+    background: #1A6933;
+    color: #F0E8D0;
+    border: none;
+}
+.sheet-update-btn:hover:not(:disabled) { opacity: 0.87; }
+.sheet-update-btn:disabled { opacity: 0.55; cursor: wait; }
+
+.sheet-unlink-btn {
+    background: transparent;
+    color: #b91c1c;
+    border: 1px solid rgba(185,28,28,0.28);
+}
+.sheet-unlink-btn:hover { background: rgba(185,28,28,0.07); }
+
+/* ── Sync status line ── */
+.sheet-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid #D2C8AE;
+    font-size: 0.75rem;
+    color: #261F0E;
+}
+.sheet-status-dot {
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 999px;
+    background: #1A6933;
+    flex-shrink: 0;
+}
+.sheet-status-text { opacity: 0.6; line-height: 1.5; }
+.sheet-status.is-error .sheet-status-dot { background: #b91c1c; }
+.sheet-status.is-error .sheet-status-text { color: #b91c1c; font-weight: 600; opacity: 1; }
+
+/* ── Auto-refresh toggle ── */
+.sheet-autosync {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 0.9rem;
+    padding: 0.75rem 0.9rem;
+    border: 1px solid #D2C8AE;
+    border-radius: 0.7rem;
+    background: rgba(38,31,14,0.03);
+}
+.sheet-autosync-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #261F0E;
+}
+.sheet-autosync-desc {
+    font-size: 0.7rem;
+    color: #261F0E;
+    opacity: 0.5;
+    line-height: 1.5;
+    margin-top: 0.15rem;
+}
+
+.sheet-switch {
+    position: relative;
+    flex-shrink: 0;
+    width: 2.4rem;
+    height: 1.3rem;
+    border-radius: 999px;
+    border: 1px solid #D2C8AE;
+    background: rgba(38,31,14,0.12);
+    cursor: pointer;
+    transition: background 0.18s, border-color 0.18s;
+}
+.sheet-switch::after {
+    content: '';
+    position: absolute;
+    top: 0.13rem;
+    left: 0.15rem;
+    width: 0.9rem;
+    height: 0.9rem;
+    border-radius: 999px;
+    background: #F0E8D0;
+    box-shadow: 0 1px 3px rgba(38,31,14,0.3);
+    transition: transform 0.18s;
+}
+.sheet-switch.is-on {
+    background: #1A6933;
+    border-color: #1A6933;
+}
+.sheet-switch.is-on::after { transform: translateX(1.05rem); }
+.sheet-switch:disabled { opacity: 0.5; cursor: wait; }
+
+/* Replaces the CSV upload button while a sheet is linked. */
+.sheet-csv-off {
+    font-size: 0.72rem;
+    color: #261F0E;
+    opacity: 0.42;
+    line-height: 1.5;
+    max-width: 20rem;
+    text-align: right;
+}
+
+/* ── Onboarding: the "or connect a sheet" alternative ── */
+.gs-alt {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #D2C8AE;
+}
+.gs-alt-text { flex: 1; }
+.gs-alt-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #261F0E;
+}
+.gs-alt-desc {
+    font-size: 0.75rem;
+    color: #261F0E;
+    opacity: 0.5;
+    line-height: 1.5;
+    margin-top: 0.15rem;
+}

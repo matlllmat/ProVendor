@@ -205,6 +205,103 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
         </div>
 
+        <!-- ── Connected Google Sheet ──────────────────────────────────────────
+             Only rendered once a sheet is linked. Everything here is about the
+             live connection: where the data comes from, when it last moved, and
+             the two levers over it (auto-refresh, disconnect).
+        ─────────────────────────────────────────────────────────────────────── -->
+        <?php if ($sheetLink): ?>
+        <?php
+            $syncFailed = $sheetLink['last_sync_status'] === 'error';
+            $syncedAt   = $sheetLink['last_synced_at']
+                ? date('M j, Y · g:i A', strtotime($sheetLink['last_synced_at']))
+                : null;
+        ?>
+        <div class="sheet-card" id="sheet-card">
+
+            <div class="sheet-card-head">
+                <div class="sheet-card-id">
+                    <p class="sheet-eyebrow">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                        </svg>
+                        Connected Google Sheet
+                    </p>
+                    <p class="sheet-name"><?php echo htmlspecialchars($sheetLink['sheet_title'] ?? 'Untitled sheet'); ?></p>
+                    <?php if (!empty($sheetLink['worksheet_title'])): ?>
+                    <p class="sheet-tab">Tab: <?php echo htmlspecialchars($sheetLink['worksheet_title']); ?></p>
+                    <?php endif; ?>
+                </div>
+
+                <div class="sheet-actions">
+                    <a class="sheet-open-btn" target="_blank" rel="noopener"
+                       href="<?php echo htmlspecialchars($sheetLink['sheet_url']); ?>">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                            <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                        </svg>
+                        Open sheet
+                    </a>
+
+                    <!-- Shown only when auto-refresh is off: with it on, the
+                         5-minute heartbeat already keeps this current. -->
+                    <button type="button" id="sheet-update-btn" class="sheet-update-btn"
+                            onclick="sheetUpdateNow()"
+                            style="<?php echo $sheetLink['auto_sync'] ? 'display:none' : ''; ?>">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 12a9 9 0 1 1-6.219-8.56"/><polyline points="21 3 21 9 15 9"/>
+                        </svg>
+                        Update Data
+                    </button>
+
+                    <button type="button" class="sheet-unlink-btn" onclick="confirmSheetUnlink()">
+                        Disconnect
+                    </button>
+                </div>
+            </div>
+
+            <div class="sheet-autosync">
+                <div>
+                    <p class="sheet-autosync-label">Refresh automatically</p>
+                    <p class="sheet-autosync-desc">
+                        Re-reads the sheet every 5 minutes while ProVendor is open, adding new days
+                        and updating any quantity you changed there. Turn this off to refresh only
+                        when you press <strong>Update Data</strong>.
+                    </p>
+                </div>
+                <button type="button" id="sheet-autosync-switch" role="switch"
+                        aria-checked="<?php echo $sheetLink['auto_sync'] ? 'true' : 'false'; ?>"
+                        aria-label="Refresh automatically"
+                        class="sheet-switch<?php echo $sheetLink['auto_sync'] ? ' is-on' : ''; ?>"
+                        onclick="toggleSheetAutoSync()"></button>
+            </div>
+
+            <div class="sheet-status<?php echo $syncFailed ? ' is-error' : ''; ?>" id="sheet-status">
+                <span class="sheet-status-dot"></span>
+                <span class="sheet-status-text" id="sheet-status-text">
+                    <?php
+                    if ($syncFailed) {
+                        echo 'Last refresh failed: ' . htmlspecialchars($sheetLink['last_sync_error'] ?? 'unknown error');
+                    } elseif ($syncedAt) {
+                        echo 'Last refreshed ' . $syncedAt;
+                        $moved = (int) $sheetLink['last_sync_added'] + (int) $sheetLink['last_sync_updated'];
+                        if ($moved > 0) {
+                            echo ' — ' . number_format((int) $sheetLink['last_sync_added']) . ' added, '
+                               . number_format((int) $sheetLink['last_sync_updated']) . ' updated.';
+                        } else {
+                            echo ' — nothing had changed.';
+                        }
+                    } else {
+                        echo 'Not refreshed yet.';
+                    }
+                    ?>
+                </span>
+            </div>
+
+        </div>
+        <?php endif; ?>
+
         <!-- ── Upload Wizard (hidden until triggered) ── -->
         <div id="wizard-panel" class="wizard-panel hidden">
 
@@ -403,12 +500,30 @@ require_once __DIR__ . '/../includes/header.php';
                     Export CSV
                 </a>
                 <?php endif; ?>
+
+                <?php if ($sheetLink): ?>
+                <!-- Sheet linked: the sheet is the way data gets in, so the CSV
+                     upload button is gone rather than sitting there failing. -->
+                <span class="sheet-csv-off">
+                    CSV import is off while your Google Sheet is connected.
+                </span>
+                <?php else: ?>
+                <button onclick="openSheetsDialog()" class="sheets-btn">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="8" y1="13" x2="16" y2="13"/>
+                        <line x1="8" y1="17" x2="16" y2="17"/>
+                    </svg>
+                    Google Sheets
+                </button>
                 <button onclick="openWizard()" class="upload-btn-primary">
                     <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                     </svg>
                     Update Sales Data
                 </button>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -2110,8 +2225,154 @@ function _msg(id, type, text) {
     el.textContent = text;
     el.style.display = '';
 }
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GOOGLE SHEETS
+// The dialog (includes/sheets_modal.php) validates the link and hands back the
+// same payload shape api/detect.php returns — so a sheet import rejoins the
+// wizard at step 2 and walks the identical mapping → preview → commit path.
+// ══════════════════════════════════════════════════════════════════════════════
+
+window.pvSheetsOnValidated = function (data) {
+    // The wizard's saved localStorage state describes whatever ran last; a stale
+    // restore over the sheet's columns would silently mis-map them.
+    wClearState();
+
+    var panel = document.getElementById('wizard-panel');
+    panel.classList.remove('hidden');
+
+    var head = panel.querySelector('.wizard-header-text');
+    if (head) {
+        head.querySelector('h2').textContent = 'Import from Google Sheets';
+        head.querySelector('p').textContent  =
+            'Reading “' + (data.sheet ? data.sheet.title : 'your sheet') + '”. Map its columns to proceed.';
+    }
+
+    var step1Label = document.querySelector('#wdot-1 .lbl');
+    if (step1Label) step1Label.textContent = 'Read Sheet';
+
+    wPopulateMappingUI(data);
+    wGoToStep(2);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+// ── Manual refresh ("Update Data", shown when auto-refresh is off) ────────────
+function sheetUpdateNow() {
+    var btn = document.getElementById('sheet-update-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Updating…'; }
+
+    var body = new FormData();
+    body.append('force', '1');   // manual press ignores the 5-minute throttle
+
+    fetch('<?php echo BASE_URL; ?>/api/sheets_sync.php', { method: 'POST', body: body })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+            restoreUpdateBtn();
+            if (data.error) { setSheetStatus(true, data.error); return; }
+
+            var moved = (data.added || 0) + (data.updated || 0);
+            setSheetStatus(false, moved > 0
+                ? 'Refreshed just now — ' + data.added + ' added, ' + data.updated + ' updated.'
+                : 'Refreshed just now — nothing had changed.');
+
+            // New rows change every figure on this page, so reload rather than
+            // leave the summary cards contradicting the status line.
+            if (moved > 0) setTimeout(function () { window.location.reload(); }, 1200);
+        })
+        .catch(function () {
+            restoreUpdateBtn();
+            setSheetStatus(true, 'Could not reach ProVendor. Check your connection and try again.');
+        });
+}
+
+function restoreUpdateBtn() {
+    var btn = document.getElementById('sheet-update-btn');
+    if (!btn) return;
+    btn.disabled  = false;
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/><polyline points="21 3 21 9 15 9"/></svg> Update Data';
+}
+
+function setSheetStatus(isError, text) {
+    var wrap = document.getElementById('sheet-status');
+    var el   = document.getElementById('sheet-status-text');
+    if (!wrap || !el) return;
+    wrap.classList.toggle('is-error', !!isError);
+    el.textContent = text;
+}
+
+// Lets the background heartbeat (includes/sheets_autosync.php) report into the
+// card when the owner happens to be sitting on this page.
+window.pvOnSheetSync = function (data) {
+    if (data.error) { setSheetStatus(true, data.error); return; }
+    if (data.skipped_recent) return;
+
+    var moved = (data.added || 0) + (data.updated || 0);
+    setSheetStatus(false, moved > 0
+        ? 'Refreshed just now — ' + data.added + ' added, ' + data.updated + ' updated.'
+        : 'Refreshed just now — nothing had changed.');
+};
+
+// ── Auto-refresh toggle ──────────────────────────────────────────────────────
+function toggleSheetAutoSync() {
+    var sw      = document.getElementById('sheet-autosync-switch');
+    var updates = document.getElementById('sheet-update-btn');
+    var turnOn  = !sw.classList.contains('is-on');
+
+    sw.disabled = true;
+
+    var body = new FormData();
+    body.append('enabled', turnOn ? '1' : '0');
+
+    fetch('<?php echo BASE_URL; ?>/api/sheets_autosync.php', { method: 'POST', body: body })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+            sw.disabled = false;
+            if (data.error) { setSheetStatus(true, data.error); return; }
+
+            sw.classList.toggle('is-on', data.auto_sync);
+            sw.setAttribute('aria-checked', data.auto_sync ? 'true' : 'false');
+
+            // Manual refresh only earns its place when nothing refreshes for you.
+            if (updates) updates.style.display = data.auto_sync ? 'none' : '';
+
+            // The heartbeat lives on this page too — start or stop it to match,
+            // instead of waiting for a reload.
+            if (window.pvSheetHeartbeat) window.pvSheetHeartbeat(data.auto_sync);
+        })
+        .catch(function () {
+            sw.disabled = false;
+            setSheetStatus(true, 'Could not change the refresh setting. Please try again.');
+        });
+}
+
+// ── Disconnect ───────────────────────────────────────────────────────────────
+function confirmSheetUnlink() {
+    showConfirm({
+        title:        'Disconnect this sheet?',
+        message:      'ProVendor will stop reading it, and CSV import becomes available again. '
+                    + 'Sales already brought in from the sheet stay exactly as they are.',
+        confirmText:  'Disconnect',
+        confirmStyle: 'danger',
+        onConfirm:    doSheetUnlink,
+    });
+}
+
+function doSheetUnlink() {
+    fetch('<?php echo BASE_URL; ?>/api/sheets_unlink.php', { method: 'POST' })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+            if (data.error) { setSheetStatus(true, data.error); return; }
+            window.location = '<?php echo BASE_URL; ?>/pages/import.view.php#import';
+            window.location.reload();
+        })
+        .catch(function () {
+            setSheetStatus(true, 'Could not disconnect the sheet. Please try again.');
+        });
+}
 </script>
 
+<?php require_once __DIR__ . '/../includes/sheets_modal.php'; ?>
 <?php require_once __DIR__ . '/../includes/confirm_modal.php'; ?>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 </body>
