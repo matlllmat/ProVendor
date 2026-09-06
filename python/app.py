@@ -117,6 +117,32 @@ def forecast_category():
 
 # ── Event regressor helpers ───────────────────────────────────────────────────
 
+def attach_occurrences(cur, events):
+    """Load event_occurrences rows for every 'custom' event, in one query.
+
+    Mirrors attachOccurrences() in queries/events.query.php so the regressor
+    sees exactly the dates the events page shows.
+    """
+    custom_ids = [e['id'] for e in events if e.get('recurrence') == 'custom']
+    by_event   = {}
+
+    if custom_ids:
+        placeholders = ','.join(['%s'] * len(custom_ids))
+        cur.execute(
+            'SELECT event_id, start_date, end_date FROM event_occurrences '
+            'WHERE event_id IN (' + placeholders + ') ORDER BY start_date',
+            tuple(custom_ids)
+        )
+        for row in cur.fetchall():
+            by_event.setdefault(row['event_id'], []).append({
+                'start_date': row['start_date'],
+                'end_date':   row['end_date'],
+            })
+
+    for e in events:
+        e['occurrences'] = by_event.get(e['id'], [])
+
+
 def get_event_active_series(event, date_index):
     """Return a float 0.0/1.0 Series — 1.0 on days when the event is active.
 
@@ -132,7 +158,18 @@ def get_event_active_series(event, date_index):
     active   = set()
     rec      = event['recurrence']
 
-    if rec == 'none':
+    if rec == 'custom':
+        # Dates come from event_occurrences - no calendar rule to apply.
+        for occ in event.get('occurrences') or []:
+            o_start = pd.to_datetime(occ['start_date'])
+            o_end   = pd.to_datetime(occ['end_date'] or occ['start_date'])
+            o_days  = max(0, (o_end - o_start).days)
+            for offset in range(o_days + 1):
+                d = o_start + pd.Timedelta(days=offset)
+                if d in date_set:
+                    active.add(d)
+
+    elif rec == 'none':
         for offset in range(duration + 1):
             d = base_start + pd.Timedelta(days=offset)
             if d in date_set:
@@ -181,7 +218,13 @@ def count_event_instances(event, train_start, train_end):
     rec        = event['recurrence']
     count      = 0
 
-    if rec == 'none':
+    if rec == 'custom':
+        for occ in event.get('occurrences') or []:
+            o_start = pd.to_datetime(occ['start_date'])
+            if train_start <= o_start <= train_end:
+                count += 1
+
+    elif rec == 'none':
         if train_start <= base_start <= train_end:
             count = 1
 
@@ -248,6 +291,7 @@ def forecast_product():
                   )
             """, (user_id, user_id))
             events = cur.fetchall()
+            attach_occurrences(cur, events)
     finally:
         conn.close()
 
@@ -388,11 +432,20 @@ def forecast_product():
     return jsonify(result)
 
 
+# What fraction of a unit's cost is recovered when it survives the ordering
+# window unsold. Durable stock isn't a write-off — it sells in the next window —
+# but holding it isn't free either (shelf space, tied-up cash, shrinkage), so the
+# recovery is deliberately short of 1.0. Perishable stock recovers nothing.
+SALVAGE_RECOVERY_RATE = 0.95
+
+
 # ── Newsvendor optimization ────────────────────────────────────────────────────
 # Input  (JSON): { forecast: [{date, predicted, lower, upper}], cost_price, selling_price,
-#                  current_stock, residual_rho (optional, lag-1 autocorrelation from backtest) }
+#                  current_stock, residual_rho (optional, lag-1 autocorrelation from backtest),
+#                  shelf_life_days (optional, null = non-perishable) }
 # Output (JSON): { total_predicted, total_std, restock_qty, optimal_total, est_profit,
-#                  rho_used, std_inflation_factor }
+#                  rho_used, std_inflation_factor, shelf_life_days, horizon_days,
+#                  effective_days, window_capped, salvage_rate, critical_ratio }
 @app.route('/optimize', methods=['POST'])
 def optimize():
     body          = request.get_json()
@@ -416,13 +469,35 @@ def optimize():
     if not forecast_data:
         return jsonify({'error': 'No forecast data provided.'}), 400
 
-    # Total mean demand over the forecast horizon
-    total_predicted = sum(r['predicted'] for r in forecast_data)
+    # ── Perishability ────────────────────────────────────────────────────────
+    # shelf_life_days is the shortest end of the owner's declared "usual range"
+    # (set via the batch editor, not derived from any import); None means the
+    # product isn't marked perishable (soap, rice, detergent — most of a
+    # sari-sari catalogue).
+    try:
+        raw_shelf_life  = body.get('shelf_life_days')
+        shelf_life_days = int(raw_shelf_life) if raw_shelf_life not in (None, '') else None
+        if shelf_life_days is not None and shelf_life_days <= 0:
+            shelf_life_days = None
+    except (TypeError, ValueError):
+        shelf_life_days = None
+
+    horizon_days = len(forecast_data)
+
+    # Cap the ordering window at the shelf life. Ordering 30 days of demand for
+    # something that keeps 3 days doesn't create 30 days of cover — it creates
+    # 27 days of spoilage. Past its shelf life the stock can't be sold at all,
+    # so only demand inside that window is orderable in one go.
+    effective_days = min(horizon_days, shelf_life_days) if shelf_life_days else horizon_days
+    window         = forecast_data[:effective_days]
+
+    # Total mean demand over the (possibly shortened) window
+    total_predicted = sum(r['predicted'] for r in window)
 
     # Estimate total std dev from Prophet confidence intervals.
     # Each day's CI is ~95%, so σ_day ≈ (upper - lower) / (2 * 1.96).
     # Independent-day baseline: total variance = sum of daily variances.
-    daily_var_sum = sum(((r['upper'] - r['lower']) / (2 * 1.96)) ** 2 for r in forecast_data)
+    daily_var_sum = sum(((r['upper'] - r['lower']) / (2 * 1.96)) ** 2 for r in window)
     total_std     = math.sqrt(daily_var_sum) if daily_var_sum > 0 else total_predicted * 0.2
 
     # AR(1) variance correction. Real daily demand is rarely independent —
@@ -432,17 +507,38 @@ def optimize():
     # We approximate the variable-variance case by applying the same inflation
     # factor to total_std. ρ comes from the per-product backtest residuals; if
     # the product has no backtest yet, ρ=0 and the factor is 1.
-    n = len(forecast_data)
+    n = len(window)
     inflation_factor = 1.0
     if n > 1 and residual_rho != 0:
         correlation_sum  = sum((n - k) * (residual_rho ** k) for k in range(1, n))
         inflation_factor = math.sqrt(max(0.0, 1.0 + 2.0 * correlation_sum / n))
         total_std       *= inflation_factor
 
-    # Newsvendor critical ratio: CR = (p - c) / p
-    # Underage cost Cu = p - c  (lost profit per unit short)
-    # Overage cost  Co = c      (cost per unsold unit)
-    critical_ratio = (selling_price - cost_price) / selling_price
+    # Newsvendor critical ratio: CR = Cu / (Cu + Co)
+    #   Underage Cu = p - s'  ... lost margin on a unit we failed to stock
+    #   Overage  Co = c - s   ... cost sunk into a unit that didn't sell
+    # which reduces to the standard CR = (p - c) / (p - s).
+    #
+    # s is the salvage value of a leftover unit, and it is where perishability
+    # enters. The model previously hard-coded s = 0 — every leftover unit written
+    # off in full — which is right for bread and badly wrong for rice: a sack that
+    # doesn't sell this month is still a sack next month. Treating durable stock
+    # as spoilage pushes the critical ratio down and systematically under-orders
+    # the products that are safest to hold.
+    if shelf_life_days is None or shelf_life_days > horizon_days:
+        # Outlives the ordering window: leftovers carry into the next one, so we
+        # recover their cost less the cost of holding them.
+        salvage_rate = SALVAGE_RECOVERY_RATE
+    else:
+        # Expires inside the window; whatever is left at the end is waste.
+        salvage_rate = 0.0
+
+    salvage = cost_price * salvage_rate
+
+    critical_ratio = (selling_price - cost_price) / (selling_price - salvage)
+    # Guard the tails: norm.ppf(0) and norm.ppf(1) are infinite, and a CR pinned
+    # at either end would produce a nonsensical order quantity.
+    critical_ratio = min(max(critical_ratio, 1e-6), 1 - 1e-6)
     z_star         = norm.ppf(critical_ratio)
 
     # Optimal total supply level and actual order quantity
@@ -470,6 +566,14 @@ def optimize():
         'est_profit':            est_profit,
         'rho_used':              round(residual_rho, 4),
         'std_inflation_factor':  round(inflation_factor, 4),
+        # Perishability, echoed so the UI can explain a suggestion that looks
+        # small: a capped window is a deliberate decision, not a bad forecast.
+        'shelf_life_days':       shelf_life_days,
+        'horizon_days':          horizon_days,
+        'effective_days':        effective_days,
+        'window_capped':         effective_days < horizon_days,
+        'salvage_rate':          salvage_rate,
+        'critical_ratio':        round(critical_ratio, 4),
     })
 
 
@@ -509,6 +613,7 @@ def evaluate_product_forecast():
                   )
             """, (user_id, user_id))
             events = cur.fetchall()
+            attach_occurrences(cur, events)
     finally:
         conn.close()
 
@@ -609,6 +714,112 @@ def evaluate_product_forecast():
         'horizon_days':  horizon,
         'n_test_days':   len(test),
         'residual_rho':  round(residual_rho, 4),
+    })
+
+
+# ── Backtest against caller-supplied "future" actuals ─────────────────────────
+# Unlike /forecast/product/evaluate above (which holds out the tail of the
+# product's own KNOWN history), this trains on the FULL history and tests
+# against actuals the caller uploaded for dates that history doesn't have —
+# see api/run_backtest_upload.php. Kept as its own route (some duplication with
+# the function above) rather than refactored into it, so the existing
+# known-history backtest stays untouched.
+# Input  (JSON): { user_id, product_id, actuals: [{date, qty}, ...] }
+# Output (JSON): { accuracy_pct, mape, mae, rmse, n_test_days } OR { error }
+@app.route('/forecast/product/evaluate_upload', methods=['POST'])
+def evaluate_product_forecast_upload():
+    body       = request.get_json()
+    user_id    = body.get('user_id')
+    product_id = body.get('product_id')
+    actuals    = body.get('actuals') or []
+
+    if not actuals:
+        return jsonify({'error': 'No actual values supplied.'}), 400
+
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT s.sale_date AS ds, s.quantity_sold AS y
+                FROM sales s
+                JOIN products p ON p.id = s.product_id
+                WHERE s.product_id = %s AND p.user_id = %s
+                ORDER BY s.sale_date
+            """, (product_id, user_id))
+            rows = cur.fetchall()
+
+            cur.execute("""
+                SELECT id, name, event_start, event_end, recurrence, is_last_day
+                FROM seasonal_events
+                WHERE (user_id IS NULL OR user_id = %s)
+                  AND id NOT IN (
+                      SELECT event_id FROM user_hidden_events WHERE user_id = %s
+                  )
+            """, (user_id, user_id))
+            events = cur.fetchall()
+            attach_occurrences(cur, events)
+    finally:
+        conn.close()
+
+    if len(rows) < 45:
+        return jsonify({
+            'error': 'Need at least 45 days of existing sales history to train a model.',
+            'available_days': len(rows),
+        }), 400
+
+    train       = pd.DataFrame(rows)
+    train['ds'] = pd.to_datetime(train['ds'])
+    train['y']  = train['y'].astype(float)
+
+    test       = pd.DataFrame(actuals)
+    test       = test.rename(columns={'date': 'ds', 'qty': 'y'})
+    test['ds'] = pd.to_datetime(test['ds'])
+    test['y']  = test['y'].astype(float)
+    test       = test.sort_values('ds').reset_index(drop=True)
+
+    model = Prophet(
+        yearly_seasonality = True,
+        weekly_seasonality = True,
+        daily_seasonality  = False,
+    )
+
+    event_col_map  = {}
+    train_date_idx = pd.DatetimeIndex(train['ds'])
+    for ev in events:
+        col = f'ev_{ev["id"]}'
+        train[col] = get_event_active_series(ev, train_date_idx).values
+        model.add_regressor(col, mode='additive')
+        event_col_map[ev['id']] = col
+
+    try:
+        model.fit(train)
+    except Exception as exc:
+        return jsonify({'error': f'Model fit failed: {exc}'}), 500
+
+    future          = pd.DataFrame({'ds': test['ds'].values})
+    future_date_idx = pd.DatetimeIndex(future['ds'])
+    for ev in events:
+        col = event_col_map[ev['id']]
+        future[col] = get_event_active_series(ev, future_date_idx).values
+
+    forecast  = model.predict(future)
+    predicted = forecast['yhat'].clip(lower=0).values
+    actual    = test['y'].values
+
+    errors         = actual - predicted
+    denom          = pd.Series(actual).clip(lower=1).values
+    abs_pct_errors = abs(errors) / denom
+    mape           = float(abs_pct_errors.mean() * 100)
+    mae            = float(abs(errors).mean())
+    rmse           = float(math.sqrt((errors ** 2).mean()))
+    accuracy_pct   = max(0.0, 100.0 - mape)
+
+    return jsonify({
+        'accuracy_pct': round(accuracy_pct, 2),
+        'mape':         round(mape, 2),
+        'mae':          round(mae, 2),
+        'rmse':         round(rmse, 2),
+        'n_test_days':  len(test),
     })
 
 

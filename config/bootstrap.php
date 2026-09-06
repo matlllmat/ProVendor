@@ -21,7 +21,7 @@ date_default_timezone_set('Asia/Manila');
 // Temporarily off while the accuracy work is finished; flip to true to restore
 // all three at once — no other edits needed.
 if (!defined('SHOW_ACCURACY_FEATURES')) {
-    define('SHOW_ACCURACY_FEATURES', false);
+    define('SHOW_ACCURACY_FEATURES', true);
 }
 
 if (session_status() === PHP_SESSION_NONE) {

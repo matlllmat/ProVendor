@@ -35,9 +35,14 @@ $latestForecasts = getLatestForecasts($pdo, $_SESSION['user_id']);
 // The full catalogue (ignoring any active search filter) drives the "Forecast
 // All Products" run, so searching the list never limits what actually gets
 // forecast. Reuse $products when no search is active to avoid a second query.
-$catalogue = ($search === '')
-    ? $products
-    : getProducts($pdo, $_SESSION['user_id'], '', '');
+//
+// Deactivated products are excluded: they aren't in the current dataset, so
+// there's nothing to forecast and no restock to suggest. They stay in $products
+// (and so in the visible list) with an explanation of what happened to them.
+$catalogue = array_values(array_filter(
+    ($search === '') ? $products : getProducts($pdo, $_SESSION['user_id'], '', ''),
+    fn($p) => (int) ($p['is_active'] ?? 1) === 1
+));
 
 // ── Events for chart annotations ──────────────────────────────────────────────
 // Expand from the earliest sale date (so historical events render) to 1 year

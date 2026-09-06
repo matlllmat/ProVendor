@@ -15,9 +15,9 @@
     <?php if (!empty($pageCss)): ?>
     <link rel="stylesheet" href="<?php echo BASE_URL; ?>/pages/css/<?php echo htmlspecialchars($pageCss); ?>?v=<?php echo filemtime(__DIR__ . '/../pages/css/' . $pageCss); ?>">
     <?php endif; ?>
-    <?php if (!empty($extraCss)): ?>
-    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/pages/css/<?php echo htmlspecialchars($extraCss); ?>?v=<?php echo filemtime(__DIR__ . '/../pages/css/' . $extraCss); ?>">
-    <?php endif; ?>
+    <?php if (!empty($extraCss)): foreach ((array) $extraCss as $_extraCssFile): ?>
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/pages/css/<?php echo htmlspecialchars($_extraCssFile); ?>?v=<?php echo filemtime(__DIR__ . '/../pages/css/' . $_extraCssFile); ?>">
+    <?php endforeach; endif; ?>
     <script src="<?php echo BASE_URL; ?>/assets/global_js/csrf.js"></script>
 </head>
 <body class="<?php echo htmlspecialchars($bodyClass ?? 'bg-[#F0E8D0] min-h-screen dot-pattern-light'); ?>">

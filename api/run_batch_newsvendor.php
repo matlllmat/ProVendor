@@ -45,7 +45,12 @@ foreach ($productsIn as $p) {
         continue;
     }
 
-    $stmt = $pdo->prepare('SELECT id, name FROM products WHERE id = ? AND user_id = ?');
+    // Perishability comes from the DB rather than the request: it's an owner
+    // declaration made via the batch editor, not something the client should be
+    // able to assert here.
+    $stmt = $pdo->prepare(
+        'SELECT id, name, is_perishable, shelf_life_min_days FROM products WHERE id = ? AND user_id = ?'
+    );
     $stmt->execute([$productId, $userId]);
     $productRow = $stmt->fetch();
     if (!$productRow) {
@@ -90,11 +95,15 @@ foreach ($productsIn as $p) {
     curl_setopt_array($ch, [
         CURLOPT_POST           => true,
         CURLOPT_POSTFIELDS     => json_encode([
-            'forecast'      => $forecastRows,
-            'cost_price'    => $costPrice,
-            'selling_price' => $sellingPrice,
-            'current_stock' => $currentStock,
-            'residual_rho'  => $residualRho,
+            'forecast'        => $forecastRows,
+            'cost_price'      => $costPrice,
+            'selling_price'   => $sellingPrice,
+            'current_stock'   => $currentStock,
+            'residual_rho'    => $residualRho,
+            'shelf_life_days' => effectiveShelfLifeDays(
+                (bool) $productRow['is_perishable'],
+                $productRow['shelf_life_min_days'] !== null ? (int) $productRow['shelf_life_min_days'] : null
+            ),
         ]),
         CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
         CURLOPT_RETURNTRANSFER => true,

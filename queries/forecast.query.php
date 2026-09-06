@@ -18,10 +18,17 @@ function getCategories(PDO $pdo, int $userId): array
 // Returns all products for this user, with optional name search and category filter.
 function getProducts(PDO $pdo, int $userId, string $search = '', string $category = ''): array
 {
-    $sql    = 'SELECT id, name, sku, category, subcategory, cost_price, selling_price,
+    // is_active/deactivated_at are selected but NOT filtered on: a product that
+    // dropped out of the current dataset stays visible in the catalogue (greyed,
+    // with an explanation) so the owner can see what happened to it. It's the
+    // forecasting queries below that skip it.
+    $sql    = 'SELECT id, name, sku, category, subcategory,
+                      is_perishable, shelf_life_min_days, shelf_life_max_days,
+                      cost_price, selling_price,
                       orig_cost_price, orig_selling_price, forecast_horizon_days,
                       accuracy_pct, accuracy_mape, accuracy_mae, accuracy_rmse,
-                      accuracy_horizon_days, accuracy_residual_rho, accuracy_computed_at
+                      accuracy_horizon_days, accuracy_residual_rho, accuracy_computed_at,
+                      is_active, deactivated_at
                FROM products WHERE user_id = ?';
     $params = [$userId];
 
@@ -75,6 +82,33 @@ function setProductPricing(PDO $pdo, int $userId, int $productId, float $cost, f
 {
     $pdo->prepare('UPDATE products SET cost_price = ?, selling_price = ? WHERE id = ? AND user_id = ?')
         ->execute([$cost, $price, $productId, $userId]);
+}
+
+// Saves the owner's perishability declaration from the batch editor. Unchecking
+// "perishable" clears the range rather than leaving stale numbers behind it.
+function setProductPerishability(PDO $pdo, int $userId, int $productId, bool $isPerishable, ?int $minDays, ?int $maxDays): void
+{
+    $pdo->prepare(
+        'UPDATE products
+         SET is_perishable = ?, shelf_life_min_days = ?, shelf_life_max_days = ?
+         WHERE id = ? AND user_id = ?'
+    )->execute([
+        $isPerishable ? 1 : 0,
+        $isPerishable ? $minDays : null,
+        $isPerishable ? $maxDays : null,
+        $productId,
+        $userId,
+    ]);
+}
+
+// Reduces a declared shelf-life RANGE to the single value the Newsvendor's
+// /optimize call actually needs. Chosen bound: the SHORTEST end of the range —
+// a conservative, worst-case assumption. Overordering a perishable item
+// (spoilage) is the costly mistake this feature exists to prevent; an
+// occasional early stockout from an over-cautious estimate is the cheaper one.
+function effectiveShelfLifeDays(bool $isPerishable, ?int $minDays): ?int
+{
+    return ($isPerishable && $minDays !== null && $minDays > 0) ? $minDays : null;
 }
 
 // Returns the cached forecast-accuracy stats for a single product (or null fields
@@ -137,7 +171,9 @@ function getCatalogueAccuracy(PDO $pdo, int $userId): array
                        FROM sales s
                        WHERE s.product_id = p.id), 0) AS total_units
          FROM products p
-         WHERE p.user_id = ?'
+         -- Deactivated products have no rows in the current dataset; including
+         -- them would drag the accuracy summary down with empty history.
+         WHERE p.user_id = ? AND p.is_active = 1'
     );
     $stmt->execute([$userId]);
     $rows = $stmt->fetchAll();
@@ -537,7 +573,8 @@ function getForecastCoverage(PDO $pdo, int $userId, int $horizonDays): array
         'SELECT p.id, p.name, p.forecast_horizon_days, MAX(f.forecast_date) AS last_date
          FROM products p
          LEFT JOIN forecasts f ON f.product_id = p.id
-         WHERE p.user_id = ?
+         -- Only products in the current dataset need forecast coverage.
+         WHERE p.user_id = ? AND p.is_active = 1
          GROUP BY p.id, p.name, p.forecast_horizon_days
          ORDER BY p.name'
     );

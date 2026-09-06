@@ -48,6 +48,42 @@ function saveDatasetVersion(
     return $versionId;
 }
 
+// True when the live sales table already matches the newest version's snapshot.
+//
+// Every path that writes sales snapshots itself afterwards (import) or before
+// (restore), so the outgoing dataset is normally already in History and
+// re-snapshotting it on replace would just burn a version slot and show the
+// owner two identical entries. The exception is a Google Sheet sync, which
+// rewrites rows on a timer without versioning — so this is checked rather than
+// assumed. Compared on (row count, total quantity), which is cheap and catches
+// any realistic drift.
+function datasetMatchesNewestVersion(PDO $pdo, int $userId): bool
+{
+    $stmt = $pdo->prepare(
+        'SELECT COUNT(*) AS n, COALESCE(SUM(s.quantity_sold), 0) AS q
+         FROM sales s JOIN products p ON p.id = s.product_id
+         WHERE p.user_id = ?'
+    );
+    $stmt->execute([$userId]);
+    $live = $stmt->fetch();
+
+    $stmt = $pdo->prepare(
+        'SELECT COUNT(*) AS n, COALESCE(SUM(ss.quantity_sold), 0) AS q
+         FROM sales_snapshots ss
+         WHERE ss.version_id = (
+             SELECT id FROM dataset_versions WHERE user_id = ?
+             ORDER BY created_at DESC, id DESC LIMIT 1
+         )'
+    );
+    $stmt->execute([$userId]);
+    $newest = $stmt->fetch();
+
+    if ((int) $newest['n'] === 0) return false;   // no version yet — must snapshot
+
+    return (int) $live['n'] === (int) $newest['n']
+        && (int) $live['q'] === (int) $newest['q'];
+}
+
 // Keeps the most recent MAX_VERSIONS_PER_USER versions and deletes older ones.
 // sales_snapshots rows are removed via ON DELETE CASCADE.
 function pruneOldVersions(PDO $pdo, int $userId): void

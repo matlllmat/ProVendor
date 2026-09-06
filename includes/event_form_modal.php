@@ -44,7 +44,105 @@ $swatches = ['#FF5722','#EF4444','#F59E0B','#EAB308','#22C55E','#3B82F6','#8B5CF
                 <select id="modal-recurrence" class="form-select" onchange="handleRecurrenceChange()">
                     <option value="yearly">Every year</option>
                     <option value="monthly">Every month</option>
+                    <option value="custom">Specific dates (irregular)</option>
+                    <option value="none">One-time (does not repeat)</option>
                 </select>
+            </div>
+
+            <!-- ── "When" controls. Exactly one block is visible at a time,
+                 chosen by handleRecurrenceChange() in assets/page_js/events.js.
+                 Each block collects only the parts that recurrence type
+                 actually stores, so nothing the owner types is discarded. ── -->
+
+            <!-- Every year: month + day. The year is not stored. -->
+            <div class="form-field" id="when-yearly">
+                <label class="form-label">When does it happen?</label>
+                <div class="form-grid-2">
+                    <select id="modal-year-month" class="form-select" aria-label="Month">
+                        <?php
+                        $months = ['January','February','March','April','May','June',
+                                   'July','August','September','October','November','December'];
+                        foreach ($months as $i => $m): ?>
+                        <option value="<?php echo $i + 1; ?>"><?php echo $m; ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <select id="modal-year-day" class="form-select" aria-label="Day"
+                            onchange="handleYearlyDayChange()">
+                        <?php for ($d = 1; $d <= 31; $d++): ?>
+                        <option value="<?php echo $d; ?>"><?php echo $d; ?></option>
+                        <?php endfor; ?>
+                    </select>
+                </div>
+                <p class="form-hint form-hint-warn hidden" id="yearly-date-hint"></p>
+            </div>
+
+            <!-- Every month: a fixed day number, or the month's real last day. -->
+            <div class="form-field" id="when-monthly">
+                <label class="form-label">When does it happen?</label>
+
+                <label class="form-radio-row">
+                    <input type="radio" name="month-mode" id="month-mode-day" value="day"
+                           onchange="handleMonthModeChange()">
+                    <span>Day of month</span>
+                    <select id="modal-month-day" class="form-select form-select-inline"
+                            aria-label="Day of month" onchange="handleMonthDayChange()">
+                        <?php for ($d = 1; $d <= 31; $d++): ?>
+                        <option value="<?php echo $d; ?>"><?php echo $d; ?></option>
+                        <?php endfor; ?>
+                    </select>
+                </label>
+
+                <label class="form-radio-row">
+                    <input type="radio" name="month-mode" id="month-mode-last" value="last"
+                           onchange="handleMonthModeChange()">
+                    <span>Last day of month</span>
+                    <span class="info-tip" tabindex="0" role="note"
+                          aria-label="Why choose last day of month">i<span class="info-tip-bubble">Month-end is not a fixed number &mdash; it is the 31st, 30th, 29th or 28th depending on the month. Choose this and every month uses its own real last day. Picking a fixed 31 instead would skip February, April, June, September and November completely.</span></span>
+                </label>
+
+                <p class="form-hint form-hint-warn hidden" id="month-day-hint"></p>
+            </div>
+
+            <!-- Specific dates: an explicit list, for happenings with no calendar
+                 rule (storms, movable holidays). Rows are built by events.js. -->
+            <div class="form-field hidden" id="when-custom">
+                <label class="form-label">Which dates?
+                    <span class="info-tip" tabindex="0" role="note"
+                          aria-label="How specific dates are used">i<span class="info-tip-bubble">Use this for things that repeat but follow no calendar rule &mdash; storms, or holidays that move each year like Holy Week or Chinese New Year. List every date it happened. The system learns one combined effect from all of them, so more dates means a more reliable figure. Group only dates of similar severity.</span></span>
+                </label>
+
+                <div id="custom-date-list" class="custom-date-list"></div>
+
+                <button type="button" class="custom-date-add" onclick="addCustomDateRow()">
+                    + Add another date
+                </button>
+
+                <p class="form-hint" id="custom-date-hint"></p>
+            </div>
+
+            <!-- One-time: real calendar dates, stored exactly as typed. -->
+            <div class="form-grid-2 hidden" id="when-once">
+                <div class="form-field">
+                    <label class="form-label" for="modal-start">Start Date *</label>
+                    <input type="date" id="modal-start" class="form-input">
+                </div>
+                <div class="form-field">
+                    <label class="form-label" for="modal-end">End Date
+                        <span class="form-label-optional">(optional)</span>
+                    </label>
+                    <input type="date" id="modal-end" class="form-input">
+                </div>
+            </div>
+
+            <!-- Duration for recurring events. Stored as event_end = start + (n-1) days. -->
+            <div class="form-field" id="duration-row">
+                <label class="form-label" for="modal-duration">How long does it last?</label>
+                <div class="form-duration-row">
+                    <input type="number" id="modal-duration" class="form-input form-input-narrow"
+                           min="1" max="365" step="1" value="1">
+                    <span class="form-duration-unit">day(s)</span>
+                </div>
+                <p class="form-hint">Leave as 1 for a single-day event.</p>
             </div>
 
             <!-- Color picker -->
@@ -64,27 +162,6 @@ $swatches = ['#FF5722','#EF4444','#F59E0B','#EAB308','#22C55E','#3B82F6','#8B5CF
                     </label>
                 </div>
                 <input type="hidden" id="modal-color" value="#FF5722">
-            </div>
-
-            <!-- Last-day-of-month option — only visible when recurrence=monthly. -->
-            <div id="last-day-row" class="hidden">
-                <label class="form-checkbox-row">
-                    <input type="checkbox" id="modal-is-last-day" onchange="handleLastDayChange()">
-                    Use last day of month (instead of a fixed date)
-                </label>
-            </div>
-
-            <div class="form-grid-2">
-                <div class="form-field">
-                    <label class="form-label" for="modal-start">Start Date *</label>
-                    <input type="date" id="modal-start" class="form-input">
-                </div>
-                <div class="form-field">
-                    <label class="form-label" for="modal-end">End Date
-                        <span class="form-label-optional">(optional)</span>
-                    </label>
-                    <input type="date" id="modal-end" class="form-input">
-                </div>
             </div>
 
             <div class="form-field">

@@ -249,8 +249,24 @@ require_once __DIR__ . '/../includes/header.php';
             <?php else: ?>
 
                 <?php foreach ($products as $product): ?>
-                <?php $fc = $latestForecasts[$product['id']] ?? null; ?>
-                <button class="product-row"
+                <?php
+                    $fc = $latestForecasts[$product['id']] ?? null;
+                    // Not in the dataset the store currently holds — kept so its
+                    // pricing, horizon and accuracy history survive, but there's
+                    // nothing to forecast for it until it reappears in an upload.
+                    $isInactive     = (int) ($product['is_active'] ?? 1) !== 1;
+                    $inactiveReason = $isInactive
+                        ? 'Not in your current dataset'
+                          . ($product['deactivated_at']
+                              ? ' (since ' . date('j M Y', strtotime($product['deactivated_at'])) . ')'
+                              : '')
+                          . '. Its sales history is still available in History, and its settings are '
+                          . 'kept — upload a file that includes it to make it active again.'
+                        : '';
+                ?>
+                <button class="product-row<?php echo $isInactive ? ' product-row-inactive' : ''; ?>"
+                        <?php if ($isInactive): ?>title="<?php echo htmlspecialchars($inactiveReason); ?>"<?php endif; ?>
+                        data-inactive="<?php echo $isInactive ? '1' : '0'; ?>"
                         data-product-id="<?php echo $product['id']; ?>"
                         data-product-name="<?php echo htmlspecialchars($product['name']); ?>"
                         data-product-sku="<?php echo htmlspecialchars($product['sku'] ?? ''); ?>"
@@ -265,6 +281,10 @@ require_once __DIR__ . '/../includes/header.php';
                     <div class="product-row-info">
                         <span class="product-row-name"><?php echo htmlspecialchars($product['name']); ?></span>
                         <div class="product-row-meta">
+                            <?php if ($isInactive): ?>
+                            <span class="product-row-inactive-badge">Not in current data</span>
+                            <span class="product-row-meta-sep">·</span>
+                            <?php endif; ?>
                             <span class="product-row-id">ID&nbsp;<?php echo $product['id']; ?></span>
                             <?php if ($product['sku']): ?>
                             <span class="product-row-meta-sep">·</span>

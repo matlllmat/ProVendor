@@ -6,7 +6,10 @@ require_once __DIR__ . '/import.logic.php';
 
 $pageTitle = 'ProVendor — Settings';
 $pageCss   = 'import.css';
-$extraCss  = 'settings.css';   // Forecast Range tab styles (merged from the old Settings page)
+$extraCss  = ['settings.css'];   // Forecast Range tab styles (merged from the old Settings page)
+if (SHOW_ACCURACY_FEATURES) {
+    $extraCss[] = 'reports.css'; // Reports tab styles (merged from the old Reports page)
+}
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
@@ -27,9 +30,12 @@ require_once __DIR__ . '/../includes/header.php';
 
     <!-- Tab bar -->
     <div class="tab-bar">
-        <button id="tab-btn-import"   class="tab-btn"        onclick="switchTab('import')">Sales Data</button>
         <button id="tab-btn-profile"  class="tab-btn active" onclick="switchTab('profile')">My Profile</button>
+        <button id="tab-btn-import"   class="tab-btn"        onclick="switchTab('import')">Sales Data</button>
         <button id="tab-btn-forecast" class="tab-btn"        onclick="switchTab('forecast')">Forecast Range</button>
+        <?php if (SHOW_ACCURACY_FEATURES): ?>
+        <button id="tab-btn-reports"  class="tab-btn"        onclick="switchTab('reports')">Reports</button>
+        <?php endif; ?>
     </div>
 
 
@@ -707,6 +713,46 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
         </div>
 
+        <!-- Delete-All-Data password confirmation modal -->
+        <div id="delete-data-modal"
+            class="fixed inset-0 z-[2000] flex items-center justify-center hidden"
+            role="dialog" aria-modal="true" aria-labelledby="delete-data-title">
+
+            <div class="absolute inset-0" style="background:rgba(38,31,14,0.55)" onclick="closeDeleteDataModal()"></div>
+
+            <div class="relative bg-[#F0E8D0] rounded-2xl border border-[#D2C8AE] w-full max-w-sm mx-4 p-8"
+                style="box-shadow:0 24px 64px rgba(38,31,14,0.3)">
+
+                <h3 id="delete-data-title" class="text-lg font-semibold text-[#261F0E] mb-2 leading-snug">
+                    Delete All Imported Data?
+                </h3>
+                <p class="text-sm text-[#261F0E] leading-relaxed mb-5" style="opacity:0.55">
+                    This will permanently erase all products, sales records, and import sessions. Your account and
+                    store settings will be kept. This cannot be undone.
+                </p>
+
+                <div class="profile-field">
+                    <label class="profile-label" for="delete-data-password">Enter your password to confirm</label>
+                    <input type="password" id="delete-data-password" class="profile-input" placeholder="••••••••"
+                           onkeydown="if (event.key === 'Enter') submitDeleteData();">
+                </div>
+
+                <div id="delete-data-feedback" class="profile-feedback hidden"></div>
+
+                <div class="flex gap-3 mt-5">
+                    <button type="button" onclick="closeDeleteDataModal()"
+                        class="flex-1 border border-[#D2C8AE] rounded-xl py-2.5 text-sm font-semibold text-[#261F0E] hover:bg-[#D2C8AE] transition-colors">
+                        Cancel
+                    </button>
+                    <button type="button" id="delete-data-confirm-btn" onclick="submitDeleteData()"
+                        class="flex-1 rounded-xl py-2.5 text-sm font-semibold transition-opacity hover:opacity-90"
+                        style="background:#FF1A1A;color:#F0E8D0">
+                        Delete Everything
+                    </button>
+                </div>
+            </div>
+        </div>
+
     </div><!-- /tab-content-profile -->
 
 
@@ -878,6 +924,236 @@ require_once __DIR__ . '/../includes/header.php';
 
     </div><!-- /tab-content-forecast -->
 
+    <?php if (SHOW_ACCURACY_FEATURES): ?>
+    <!-- ════════════════════════════════════════════
+         TAB: REPORTS  (merged from the old Reports page)
+    ════════════════════════════════════════════ -->
+    <div id="tab-content-reports" class="hidden">
+
+        <!-- ── Catalogue Accuracy (PRIMARY — the system's own accuracy, tested
+             automatically against each product's held-out recent history; no
+             upload needed) ─────────────────────────────────────────────────── -->
+        <?php
+            $_ca      = $catalogueAccuracy;
+            $_evald   = (int) $_ca['evaluated_count'];
+            $_total   = (int) $_ca['total_count'];
+            $_accPct  = $_ca['weighted_accuracy_pct'];
+            $_hasData = $_accPct !== null;
+            $_accTone = $_hasData
+                ? ($_accPct >= 80 ? 'good' : ($_accPct >= 60 ? 'okay' : 'low'))
+                : 'note';
+        ?>
+        <div class="catalogue-accuracy catalogue-accuracy-<?php echo $_accTone; ?>" id="catalogue-accuracy-card">
+            <div class="catalogue-accuracy-head">
+                <div>
+                    <p class="catalogue-accuracy-eyebrow">Catalogue Accuracy</p>
+                    <h2 class="catalogue-accuracy-title" id="ca-title">
+                        <?php if ($_hasData): ?>
+                            <strong><?php echo number_format($_accPct, 1); ?>%</strong>
+                            <span class="catalogue-accuracy-title-sub">average forecast accuracy</span>
+                        <?php else: ?>
+                            <span class="catalogue-accuracy-title-sub">Testing your products&hellip;</span>
+                        <?php endif; ?>
+                    </h2>
+                    <p class="catalogue-accuracy-sub" id="ca-sub">
+                        <?php if ($_hasData): ?>
+                            Volume-weighted across <strong><?php echo $_evald; ?></strong>
+                            of <strong><?php echo $_total; ?></strong>
+                            product<?php echo $_total !== 1 ? 's' : ''; ?>. High-volume products contribute more to this number.
+                        <?php else: ?>
+                            Automatically testing each product against its own recent sales history —
+                            this can take a moment on your first visit.
+                        <?php endif; ?>
+                    </p>
+                </div>
+                <button type="button" class="ca-refresh-btn" id="ca-refresh-btn"
+                        onclick="runCatalogueAccuracy(true)" title="Re-test every product">&#8635;</button>
+            </div>
+
+            <div class="catalogue-accuracy-grid" id="ca-grid" style="<?php echo $_hasData ? '' : 'display:none'; ?>">
+                <div class="catalogue-accuracy-card">
+                    <p class="catalogue-accuracy-label">
+                        MAPE
+                        <span class="info-tip" tabindex="0" role="note" aria-label="What MAPE means">i<span class="info-tip-bubble">Mean Absolute Percentage Error — the average miss size as a percentage of actual sales. A friendly headline number, but it can look worse than it is on low-volume products.</span></span>
+                    </p>
+                    <p class="catalogue-accuracy-value" id="ca-mape"><?php echo $_hasData ? number_format($_ca['weighted_mape'], 1) . '%' : ''; ?></p>
+                    <p class="catalogue-accuracy-unit">avg % error</p>
+                </div>
+                <div class="catalogue-accuracy-card">
+                    <p class="catalogue-accuracy-label">
+                        MAE
+                        <span class="info-tip" tabindex="0" role="note" aria-label="What MAE means">i<span class="info-tip-bubble">Mean Absolute Error — average units off per day, in the same units as your sales. Easier to judge on a specific product than MAPE.</span></span>
+                    </p>
+                    <p class="catalogue-accuracy-value" id="ca-mae"><?php echo $_hasData ? number_format($_ca['weighted_mae'], 1) : ''; ?></p>
+                    <p class="catalogue-accuracy-unit">units/day off</p>
+                </div>
+                <div class="catalogue-accuracy-card">
+                    <p class="catalogue-accuracy-label">
+                        RMSE
+                        <span class="info-tip" tabindex="0" role="note" aria-label="What RMSE means">i<span class="info-tip-bubble">Root Mean Square Error — like MAE, but squares each miss first, so a few big blow-outs raise it much more than many small ones. RMSE noticeably higher than MAE means occasional large misses.</span></span>
+                    </p>
+                    <p class="catalogue-accuracy-value" id="ca-rmse"><?php echo $_hasData ? number_format($_ca['weighted_rmse'], 1) : ''; ?></p>
+                    <p class="catalogue-accuracy-unit">units/day off</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Per-Product Accuracy (kept for the weighted overall number; not shown — only the header card above is) ──── -->
+        <div class="breakdown-panel" id="accuracy-breakdown-panel" style="display:none">
+            <div class="breakdown-head">
+                <div>
+                    <p class="breakdown-eyebrow">Per-Product Accuracy</p>
+                    <h2 class="breakdown-title">Which products affect the catalogue number most?</h2>
+                    <p class="breakdown-sub">
+                        Sorted by impact on the catalogue-weighted MAE (volume &times; absolute error).
+                    </p>
+                </div>
+            </div>
+
+            <div class="breakdown-table-wrap">
+                <table class="breakdown-table">
+                    <thead>
+                        <tr>
+                            <th class="bk-col-product">Product</th>
+                            <th class="bk-col-num">Avg/day</th>
+                            <th class="bk-col-num">
+                                MAPE
+                                <span class="info-tip" tabindex="0" role="note" aria-label="What MAPE means">i<span class="info-tip-bubble">Mean Absolute Percentage Error — the average miss size as a percentage of actual sales. A friendly headline number, but it can look worse than it is on low-volume products.</span></span>
+                            </th>
+                            <th class="bk-col-num">
+                                MAE
+                                <span class="info-tip" tabindex="0" role="note" aria-label="What MAE means">i<span class="info-tip-bubble">Mean Absolute Error — average units off per day, in the same units as your sales. Easier to judge on a specific product than MAPE.</span></span>
+                            </th>
+                            <th class="bk-col-num">
+                                RMSE
+                                <span class="info-tip" tabindex="0" role="note" aria-label="What RMSE means">i<span class="info-tip-bubble">Root Mean Square Error — like MAE, but squares each miss first, so a few big blow-outs raise it much more than many small ones. RMSE noticeably higher than MAE means occasional large misses.</span></span>
+                            </th>
+                            <th class="bk-col-status">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="accuracy-breakdown-tbody">
+                        <?php foreach ($productBreakdown as $p): ?>
+                        <?php
+                            $totalUnits = (int) $p['total_units'];
+                            $saleDays   = (int) $p['sale_days'];
+                            $avgDaily   = $saleDays > 0 ? $totalUnits / $saleDays : null;
+
+                            $pct   = $p['accuracy_pct'];
+                            $evald = $pct !== null;
+                            $tone  = !$evald
+                                ? 'untested'
+                                : ((float) $pct >= 80 ? 'good' : ((float) $pct >= 60 ? 'okay' : 'low'));
+                            $toneLabel = [
+                                'good'     => 'Good',
+                                'okay'     => 'Fair',
+                                'low'      => 'Poor',
+                                'untested' => 'Untested',
+                            ][$tone];
+                        ?>
+                        <tr class="bk-row bk-row-<?php echo $tone; ?>">
+                            <td class="bk-col-product">
+                                <span class="bk-product-name"><?php echo htmlspecialchars($p['name']); ?></span>
+                                <?php if (!empty($p['category'])): ?>
+                                <span class="bk-product-category"><?php echo htmlspecialchars($p['category']); ?></span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="bk-col-num"><?php echo $avgDaily !== null ? number_format($avgDaily, 1) : '—'; ?></td>
+                            <td class="bk-col-num"><?php echo $p['accuracy_mape'] !== null ? number_format((float) $p['accuracy_mape'], 1) . '%' : '—'; ?></td>
+                            <td class="bk-col-num"><?php echo $p['accuracy_mae']  !== null ? number_format((float) $p['accuracy_mae'],  1) : '—'; ?></td>
+                            <td class="bk-col-num"><?php echo $p['accuracy_rmse'] !== null ? number_format((float) $p['accuracy_rmse'], 1) : '—'; ?></td>
+                            <td class="bk-col-status"><span class="bk-status bk-status-<?php echo $tone; ?>"><?php echo $toneLabel; ?></span></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ── Backtest with your own data (SECONDARY — optional, uses data you
+             upload for dates ProVendor doesn't have) ──────────────────────────── -->
+        <div class="settings-card settings-card-secondary">
+            <div class="settings-card-head">
+                <p class="settings-eyebrow">Optional</p>
+                <h2 class="settings-title">Backtest With Your Own Data</h2>
+                <p class="settings-sub">
+                    Upload actual sales for dates that aren&rsquo;t in ProVendor yet — a week you held
+                    back, or results that came in after your last import. Each matching product trains
+                    on its full existing history and predicts those dates; how close it gets is the
+                    score below. Only your most recent run is kept — uploading again replaces it, or
+                    clear it below.
+                </p>
+            </div>
+
+            <div class="backtest-upload-row">
+                <label class="backtest-file-label" for="backtest-file-input">
+                    <span id="backtest-file-name">Choose a CSV file&hellip;</span>
+                </label>
+                <input type="file" id="backtest-file-input" accept=".csv" style="display:none"
+                       onchange="onBacktestFileChosen(this)">
+                <button type="button" id="backtest-run-btn" class="settings-save-btn" disabled
+                        onclick="runBacktestUpload()">
+                    Run Backtest
+                </button>
+            </div>
+            <p class="settings-hint">
+                Expects columns for product, date, and quantity — headers are auto-detected.
+                Large catalogues may take a minute to test.
+            </p>
+            <div id="backtest-msg" class="settings-msg" style="display:none"></div>
+            <p id="backtest-notes" class="settings-hint" style="display:none; margin-top:0.5rem;"></p>
+
+            <div id="upload-result" style="<?php echo $backtestRun ? '' : 'display:none;'; ?> margin-top:1.1rem; padding-top:1.1rem; border-top:1px dashed rgba(38,31,14,0.15);">
+                <div style="display:flex; align-items:baseline; justify-content:space-between; gap:1rem; flex-wrap:wrap;">
+                    <p class="settings-label" style="margin-bottom:0;">
+                        Result
+                        <span id="upload-timestamp" style="text-transform:none; font-weight:400; opacity:0.7;">
+                            <?php echo $backtestRun ? '— ' . date('M j, Y g:i A', strtotime($backtestRun['created_at'])) : ''; ?>
+                        </span>
+                    </p>
+                    <div id="upload-result-actions" style="display:flex; gap:0.6rem; flex-shrink:0;">
+                        <a id="upload-download-link" href="<?php echo BASE_URL; ?>/api/download_backtest_csv.php"
+                           style="font-size:0.72rem; font-weight:600; color:#261F0E; opacity:0.65; text-decoration:underline;">
+                            Download data
+                        </a>
+                        <button type="button" id="upload-clear-btn" onclick="clearBacktest()"
+                                style="font-size:0.72rem; font-weight:600; color:#c0392b; opacity:0.75; background:none; border:none; cursor:pointer; padding:0;">
+                            Clear
+                        </button>
+                    </div>
+                </div>
+                <p id="upload-summary" class="settings-sub" style="margin-top:0.3rem;"></p>
+                <div class="catalogue-accuracy-grid" style="margin-top:0.85rem; margin-bottom:0;">
+                    <div class="catalogue-accuracy-card">
+                        <p class="catalogue-accuracy-label">
+                            MAPE
+                            <span class="info-tip" tabindex="0" role="note" aria-label="What MAPE means">i<span class="info-tip-bubble">Mean Absolute Percentage Error — the average miss size as a percentage of actual sales. A friendly headline number, but it can look worse than it is on low-volume products.</span></span>
+                        </p>
+                        <p class="catalogue-accuracy-value" id="ub-mape"></p>
+                        <p class="catalogue-accuracy-unit">avg % error</p>
+                    </div>
+                    <div class="catalogue-accuracy-card">
+                        <p class="catalogue-accuracy-label">
+                            MAE
+                            <span class="info-tip" tabindex="0" role="note" aria-label="What MAE means">i<span class="info-tip-bubble">Mean Absolute Error — average units off per day, in the same units as your sales. Easier to judge on a specific product than MAPE.</span></span>
+                        </p>
+                        <p class="catalogue-accuracy-value" id="ub-mae"></p>
+                        <p class="catalogue-accuracy-unit">units/day off</p>
+                    </div>
+                    <div class="catalogue-accuracy-card">
+                        <p class="catalogue-accuracy-label">
+                            RMSE
+                            <span class="info-tip" tabindex="0" role="note" aria-label="What RMSE means">i<span class="info-tip-bubble">Root Mean Square Error — like MAE, but squares each miss first, so a few big blow-outs raise it much more than many small ones. RMSE noticeably higher than MAE means occasional large misses.</span></span>
+                        </p>
+                        <p class="catalogue-accuracy-value" id="ub-rmse"></p>
+                        <p class="catalogue-accuracy-unit">units/day off</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /tab-content-reports -->
+    <?php endif; ?>
+
 </main>
 
 
@@ -887,29 +1163,49 @@ require_once __DIR__ . '/../includes/header.php';
 <script>
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
-var TABS = ['import', 'profile', 'forecast'];
+var TABS = ['import', 'profile', 'forecast'<?php echo SHOW_ACCURACY_FEATURES ? ", 'reports'" : ''; ?>];
 function switchTab(name) {
     TABS.forEach(function (t) {
         document.getElementById('tab-btn-' + t)    .classList.toggle('active', name === t);
         document.getElementById('tab-content-' + t).classList.toggle('hidden', name !== t);
     });
     window.location.hash = name;
+
+    // First time the Reports tab is opened, quietly test any product that
+    // doesn't have a cached accuracy figure yet — no button, no upload needed.
+    if (name === 'reports' && typeof runCatalogueAccuracy === 'function' && !window.pvCatalogueAccuracyLoaded) {
+        window.pvCatalogueAccuracyLoaded = true;
+        runCatalogueAccuracy(false);
+    }
 }
 
 // Restore the active tab on load.
 // Default is My Profile. Switch away from it if:
 //   - arriving from a successful import (?imported=1) → Sales Data, or
-//   - the URL hash explicitly requests a tab (#import / #forecast / #profile).
+//   - the URL hash explicitly requests a tab (#import / #forecast / #profile / #reports).
 document.addEventListener('DOMContentLoaded', function() {
     var fromImport = window.location.search.indexOf('imported=1') !== -1;
     var hash       = window.location.hash.replace('#', '');
 
     if (fromImport || hash === 'import') {
         switchTab('import');
-    } else if (hash === 'forecast' || hash === 'profile') {
+    } else if (TABS.indexOf(hash) !== -1) {
         switchTab(hash);
     }
     wRestoreState();
+
+    <?php if (SHOW_ACCURACY_FEATURES && $backtestRun): ?>
+    renderUploadResult({
+        catalogue: {
+            evaluated_count:       <?php echo (int) $backtestRun['evaluated_count']; ?>,
+            total_count:           <?php echo (int) $backtestRun['total_count']; ?>,
+            weighted_mape:         <?php echo $backtestRun['weighted_mape']         !== null ? (float) $backtestRun['weighted_mape']         : 'null'; ?>,
+            weighted_mae:          <?php echo $backtestRun['weighted_mae']          !== null ? (float) $backtestRun['weighted_mae']          : 'null'; ?>,
+            weighted_rmse:         <?php echo $backtestRun['weighted_rmse']         !== null ? (float) $backtestRun['weighted_rmse']         : 'null'; ?>,
+            weighted_accuracy_pct: <?php echo $backtestRun['weighted_accuracy_pct'] !== null ? (float) $backtestRun['weighted_accuracy_pct'] : 'null'; ?>
+        }
+    });
+    <?php endif; ?>
 });
 
 
@@ -1050,27 +1346,47 @@ function showProfileFeedback(elementId, type, message) {
 
 // ── Danger zone ───────────────────────────────────────────────────────────────
 function confirmClearData() {
-    showConfirm({
-        title:        'Delete All Imported Data?',
-        message:      'This will permanently erase all products, sales records, and import sessions. Your account and store settings will be kept. You will be sent back to the setup page. This cannot be undone.',
-        confirmText:  'Delete Everything',
-        confirmStyle: 'danger',
-        onConfirm:    doClearData,
-    });
+    document.getElementById('delete-data-password').value = '';
+    document.getElementById('delete-data-feedback').classList.add('hidden');
+    document.getElementById('delete-data-modal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
 }
 
-async function doClearData() {
+function closeDeleteDataModal() {
+    document.getElementById('delete-data-modal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+async function submitDeleteData() {
+    var password = document.getElementById('delete-data-password').value;
+
+    if (!password) {
+        showProfileFeedback('delete-data-feedback', 'error', 'Please enter your password.');
+        return;
+    }
+
+    var btn = document.getElementById('delete-data-confirm-btn');
+    btn.textContent = 'Deleting…';
+    btn.disabled    = true;
+
+    var formData = new FormData();
+    formData.append('password', password);
+
     try {
-        var res  = await fetch('<?php echo BASE_URL; ?>/api/clear_data.php', { method: 'POST' });
+        var res  = await fetch('<?php echo BASE_URL; ?>/api/clear_data.php', { method: 'POST', body: formData });
         var data = await res.json();
 
         if (data.success) {
             window.location = '<?php echo BASE_URL; ?>/pages/landing.view.php';
         } else {
-            alert('Delete failed: ' + (data.error || 'Unknown error.'));
+            showProfileFeedback('delete-data-feedback', 'error', data.error || 'Delete failed.');
+            btn.textContent = 'Delete Everything';
+            btn.disabled    = false;
         }
     } catch (e) {
-        alert('Network error. Please try again.');
+        showProfileFeedback('delete-data-feedback', 'error', 'Network error. Please try again.');
+        btn.textContent = 'Delete Everything';
+        btn.disabled    = false;
     }
 }
 
@@ -1445,8 +1761,7 @@ function wClearPreflight() {
 
 async function wSubmitImport() {
     if (wPreflightDone) {
-        var replace = !!(document.getElementById('w-replace-overlap') || {checked: false}).checked;
-        await wDoImport(wMappingCache, replace);
+        await wDoImport(wMappingCache);
         return;
     }
 
@@ -1493,7 +1808,7 @@ var wPreviewRows   = [];
 var wPreviewData   = null;
 var wPreviewFilter = 'all'; // all | new | overlap | invalid | noop
 var wPreviewPage   = 1;
-var W_PER_PAGE     = 50;
+var W_PER_PAGE     = 15;
 var wSortColumn    = null;  // null = preflight's default order (invalid → overlap → new → noop)
 var wSortDir       = 'asc';
 
@@ -1511,12 +1826,41 @@ function wRenderPreviewCard(data) {
     html += '<div class="preview-card-title">Preview of changes</div>';
     html += wRenderSummary();
 
+    var noteIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+
+    html += wRenderReplaceNotice(data);
+
     if (data.recovered_count > 0) {
         var rc = data.recovered_count;
         html += '<div class="recovery-notice">';
-        html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+        html += noteIcon;
         html += '<span><strong>' + rc.toLocaleString() + ' row' + (rc !== 1 ? 's' : '') + '</strong> ignored the selected date format and were parsed automatically — their structure was unambiguous (e.g. ISO&nbsp;YYYY-MM-DD, or a day value above&nbsp;12). If any dates look wrong in the table, adjust the <strong>Date Format</strong> selector above and re-run.</span>';
         html += '</div>';
+    }
+
+    // Lossless repairs — reported once, since nothing was lost.
+    var autoFixes = [];
+    if (data.encoding_converted) {
+        autoFixes.push('converted from Windows (ANSI) encoding');
+    }
+    if (data.money_reformatted > 0) {
+        autoFixes.push(data.money_reformatted.toLocaleString() + ' money value' +
+                       (data.money_reformatted !== 1 ? 's' : '') +
+                       ' had currency symbols or thousands separators removed');
+    }
+    if (autoFixes.length) {
+        html += '<div class="recovery-notice">' + noteIcon +
+                '<span><strong>Cleaned automatically:</strong> ' + autoFixes.join('; ') +
+                '. Nothing was lost — no action needed.</span></div>';
+    }
+
+    // Lossy repairs — the user should see these before committing.
+    if (data.warnings_count > 0) {
+        var wc = data.warnings_count;
+        html += '<div class="recovery-notice recovery-notice-warn">' + noteIcon +
+                '<span><strong>' + wc.toLocaleString() + ' row' + (wc !== 1 ? 's' : '') +
+                '</strong> had a value shortened or left empty so it would fit — the sales themselves were kept. ' +
+                'Use the <strong>Needs review</strong> filter to see exactly what changed.</span></div>';
     }
 
     html += '<div class="preview-toolbar">';
@@ -1526,11 +1870,11 @@ function wRenderPreviewCard(data) {
     html += wFilterChip('overlap', 'Conflict');
     html += wFilterChip('invalid', 'Invalid');
     html += wFilterChip('noop',    'Unchanged');
+    if (data.warnings_count > 0) html += wFilterChip('review', 'Needs review');
     html += '</div>';
-    html += '<label class="preview-replace-label">';
-    html += '<input type="checkbox" id="w-replace-overlap" class="preview-replace-check" onchange="wRefreshSummary()">';
-    html += '<span>Replace existing values for un-edited conflicts</span>';
-    html += '</label>';
+    // The "Replace existing values for un-edited conflicts" toggle lived here.
+    // A store holds one dataset and this upload becomes it, so there are no
+    // conflicts left to resolve — the choice it offered no longer exists.
     html += '</div>';
 
     html += '<div class="preview-table-wrap"><table class="preview-table">';
@@ -1575,6 +1919,59 @@ function wSummaryRow(cls, label, value) {
     return '<div class="preview-summary-row ' + cls + '">' +
            '<span class="preview-summary-label">' + label + '</span>' +
            '<span class="preview-summary-value">' + value + '</span></div>';
+}
+
+// What this upload does to the store's single dataset. Replacing is the one
+// action here that discards data, so the numbers are stated plainly rather than
+// left for the owner to infer — and a file that would shorten the history gets
+// a louder treatment than one that simply refreshes it.
+function wRenderReplaceNotice(data) {
+    var r = data.replaces;
+    if (!r) return '';
+    var icon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+    var html = '';
+
+    if (r.rows_now === 0) {
+        html += '<div class="recovery-notice">' + icon +
+                '<span>This becomes your store\'s dataset: <strong>' +
+                r.rows_incoming.toLocaleString() + ' rows</strong> across <strong>' +
+                r.products_incoming + ' products</strong>.</span></div>';
+    } else {
+        var cls = r.narrows_history ? ' recovery-notice-warn' : '';
+        var body = 'Uploading replaces your current dataset — <strong>' +
+                   r.rows_now.toLocaleString() + ' rows</strong> (' + r.first_date_now +
+                   ' to ' + r.last_date_now + ') become <strong>' +
+                   r.rows_incoming.toLocaleString() + ' rows</strong> (' + r.first_date_new +
+                   ' to ' + r.last_date_new + '). The current data is saved to History first, '
+                   + 'so you can view, download or restore it afterwards.';
+
+        if (r.narrows_history) {
+            body = '<strong>This file covers a shorter period than your stored data.</strong> ' + body +
+                   ' If your export only covers recent weeks, re-export the full history before importing.';
+        }
+        if (r.products_leaving && r.products_leaving.length) {
+            var n = r.products_leaving.length;
+            body += ' <strong>' + n + ' product' + (n !== 1 ? 's' : '') + '</strong> (' +
+                    r.products_leaving.slice(0, 3).map(escHtml).join(', ') +
+                    (n > 3 ? ', +' + (n - 3) + ' more' : '') +
+                    ') ' + (n !== 1 ? 'are' : 'is') + ' not in this file and will be marked inactive — ' +
+                    'kept with their settings and history, just excluded from forecasting.';
+        }
+        html += '<div class="recovery-notice' + cls + '">' + icon + '<span>' + body + '</span></div>';
+    }
+
+    // History is capped, so name the version this upload pushes out while it can
+    // still be downloaded.
+    if (data.pruned_version) {
+        var p = data.pruned_version;
+        html += '<div class="recovery-notice recovery-notice-warn">' + icon +
+                '<span>You have the maximum of <strong>' + p.max + ' saved versions</strong>. ' +
+                'Importing will permanently delete the oldest — <strong>' + escHtml(p.label) +
+                '</strong> (' + p.total_rows.toLocaleString() + ' rows, saved ' + p.created_at +
+                '). Download it from History first if you want to keep it.</span></div>';
+    }
+
+    return html;
 }
 
 function wFilterChip(key, label) {
@@ -1687,11 +2084,14 @@ function wRenderRows() {
 
     // Filtered set first, then paginate so the page indicator reflects what
     // the user is actually navigating.
+    // 'review' is orthogonal to status — a row can be perfectly importable and
+    // still have had a value clamped to fit, which is exactly what needs eyes.
     var filtered = [];
     wPreviewRows.forEach(function (r, idx) {
-        if (wPreviewFilter === 'all' || r.status === wPreviewFilter) {
-            filtered.push({ row: r, idx: idx });
-        }
+        var match = wPreviewFilter === 'all'
+            || (wPreviewFilter === 'review' ? !!(r.warnings && r.warnings.length)
+                                            : r.status === wPreviewFilter);
+        if (match) filtered.push({ row: r, idx: idx });
     });
 
     var totalPages = Math.max(1, Math.ceil(filtered.length / W_PER_PAGE));
@@ -1806,6 +2206,13 @@ function wStatusBadge(r) {
     if (r.status === 'invalid' && r.reason) {
         html += '<div class="preview-row-reason" title="' + escHtml(r.reason) + '">' + escHtml(r.reason) + '</div>';
     }
+    if (r.warnings && r.warnings.length) {
+        var notes = r.warnings.map(function (w) {
+            return w.field + ': ' + w.reason + ' (was "' + w.original + '")';
+        });
+        html += '<div class="preview-row-warning" title="' + escHtml(notes.join('\n')) + '">' +
+                escHtml(notes.join(' · ')) + '</div>';
+    }
     return html;
 }
 
@@ -1877,20 +2284,16 @@ function wRefreshSummary() {
     var s   = computePreviewCounts(wPreviewRows);
     var btn = document.getElementById('w-import-btn');
 
-    // Un-edited "overlap" rows (same product+date, different quantity) only commit
-    // when Replace is on — so they mustn't count toward an enabled button, or the
-    // owner clicks an import that provably applies nothing.
-    var replaceOn  = !!(document.getElementById('w-replace-overlap') || { checked: false }).checked;
-    var willCommit = s.new + s.edited + (replaceOn ? s.overlap : 0);
+    // Every valid row commits: this upload becomes the dataset, so there's no
+    // longer a class of rows held back pending a toggle.
+    var willCommit = s.new + s.edited;
 
     if (willCommit === 0) {
-        btn.innerHTML     = (s.overlap > 0 && !replaceOn)
-            ? 'Turn on “Replace existing” to apply'
-            : 'No changes to apply';
+        btn.innerHTML     = 'No valid rows to import';
         btn.disabled      = true;
         btn.style.opacity = '0.55';
     } else {
-        btn.innerHTML     = 'Apply changes <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+        btn.innerHTML     = 'Replace dataset <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
         btn.disabled      = false;
         btn.style.opacity = '1';
     }
@@ -1922,7 +2325,6 @@ async function wDoImport(mapping, replace) {
     var formData = new FormData();
     formData.append('rows',     JSON.stringify(payloadRows));
     formData.append('csv_rows', wRowCount);
-    formData.append('replace',  replace ? '1' : '0');
 
     try {
         var res  = await fetch('<?php echo BASE_URL; ?>/api/import.php', { method: 'POST', body: formData });
@@ -2370,6 +2772,178 @@ function doSheetUnlink() {
             setSheetStatus(true, 'Could not disconnect the sheet. Please try again.');
         });
 }
+
+<?php if (SHOW_ACCURACY_FEATURES): ?>
+// ══════════════════════════════════════════════════════════════════════════════
+// REPORTS TAB — primary (automatic) + optional (uploaded-data) backtests
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Primary: automatic backtest against each product's own held-out history ──
+function runCatalogueAccuracy(forceRefresh) {
+    var btn = document.getElementById('ca-refresh-btn');
+    btn.disabled = true;
+    btn.classList.add('spinning');
+
+    var body = new FormData();
+    if (forceRefresh) body.append('refresh', '1');
+
+    fetch('<?php echo BASE_URL; ?>/api/run_catalogue_accuracy.php', { method: 'POST', body: body })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.error) return;
+
+            var ca      = data.catalogue;
+            var card    = document.getElementById('catalogue-accuracy-card');
+            var hasData = ca.weighted_accuracy_pct !== null;
+            var tone    = !hasData ? 'note' : (ca.weighted_accuracy_pct >= 80 ? 'good' : (ca.weighted_accuracy_pct >= 60 ? 'okay' : 'low'));
+
+            card.className = 'catalogue-accuracy catalogue-accuracy-' + tone;
+
+            document.getElementById('ca-title').innerHTML = hasData
+                ? '<strong>' + ca.weighted_accuracy_pct.toFixed(1) + '%</strong> <span class="catalogue-accuracy-title-sub">average forecast accuracy</span>'
+                : '<span class="catalogue-accuracy-title-sub">No products could be tested yet</span>';
+
+            document.getElementById('ca-sub').innerHTML = hasData
+                ? 'Volume-weighted across <strong>' + ca.evaluated_count + '</strong> of <strong>' + ca.total_count + '</strong> product' +
+                  (ca.total_count !== 1 ? 's' : '') + '. High-volume products contribute more to this number.'
+                : 'Products need at least ~7 weeks of sales history before they can be tested.';
+
+            document.getElementById('ca-grid').style.display = hasData ? '' : 'none';
+            if (hasData) {
+                document.getElementById('ca-mape').textContent = ca.weighted_mape.toFixed(1) + '%';
+                document.getElementById('ca-mae').textContent  = ca.weighted_mae.toFixed(1);
+                document.getElementById('ca-rmse').textContent = ca.weighted_rmse.toFixed(1);
+            }
+
+        })
+        .finally(function () {
+            btn.disabled = false;
+            btn.classList.remove('spinning');
+        });
+}
+
+// ── Optional: backtest against data the user uploads for dates ProVendor doesn't have ──
+function onBacktestFileChosen(input) {
+    var file = input.files && input.files[0];
+    document.getElementById('backtest-file-name').textContent = file ? file.name : 'Choose a CSV file…';
+    document.getElementById('backtest-run-btn').disabled = !file;
+}
+
+function runBacktestUpload() {
+    var input = document.getElementById('backtest-file-input');
+    var file  = input.files && input.files[0];
+    if (!file) return;
+
+    var btn   = document.getElementById('backtest-run-btn');
+    var msg   = document.getElementById('backtest-msg');
+    var notes = document.getElementById('backtest-notes');
+    btn.disabled    = true;
+    btn.textContent = 'Running…';
+    msg.style.display   = 'none';
+    notes.style.display = 'none';
+
+    var body = new FormData();
+    body.append('csv', file);
+
+    fetch('<?php echo BASE_URL; ?>/api/run_backtest_upload.php', { method: 'POST', body: body })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            btn.disabled    = false;
+            btn.textContent = 'Run Backtest';
+
+            if (data.error) {
+                showBacktestMsg(true, data.error);
+                return;
+            }
+
+            renderUploadResult(data, '— just now');
+
+            var noteParts = [];
+            if (data.rows_dropped) {
+                noteParts.push(data.rows_dropped + ' row' + (data.rows_dropped !== 1 ? 's' : '') + ' skipped (missing or invalid date/quantity).');
+            }
+            if (data.unmatched_products && data.unmatched_products.length) {
+                noteParts.push(data.unmatched_products.length + ' product name' + (data.unmatched_products.length !== 1 ? 's' : '') +
+                    " didn't match your catalogue: " + data.unmatched_products.slice(0, 5).join(', ') +
+                    (data.unmatched_products.length > 5 ? ', …' : '') + '.');
+            }
+            if (data.skipped && data.skipped.length) {
+                noteParts.push(data.skipped.length + ' matched product' + (data.skipped.length !== 1 ? 's' : '') + " couldn't be tested: " +
+                    data.skipped.slice(0, 3).map(function (s) { return s.name + ' (' + s.reason + ')'; }).join('; ') +
+                    (data.skipped.length > 3 ? ', …' : '') + '.');
+            }
+            if (noteParts.length) {
+                notes.textContent   = noteParts.join(' ');
+                notes.style.display = '';
+            }
+
+            if (!data.products.length) {
+                showBacktestMsg(false, 'No products could be tested from this file — see the notes above.');
+            } else {
+                showBacktestMsg(false, 'Tested ' + data.products.length + ' of ' + data.catalogue.total_count +
+                    ' matched product' + (data.catalogue.total_count !== 1 ? 's' : '') + '.');
+            }
+        })
+        .catch(function () {
+            btn.disabled    = false;
+            btn.textContent = 'Run Backtest';
+            showBacktestMsg(true, 'Could not run the backtest. Please try again.');
+        });
+}
+
+function showBacktestMsg(isError, text) {
+    var msg = document.getElementById('backtest-msg');
+    msg.textContent    = text;
+    msg.className      = 'settings-msg ' + (isError ? 'settings-msg-error' : 'settings-msg-success');
+    msg.style.display  = '';
+}
+
+function renderUploadResult(data, timestampText) {
+    var ca      = data.catalogue;
+    var result  = document.getElementById('upload-result');
+    var summary = document.getElementById('upload-summary');
+    var grid    = result.querySelector('.catalogue-accuracy-grid');
+
+    result.style.display = '';
+    document.getElementById('upload-result-actions').style.display = '';
+    if (timestampText !== undefined) {
+        document.getElementById('upload-timestamp').textContent = timestampText;
+    }
+
+    if (!ca.evaluated_count) {
+        summary.textContent = 'No matched products could be tested.';
+        grid.style.display  = 'none';
+        return;
+    }
+
+    summary.innerHTML = '<strong>' + ca.weighted_accuracy_pct.toFixed(1) + '%</strong> average accuracy — volume-weighted across ' +
+        ca.evaluated_count + ' of ' + ca.total_count + ' matched product' + (ca.total_count !== 1 ? 's' : '') + '.';
+
+    grid.style.display = '';
+    document.getElementById('ub-mape').textContent = ca.weighted_mape.toFixed(1) + '%';
+    document.getElementById('ub-mae').textContent  = ca.weighted_mae.toFixed(1);
+    document.getElementById('ub-rmse').textContent = ca.weighted_rmse.toFixed(1);
+}
+
+// ── Clear the saved run (both the DB row and the CSV kept for re-download) ──
+function clearBacktest() {
+    showConfirm({
+        title:        'Clear this backtest?',
+        message:      'This removes the saved result and the uploaded file. It can\'t be undone — you\'d need to upload the CSV again.',
+        confirmText:  'Clear',
+        confirmStyle: 'danger',
+        onConfirm:    function () {
+            fetch('<?php echo BASE_URL; ?>/api/clear_backtest.php', { method: 'POST' })
+                .then(function (r) { return r.json(); })
+                .then(function () {
+                    document.getElementById('upload-result').style.display = 'none';
+                    document.getElementById('backtest-msg').style.display  = 'none';
+                    document.getElementById('backtest-notes').style.display = 'none';
+                });
+        },
+    });
+}
+<?php endif; ?>
 </script>
 
 <?php require_once __DIR__ . '/../includes/sheets_modal.php'; ?>

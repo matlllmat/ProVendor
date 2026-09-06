@@ -39,3 +39,18 @@ $forecastCoverage = getForecastCoverage(
     $pdo, (int) $_SESSION['user_id'],
     (int) ($profile['forecast_horizon_days'] ?? 30)
 );
+
+// Reports tab: the system's own accuracy, tested automatically against each
+// product's held-out recent history — no upload needed. Hidden when the flag
+// is off. The page renders whatever's cached; untested products are quietly
+// backfilled by a background AJAX call the moment the tab is opened
+// (api/run_catalogue_accuracy.php), so this stays cheap on every load.
+if (SHOW_ACCURACY_FEATURES) {
+    $catalogueAccuracy = getCatalogueAccuracy($pdo, $_SESSION['user_id']);
+    $productBreakdown  = getProductAccuracyBreakdown($pdo, $_SESSION['user_id']);
+
+    // "Backtest With Your Own Data" — only the most recent upload run is kept;
+    // shown as-is on load so it's there to view again without re-uploading.
+    require_once __DIR__ . '/../queries/backtest.query.php';
+    $backtestRun = getBacktestRun($pdo, (int) $_SESSION['user_id']);
+}

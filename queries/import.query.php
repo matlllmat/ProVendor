@@ -9,7 +9,8 @@
 function upsertProduct(PDO $pdo, int $userId, string $name, ?string $sku, ?string $category, ?string $subcategory, ?float $cost, ?float $price): int
 {
     $stmt = $pdo->prepare(
-        'SELECT id, sku, category, subcategory, cost_price, selling_price
+        'SELECT id, sku, category, subcategory, cost_price, selling_price,
+                orig_cost_price, orig_selling_price, is_active
          FROM products WHERE user_id = ? AND name = ? LIMIT 1'
     );
     $stmt->execute([$userId, $name]);
@@ -26,11 +27,30 @@ function upsertProduct(PDO $pdo, int $userId, string $name, ?string $sku, ?strin
         if ($existing['sku']         === null && $sku         !== null) { $updates[] = 'sku = ?';         $params[] = $sku; }
         if ($existing['category']    === null && $category    !== null) { $updates[] = 'category = ?';    $params[] = $category; }
         if ($existing['subcategory'] === null && $subcategory !== null) { $updates[] = 'subcategory = ?'; $params[] = $subcategory; }
-        // Money is last-write-wins from the import. Mirror the imported value into
-        // orig_* so the forecast page's "Reset to imported price" can restore it,
-        // even after the owner edits cost_price/selling_price on the forecast page.
-        if ($cost  !== null) { $updates[] = 'cost_price = ?';    $params[] = $cost;  $updates[] = 'orig_cost_price = ?';    $params[] = $cost;  }
-        if ($price !== null) { $updates[] = 'selling_price = ?'; $params[] = $price; $updates[] = 'orig_selling_price = ?'; $params[] = $price; }
+        // Money is last-write-wins from the import, with one exception: a price the
+        // owner has edited on the forecast page is theirs, and a re-upload must not
+        // silently undo it. cost_price != orig_cost_price is exactly that signal —
+        // orig_* holds what the last import supplied, so any divergence is a manual
+        // edit. We still refresh orig_* either way, so "Reset to imported price"
+        // restores what the newest file says rather than a stale value.
+        if ($cost !== null) {
+            $costEdited = $existing['orig_cost_price'] !== null
+                          && (float) $existing['cost_price'] !== (float) $existing['orig_cost_price'];
+            if (!$costEdited) { $updates[] = 'cost_price = ?'; $params[] = $cost; }
+            $updates[] = 'orig_cost_price = ?'; $params[] = $cost;
+        }
+        if ($price !== null) {
+            $priceEdited = $existing['orig_selling_price'] !== null
+                           && (float) $existing['selling_price'] !== (float) $existing['orig_selling_price'];
+            if (!$priceEdited) { $updates[] = 'selling_price = ?'; $params[] = $price; }
+            $updates[] = 'orig_selling_price = ?'; $params[] = $price;
+        }
+
+        // Present in this upload, so it's sold again — undo any earlier deactivation.
+        if ((int) $existing['is_active'] !== 1) {
+            $updates[] = 'is_active = 1';
+            $updates[] = 'deactivated_at = NULL';
+        }
 
         if (!empty($updates)) {
             $params[] = (int) $existing['id'];
@@ -48,6 +68,50 @@ function upsertProduct(PDO $pdo, int $userId, string $name, ?string $sku, ?strin
     );
     $stmt->execute([$userId, $name, $sku, $category, $subcategory, $cost, $price, $cost, $price]);
     return (int) $pdo->lastInsertId();
+}
+
+// Deletes every sales row belonging to this user.
+//
+// A store has exactly one dataset, so an upload replaces it rather than merging
+// into it. Callers MUST have snapshotted the outgoing state first (import.php
+// does this via saveDatasetVersion) — this is the point of no return, and the
+// only way back is that version.
+function deleteAllUserSales(PDO $pdo, int $userId): int
+{
+    $stmt = $pdo->prepare(
+        'DELETE s FROM sales s JOIN products p ON p.id = s.product_id WHERE p.user_id = ?'
+    );
+    $stmt->execute([$userId]);
+    return $stmt->rowCount();
+}
+
+// Marks every product NOT in $keepIds as inactive, and returns the names of the
+// ones just deactivated so the UI can say which products left the catalogue.
+//
+// They are kept rather than deleted: the owner's pricing edits, horizon
+// overrides, shelf life and accuracy history live on the product row, and
+// earlier versions' snapshots reference it by id.
+function deactivateAbsentProducts(PDO $pdo, int $userId, array $keepIds): array
+{
+    $sql    = 'SELECT id, name FROM products WHERE user_id = ? AND is_active = 1';
+    $params = [$userId];
+    if (!empty($keepIds)) {
+        $sql .= ' AND id NOT IN (' . implode(',', array_fill(0, count($keepIds), '?')) . ')';
+        $params = array_merge($params, array_map('intval', $keepIds));
+    }
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $going = $stmt->fetchAll();
+
+    if (empty($going)) return [];
+
+    $ids          = array_column($going, 'id');
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $pdo->prepare(
+        "UPDATE products SET is_active = 0, deactivated_at = NOW() WHERE id IN ($placeholders)"
+    )->execute($ids);
+
+    return array_column($going, 'name');
 }
 
 // Returns a set of "product_id|sale_date" keys already in the DB for this user.

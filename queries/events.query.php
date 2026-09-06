@@ -29,7 +29,7 @@ function getRawEventsForUser(PDO $pdo, int $userId): array
          ORDER BY name'
     );
     $stmt->execute([$userId, $userId]);
-    return $stmt->fetchAll();
+    return attachOccurrences($pdo, $stmt->fetchAll());
 }
 
 // Returns all raw event rows visible to this user (global + own), for the events list page.
@@ -43,7 +43,7 @@ function getAllEventsForUser(PDO $pdo, int $userId): array
          ORDER BY is_seeded DESC, name'
     );
     $stmt->execute([$userId, $userId]);
-    return $stmt->fetchAll();
+    return attachOccurrences($pdo, $stmt->fetchAll());
 }
 
 // Returns paginated raw event rows for the events list page, excluding hidden events.
@@ -58,7 +58,7 @@ function getEventsPaginated(PDO $pdo, int $userId, int $page, int $perPage): arr
          LIMIT ? OFFSET ?'
     );
     $stmt->execute([$userId, $userId, $perPage, $offset]);
-    return $stmt->fetchAll();
+    return attachOccurrences($pdo, $stmt->fetchAll());
 }
 
 function countEvents(PDO $pdo, int $userId): int
@@ -80,7 +80,9 @@ function getEventById(PDO $pdo, int $eventId, int $userId): array|false
          WHERE id = ? AND (user_id IS NULL OR user_id = ?) LIMIT 1'
     );
     $stmt->execute([$eventId, $userId]);
-    return $stmt->fetch();
+    $row = $stmt->fetch();
+    if (!$row) return false;
+    return attachOccurrences($pdo, [$row])[0];
 }
 
 // Hides a seeded event for this user only (does not delete the global row).
@@ -112,6 +114,59 @@ function unhideEvent(PDO $pdo, int $eventId, int $userId): void
         'DELETE FROM user_hidden_events WHERE user_id = ? AND event_id = ?'
     );
     $stmt->execute([$userId, $eventId]);
+}
+
+// ── Custom-date occurrences ───────────────────────────────────────────────────
+
+// Loads the concrete dates for every 'custom' event in $events in one query and
+// attaches them as an 'occurrences' key. Non-custom events get an empty array,
+// so callers can read $event['occurrences'] without checking recurrence first.
+function attachOccurrences(PDO $pdo, array $events): array
+{
+    $customIds = [];
+    foreach ($events as $ev) {
+        if (($ev['recurrence'] ?? '') === 'custom') $customIds[] = (int) $ev['id'];
+    }
+
+    $byEvent = [];
+    if ($customIds) {
+        $in   = implode(',', array_fill(0, count($customIds), '?'));
+        $stmt = $pdo->prepare(
+            "SELECT event_id, start_date, end_date FROM event_occurrences
+             WHERE event_id IN ($in) ORDER BY start_date"
+        );
+        $stmt->execute($customIds);
+        foreach ($stmt->fetchAll() as $row) {
+            $byEvent[(int) $row['event_id']][] = [
+                'start_date' => $row['start_date'],
+                'end_date'   => $row['end_date'],
+            ];
+        }
+    }
+
+    foreach ($events as &$ev) {
+        $ev['occurrences'] = $byEvent[(int) $ev['id']] ?? [];
+    }
+    unset($ev);
+
+    return $events;
+}
+
+// Replaces an event's occurrence list wholesale. $dates is a list of
+// ['start_date' => 'Y-m-d', 'end_date' => 'Y-m-d'|null].
+// Delete-then-insert keeps the write simple; these lists are short and
+// edited as a unit, so there is no partial-update case to preserve.
+function replaceEventOccurrences(PDO $pdo, int $eventId, array $dates): void
+{
+    $pdo->prepare('DELETE FROM event_occurrences WHERE event_id = ?')->execute([$eventId]);
+    if (!$dates) return;
+
+    $stmt = $pdo->prepare(
+        'INSERT INTO event_occurrences (event_id, start_date, end_date) VALUES (?, ?, ?)'
+    );
+    foreach ($dates as $d) {
+        $stmt->execute([$eventId, $d['start_date'], $d['end_date'] ?: null]);
+    }
 }
 
 function createEvent(
@@ -291,6 +346,17 @@ function expandEvents(array $rawEvents, string $fromDate, string $toDate): array
                 }
                 break;
 
+            case 'custom':
+                // Dates come straight from event_occurrences - no rule to apply.
+                foreach ($event['occurrences'] ?? [] as $occ) {
+                    $iStart = new DateTime($occ['start_date']);
+                    $iEnd   = $occ['end_date'] ? new DateTime($occ['end_date']) : null;
+                    if ($iStart <= $to && ($iEnd ?? $iStart) >= $from) {
+                        $instances[] = makeEventInstance($event, $iStart, $iEnd);
+                    }
+                }
+                break;
+
             case 'monthly':
                 $cursor = new DateTime($from->format('Y-m-01'));
                 while ($cursor <= $to) {
@@ -341,6 +407,15 @@ function getNextOccurrenceDate(array $event, string $today): ?string
     switch ($event['recurrence']) {
         case 'none':
             return $base >= $now ? $base->format('Y-m-d') : null;
+
+        case 'custom':
+            // Occurrences arrive sorted by start_date, so the first one that has
+            // not finished yet is the next one.
+            foreach ($event['occurrences'] ?? [] as $occ) {
+                $end = new DateTime($occ['end_date'] ?: $occ['start_date']);
+                if ($end >= $now) return $occ['start_date'];
+            }
+            return null;
 
         case 'yearly':
             for ($y = (int) $now->format('Y'); $y <= (int) $now->format('Y') + 1; $y++) {

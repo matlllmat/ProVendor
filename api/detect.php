@@ -56,8 +56,24 @@ if (!move_uploaded_file($file['tmp_name'], $tempPath)) {
     exit;
 }
 
-$_SESSION['temp_csv']      = $tempPath;
-$_SESSION['temp_csv_name'] = $file['name'];
+// Excel on Windows writes CSV as ANSI (Windows-1252) by default, not UTF-8.
+// Those bytes are invalid UTF-8, and json_encode() returns false on invalid
+// UTF-8 — so every response below would be an empty body and the wizard would
+// die with no error message at all. Normalize the file once, here: preflight
+// and import re-read this same temp file, so they're fixed for free.
+$raw               = file_get_contents($tempPath);
+$encodingConverted = false;
+
+if ($raw !== false && !mb_check_encoding($raw, 'UTF-8')) {
+    $converted = mb_convert_encoding($raw, 'UTF-8', 'Windows-1252');
+    if ($converted !== '' && file_put_contents($tempPath, $converted) !== false) {
+        $encodingConverted = true;
+    }
+}
+
+$_SESSION['temp_csv']               = $tempPath;
+$_SESSION['temp_csv_name']          = $file['name'];
+$_SESSION['temp_csv_encoding_conv'] = $encodingConverted;
 
 // The owner validated a sheet and then chose to upload a CSV instead. Drop the
 // half-finished link, or import.php would attach it to these CSV rows and start
@@ -116,9 +132,10 @@ if ($suggestions['date'] !== null) {
 $_SESSION['temp_csv_date_format'] = $dateFormat;
 
 echo json_encode([
-    'headers'     => $headers,
-    'sample'      => array_slice($sampleRows, 0, 5),
-    'suggestions' => $suggestions,
-    'row_count'   => $rowCount,
-    'date_format' => $dateFormat,
+    'headers'            => $headers,
+    'sample'             => array_slice($sampleRows, 0, 5),
+    'suggestions'        => $suggestions,
+    'row_count'          => $rowCount,
+    'date_format'        => $dateFormat,
+    'encoding_converted' => $encodingConverted,
 ]);

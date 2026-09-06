@@ -1,21 +1,25 @@
 <?php
 // api/batch_update_products.php
-// Applies cost / selling price / current-stock edits to many products in one go
-// (the "Batch edit" table on the forecast page), so an owner with incomplete
-// imported data can fill everything in once instead of product by product.
+// Applies cost / selling price / current-stock / perishability edits to many
+// products in one go (the "Batch edit" table on the forecast page), so an
+// owner with incomplete imported data can fill everything in once instead of
+// product by product.
 //
 // Per product it:
 //   1. saves the effective price to `products` (orig_* is left alone, so
-//      "reset to imported" keeps working exactly as it does per-product), then
-//   2. re-runs the Newsvendor optimization against that product's ALREADY SAVED
+//      "reset to imported" keeps working exactly as it does per-product),
+//   2. saves the perishability declaration (is it perishable, and what's the
+//      usual shelf-life range) — this never comes from the CSV, only from here,
+//   3. re-runs the Newsvendor optimization against that product's ALREADY SAVED
 //      forecast and re-saves it, so the restock qty / est. profit / current stock
-//      reflect the new numbers.
+//      reflect the new numbers AND the new shelf-life cap.
 //
-// Prophet is NOT re-run — the demand forecast doesn't change when a price or a
-// stock count changes, only the order quantity derived from it. That keeps this
-// fast enough to do synchronously.
+// Prophet is NOT re-run — the demand forecast doesn't change when a price, a
+// stock count, or perishability changes, only the order quantity derived from
+// it. That keeps this fast enough to do synchronously.
 //
-// Input  (JSON): { items: [ { id, cost_price, selling_price, current_stock }, ... ] }
+// Input  (JSON): { items: [ { id, cost_price, selling_price, current_stock,
+//                             is_perishable, shelf_life_min_days, shelf_life_max_days }, ... ] }
 // Output (JSON): { success, updated, repriced, skipped, failed, results: [...] }
 
 require_once __DIR__ . '/../config/bootstrap.php';
@@ -51,10 +55,15 @@ $skipped  = 0;   // valid, but nothing to re-optimize (no forecast yet)
 $failed   = 0;
 
 foreach ($body['items'] as $item) {
-    $productId = (int)   ($item['id']            ?? 0);
-    $cost      = (float) ($item['cost_price']    ?? 0);
-    $price     = (float) ($item['selling_price'] ?? 0);
-    $stock     = max(0, (int) ($item['current_stock'] ?? 0));
+    $productId    = (int)   ($item['id']            ?? 0);
+    $cost         = (float) ($item['cost_price']    ?? 0);
+    $price        = (float) ($item['selling_price'] ?? 0);
+    $stock        = max(0, (int) ($item['current_stock'] ?? 0));
+    $isPerishable = !empty($item['is_perishable']);
+    $shelfMin     = isset($item['shelf_life_min_days']) && $item['shelf_life_min_days'] !== ''
+                    ? (int) $item['shelf_life_min_days'] : null;
+    $shelfMax     = isset($item['shelf_life_max_days']) && $item['shelf_life_max_days'] !== ''
+                    ? (int) $item['shelf_life_max_days'] : null;
 
     if ($productId <= 0) { $failed++; continue; }
 
@@ -79,7 +88,17 @@ foreach ($body['items'] as $item) {
         continue;
     }
 
+    if ($isPerishable && ($shelfMin === null || $shelfMax === null || $shelfMin <= 0 || $shelfMax < $shelfMin)) {
+        $failed++;
+        $results[] = [
+            'id' => $productId, 'name' => $name, 'ok' => false,
+            'error' => 'Perishable products need a shelf-life range: both days above 0, minimum no greater than maximum.',
+        ];
+        continue;
+    }
+
     setProductPricing($pdo, $userId, $productId, $cost, $price);
+    setProductPerishability($pdo, $userId, $productId, $isPerishable, $shelfMin, $shelfMax);
     $updated++;
 
     // Re-optimize against the saved forecast. A product that has never been
@@ -91,7 +110,10 @@ foreach ($body['items'] as $item) {
         continue;
     }
 
-    $opt = runOptimize($pdo, $userId, $productId, $saved['forecast'], $cost, $price, $stock);
+    $opt = runOptimize(
+        $pdo, $userId, $productId, $saved['forecast'], $cost, $price, $stock,
+        effectiveShelfLifeDays($isPerishable, $shelfMin)
+    );
     if ($opt === null) {
         // Pricing is already saved; only the re-optimization failed.
         $results[] = [
@@ -123,10 +145,10 @@ echo json_encode([
 
 
 // Runs Flask /optimize for one product and re-saves its forecast with the new
-// cost / price / stock. Returns the optimize payload, or null if it failed.
-// (Mirrors the per-product path in api/run_batch_newsvendor.php, but reads the
-// forecast from the DB instead of taking it from the request.)
-function runOptimize(PDO $pdo, int $userId, int $productId, array $forecastRows, float $cost, float $price, int $stock): ?array
+// cost / price / stock / shelf life. Returns the optimize payload, or null if
+// it failed. (Mirrors the per-product path in api/run_batch_newsvendor.php,
+// but reads the forecast from the DB instead of taking it from the request.)
+function runOptimize(PDO $pdo, int $userId, int $productId, array $forecastRows, float $cost, float $price, int $stock, ?int $shelfLifeDays): ?array
 {
     $residualRho = 0.0;
     $acc = getProductAccuracy($pdo, $userId, $productId);
@@ -138,11 +160,12 @@ function runOptimize(PDO $pdo, int $userId, int $productId, array $forecastRows,
     curl_setopt_array($ch, [
         CURLOPT_POST           => true,
         CURLOPT_POSTFIELDS     => json_encode([
-            'forecast'      => $forecastRows,
-            'cost_price'    => $cost,
-            'selling_price' => $price,
-            'current_stock' => $stock,
-            'residual_rho'  => $residualRho,
+            'forecast'        => $forecastRows,
+            'cost_price'      => $cost,
+            'selling_price'   => $price,
+            'current_stock'   => $stock,
+            'residual_rho'    => $residualRho,
+            'shelf_life_days' => $shelfLifeDays,
         ]),
         CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
         CURLOPT_RETURNTRANSFER => true,

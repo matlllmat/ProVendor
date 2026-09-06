@@ -1,18 +1,20 @@
 <?php
 // api/import.php
-// Commits the preview rows submitted by the editor UI. The client sends a JSON
-// array of already-classified rows (new / overlap / invalid / edited); we
-// re-validate each one, upsert products, write the sales rows, and snapshot
-// the resulting state into dataset_versions.
+// Commits the preview rows submitted by the editor UI.
+//
+// A store holds exactly ONE dataset. This upload becomes that dataset: the
+// outgoing rows are snapshotted into dataset_versions, the sales table is
+// cleared, and the submitted rows are written in their place. Products absent
+// from the upload are deactivated rather than deleted, so the owner's pricing
+// edits, horizon overrides, shelf life and accuracy history survive — and so do
+// the snapshots that earlier versions reference.
 //
 // Input  (POST):
 //   rows     JSON array of row objects (see preflight.php for shape)
-//   replace  '1' = apply un-edited overlap rows (overwrite existing qty)
-//            '0' = skip un-edited overlap rows (keep existing qty)
 //   csv_rows total raw rows in the original CSV (for the response summary)
 //
-// Output (JSON): { success, rows, replaced, skipped, dropped, dropped_samples,
-//                  csv_rows, products, version_id }
+// Output (JSON): { success, rows, replaced_rows, dropped, dropped_samples,
+//                  csv_rows, products, deactivated, version_id }
 
 require_once __DIR__ . '/../config/bootstrap.php';
 require_once __DIR__ . '/import_helpers.php';
@@ -25,14 +27,15 @@ if (!isset($_SESSION['user_id'])) {
 
 $rows    = json_decode($_POST['rows'] ?? '[]', true);
 $csvRows = (int) ($_POST['csv_rows'] ?? 0);
-$replace = ($_POST['replace'] ?? '0') === '1';
 
 if (!is_array($rows) || empty($rows)) {
     echo json_encode(['error' => 'No rows submitted.']);
     exit;
 }
 
-$filename   = $_SESSION['temp_csv_name'] ?? 'Manual entry';
+// Clamped to dataset_versions.label (VARCHAR(150)) — a long filename would
+// otherwise throw at insert and roll back an otherwise-good import.
+$filename   = mb_substr($_SESSION['temp_csv_name'] ?? 'Manual entry', 0, VERSION_LABEL_MAX);
 $tempPath   = $_SESSION['temp_csv'] ?? null;
 $dateFormat = $_SESSION['temp_csv_date_format']['format'] ?? null;
 
@@ -49,6 +52,15 @@ try {
     $clean          = [];
     $dropped        = 0;
     $droppedSamples = [];
+
+    // Trim first, then treat empty as NULL. Checking `!== ''` before trimming
+    // let a whitespace-only cell through as '', which is not NULL and so
+    // permanently defeats upsertProduct's "only fill when currently NULL" rule.
+    $optText = function ($v): ?string {
+        if ($v === null) return null;
+        $v = trim((string) $v);
+        return $v === '' ? null : $v;
+    };
 
     foreach ($rows as $r) {
         $rowNum      = isset($r['rowNum']) ? (int) $r['rowNum'] : 0;
@@ -85,17 +97,30 @@ try {
             continue;
         }
 
+        // Re-apply the clamps preflight used. These rows come back from the
+        // client and are editable there, so this is the last gate before MySQL:
+        // an over-length category or a price past DECIMAL(10,2) would otherwise
+        // throw at insert and roll back the entire import.
+        [$sku]         = clampFieldLength($optText($r['sku']         ?? null), 'sku');
+        [$category]    = clampFieldLength($optText($r['category']    ?? null), 'category');
+        [$subcategory] = clampFieldLength($optText($r['subcategory'] ?? null), 'subcategory');
+
+        [$costParsed]  = parseMoney($r['cost']  ?? '');
+        [$priceParsed] = parseMoney($r['price'] ?? '');
+        [$cost]        = clampMoney($costParsed);
+        [$price]       = clampMoney($priceParsed);
+
         $clean[] = [
             'rowNum'      => $rowNum,
             'product'     => $productName,
             'date'        => $date,
             'qty'         => (int) $qtyRaw,
             'edited'      => !empty($r['edited']),
-            'sku'         => isset($r['sku'])         && $r['sku']         !== '' ? trim((string) $r['sku'])         : null,
-            'category'    => isset($r['category'])    && $r['category']    !== '' ? trim((string) $r['category'])    : null,
-            'subcategory' => isset($r['subcategory']) && $r['subcategory'] !== '' ? trim((string) $r['subcategory']) : null,
-            'cost'        => isset($r['cost'])  && is_numeric($r['cost'])  ? (float) $r['cost']  : null,
-            'price'       => isset($r['price']) && is_numeric($r['price']) ? (float) $r['price'] : null,
+            'sku'         => $sku,
+            'category'    => $category,
+            'subcategory' => $subcategory,
+            'cost'        => $cost,
+            'price'       => $price,
         ];
     }
 
@@ -130,14 +155,38 @@ try {
         }
     }
 
-    // ── Lookup existing (product_id|date) pairs by name, with IDs ────────────
-    $existingByName = getExistingSalesWithIdsByName($pdo, $_SESSION['user_id']);
+    // ── Snapshot the outgoing dataset, then clear it ─────────────────────────
+    // A store holds exactly one dataset: this upload replaces it rather than
+    // being stitched into it. That removes the whole class of merge semantics
+    // (conflict/no-op classification, the replace toggle, cross-import
+    // aggregation) that made a re-upload hard to predict.
+    //
+    // The outgoing rows are snapshotted first so they remain browsable,
+    // downloadable and restorable from History. Both statements are inside the
+    // transaction already open, so a failure anywhere below leaves the previous
+    // dataset exactly as it was.
+    $replacedRows = 0;
+    if (userHasSales($pdo, (int) $_SESSION['user_id'])) {
+        // Normally the outgoing dataset is already the newest version, so
+        // snapshotting again would duplicate it and waste one of the ten slots.
+        // Only capture it when it has drifted (a Google Sheet sync since the
+        // last import) and would otherwise be lost.
+        if (!datasetMatchesNewestVersion($pdo, (int) $_SESSION['user_id'])) {
+            saveDatasetVersion(
+                $pdo,
+                $_SESSION['user_id'],
+                'Before ' . $filename,
+                0,
+                0,
+                false,
+                'Automatic snapshot of unversioned changes this upload replaced.'
+            );
+        }
+        $replacedRows = deleteAllUserSales($pdo, (int) $_SESSION['user_id']);
+    }
 
     $productCache   = [];
     $salesBatch     = [];
-    $updateBatch    = [];
-    $skippedDupes   = 0;
-    $replacedCount  = 0;
 
     foreach ($clean as $r) {
         // Upsert product (cached by name to avoid repeat lookups).
@@ -157,28 +206,10 @@ try {
         }
         $pid = $productCache[$r['product']];
 
-        // Existing-pair check uses lowercase name (consistent with preflight + DB collation).
-        $existKey = mb_strtolower($r['product']) . '|' . $r['date'];
-        if (isset($existingByName[$existKey])) {
-            $existQty = (int) $existingByName[$existKey]['qty'];
-            $saleId   = (int) $existingByName[$existKey]['id'];
-
-            if ($existQty === $r['qty']) {
-                // Exact match — silent no-op, doesn't count toward replaced.
-                continue;
-            }
-
-            // Apply this row if (a) the user edited it (explicit intent) or
-            // (b) the "replace" toggle was set (bulk override).
-            if ($r['edited'] || $replace) {
-                $updateBatch[] = ['sale_id' => $saleId, 'qty' => $r['qty']];
-                $replacedCount++;
-            } else {
-                $skippedDupes++;
-            }
-            continue;
-        }
-
+        // No existing-pair check: the table was just cleared, so every valid row
+        // is simply inserted. preflight already collapsed duplicate
+        // (product, date) pairs within the file itself, which is what the
+        // sales_product_date_unique key requires.
         $salesBatch[] = [
             'product_id'    => $pid,
             'quantity_sold' => $r['qty'],
@@ -186,46 +217,39 @@ try {
         ];
     }
 
-    if (empty($salesBatch) && empty($updateBatch)) {
+    if (empty($salesBatch)) {
+        // Rolling back also restores the dataset cleared above, so an upload that
+        // turns out to be entirely unusable can't leave the store empty.
         $pdo->rollBack();
-
-        // Say WHY nothing committed, and what to do about it. The common case is
-        // rows that already exist with a different quantity: those only apply when
-        // "Replace existing values" is on (or the row was edited by hand), so a
-        // bare "No changes to apply" left the owner with no way forward.
-        $message = $skippedDupes > 0
-            ? 'These ' . number_format($skippedDupes) . ' row' . ($skippedDupes === 1 ? '' : 's')
-              . ' already exist for the same product and date, with a different quantity. '
-              . 'Turn on “Replace existing values for un-edited conflicts” to overwrite them, '
-              . 'or edit just the rows you want to change.'
-            : 'This data is already in your store — there is nothing new to import.';
-
         echo json_encode([
-            'error'           => $message,
-            'skipped'         => $skippedDupes,
+            'error'           => 'None of the rows in this file could be imported, so your '
+                               . 'existing data has been left untouched.',
             'dropped'         => $dropped,
             'dropped_samples' => $droppedSamples,
-            // Nothing committed because these rows are already stored, so this
-            // account HAS data. Onboarding uses this to offer a way into the app
-            // instead of leaving a new owner stranded on the upload screen.
             'has_data'        => userHasSales($pdo, (int) $_SESSION['user_id']),
         ]);
         exit;
     }
 
-    if (!empty($salesBatch))  insertSalesBatch($pdo, $salesBatch);
-    if (!empty($updateBatch)) bulkUpdateSalesByPair($pdo, $updateBatch);
+    insertSalesBatch($pdo, $salesBatch);
+
+    // Products that aren't in this upload are no longer sold. They're kept
+    // (settings, history and snapshot references live on the row) but marked
+    // inactive and dropped from forecasting.
+    $deactivated = deactivateAbsentProducts($pdo, (int) $_SESSION['user_id'],
+                                            array_values($productCache));
 
     // Stale accuracy caches: every product that just got new/changed sales.
     invalidateProductAccuracy($pdo, array_values($productCache));
 
-    // Snapshot resulting state so the user can roll back this import.
+    // Snapshot the incoming dataset. One version per upload, so History reads as
+    // a list of the files this store has been fed.
     $versionId = saveDatasetVersion(
         $pdo,
         $_SESSION['user_id'],
         $filename,
         count($salesBatch),
-        $replacedCount
+        0
     );
 
     $pdo->commit();
@@ -242,7 +266,7 @@ try {
             'column_mapping' => $_SESSION['temp_csv_mapping'] ?? [],
             'date_format'    => $dateFormat,
             'added'          => count($salesBatch),
-            'updated'        => $replacedCount,
+            'updated'        => 0,
         ]);
 
         $linkedSheet = $_SESSION['pending_sheet'];
@@ -258,12 +282,15 @@ try {
         'success'         => true,
         'linked_sheet'    => $linkedSheet,
         'rows'            => count($salesBatch),
-        'replaced'        => $replacedCount,
-        'skipped'         => $skippedDupes,
+        // Rows in the dataset this upload replaced — 0 on a first import. The
+        // outgoing data isn't lost: it's the version saved just before the swap.
+        'replaced_rows'   => $replacedRows,
         'dropped'         => $dropped,
         'dropped_samples' => $droppedSamples,
         'csv_rows'        => $csvRows,
         'products'        => count($productCache),
+        // Products that were in the old dataset but not this one.
+        'deactivated'     => $deactivated,
         'version_id'      => $versionId,
     ]);
 

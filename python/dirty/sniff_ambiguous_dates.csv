@@ -1,0 +1,13 @@
+date,product,sku,quantity,category,cost_price,selling_price
+01/01/2029,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,10,Pantry,60.00,75.00
+02/02/2029,Lucky Me Pancit Canton,PNT-LMC-55G,11,Pantry,10.00,14.00
+03/03/2029,Argentina Corned Beef 175g,CAN-ACB-175,12,Canned Goods,45.00,55.00
+04/04/2029,Century Tuna Flakes in Oil,CAN-CTF-155,13,Canned Goods,38.00,48.00
+05/05/2029,Nescafé 3-in-1 Original,BEV-N3N-01,14,Beverages,5.00,7.00
+06/06/2029,San Miguel Pale Pilsen 330ml,BEV-SMB-330,15,Beverages,50.00,65.00
+07/07/2029,Coca-Cola 1.5L,BEV-CCR-15L,16,Beverages,55.00,70.00
+08/08/2029,Milo Powdered Drink 33g Sachet,BEV-MIL-33,17,Beverages,6.00,9.00
+09/01/2029,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,18,Beverages,6.00,9.00
+01/02/2029,Sky Flakes Crackers,SNK-SKF-01,19,Snacks,8.00,12.00
+02/03/2029,Chippy Barbecue 110g,SNK-CHP-110,20,Snacks,12.00,18.00
+03/04/2029,Surf Detergent Powder 65g,HSH-SRF-65,21,Household,6.00,9.00

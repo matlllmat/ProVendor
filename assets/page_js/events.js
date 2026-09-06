@@ -125,34 +125,90 @@
 
     // ── Create / edit modal ───────────────────────────────────────────────────
     window.openCreateModal = function () {
-        document.getElementById('modal-title').textContent   = 'Add Event';
-        document.getElementById('modal-event-id').value      = '';
-        document.getElementById('modal-name').value          = '';
-        document.getElementById('modal-recurrence').value    = 'yearly';
-        document.getElementById('modal-is-last-day').checked = false;
-        document.getElementById('modal-start').value         = '';
-        document.getElementById('modal-end').value           = '';
-        document.getElementById('modal-note').value          = '';
-        document.getElementById('last-day-row').classList.add('hidden');
+        document.getElementById('modal-title').textContent = 'Add Event';
+        document.getElementById('modal-event-id').value    = '';
+        document.getElementById('modal-name').value        = '';
+        document.getElementById('modal-recurrence').value  = 'yearly';
+        document.getElementById('modal-note').value        = '';
+
+        var now = new Date();
+        setYearlyParts(now.getMonth() + 1, now.getDate());
+        setMonthlyParts(0, now.getDate());
+        document.getElementById('modal-start').value    = '';
+        document.getElementById('modal-end').value      = '';
+        document.getElementById('modal-duration').value = 1;
+        setCustomDates([]);
+
+        handleRecurrenceChange();
         selectColor('#FF5722');
         resetSaveButton();
         showModal();
     };
 
     window.openEditModal = function (ev) {
-        document.getElementById('modal-title').textContent   = 'Edit Event';
-        document.getElementById('modal-event-id').value      = ev.id;
-        document.getElementById('modal-name').value          = ev.name;
-        document.getElementById('modal-recurrence').value    = ev.recurrence;
-        document.getElementById('modal-is-last-day').checked = ev.is_last_day == 1;
-        document.getElementById('modal-start').value         = ev.event_start;
-        document.getElementById('modal-end').value           = ev.event_end || '';
-        document.getElementById('modal-note').value          = ev.impact_note || '';
-        document.getElementById('last-day-row').classList.toggle('hidden', ev.recurrence !== 'monthly');
+        document.getElementById('modal-title').textContent = 'Edit Event';
+        document.getElementById('modal-event-id').value    = ev.id;
+        document.getElementById('modal-name').value        = ev.name;
+        document.getElementById('modal-recurrence').value  = ev.recurrence;
+        document.getElementById('modal-note').value        = ev.impact_note || '';
+
+        // Reverse the stored row back into the parts each mode edits.
+        var startParts = parseYMD(ev.event_start);
+        setYearlyParts(startParts.month, startParts.day);
+        setMonthlyParts(ev.is_last_day == 1 ? 1 : 0, startParts.day);
+
+        document.getElementById('modal-start').value = ev.event_start;
+        document.getElementById('modal-end').value   = ev.event_end || '';
+        document.getElementById('modal-duration').value =
+            daysBetween(ev.event_start, ev.event_end) + 1;
+        setCustomDates(ev.occurrences || []);
+
+        handleRecurrenceChange();
         selectColor(ev.color || '#FF5722');
         resetSaveButton();
         showModal();
     };
+
+    // -- Date part helpers ----------------------------------------------------
+    // Recurring events store a placeholder date; expandEvents() reads back only
+    // some of it (yearly: month+day, monthly: day). ANCHOR_YEAR is a leap year
+    // so a Feb 29 yearly event still stores a valid date.
+    var ANCHOR_YEAR   = 2024;
+    // Days per month in a leap year, so February counts as 29.
+    var MONTH_LENGTHS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+    function parseYMD(str) {
+        var p = (str || '').split('-');
+        return { year: +p[0] || ANCHOR_YEAR, month: +p[1] || 1, day: +p[2] || 1 };
+    }
+
+    function pad2(n) { return String(n).padStart(2, '0'); }
+
+    // Whole days from start to end (0 when end is missing or the same day).
+    function daysBetween(startStr, endStr) {
+        if (!startStr || !endStr) return 0;
+        var ms = new Date(endStr + 'T00:00:00') - new Date(startStr + 'T00:00:00');
+        return ms > 0 ? Math.round(ms / 86400000) : 0;
+    }
+
+    function addDays(dateStr, n) {
+        var d = new Date(dateStr + 'T00:00:00');
+        d.setDate(d.getDate() + n);
+        return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+    }
+
+    function setYearlyParts(month, day) {
+        document.getElementById('modal-year-month').value = month;
+        document.getElementById('modal-year-day').value   = day;
+        handleYearlyDayChange();
+    }
+
+    function setMonthlyParts(isLastDay, day) {
+        document.getElementById('month-mode-day').checked  = !isLastDay;
+        document.getElementById('month-mode-last').checked = !!isLastDay;
+        document.getElementById('modal-month-day').value   = day;
+        handleMonthModeChange();
+    }
 
     function showModal() {
         document.getElementById('event-modal-overlay').classList.remove('hidden');
@@ -185,42 +241,238 @@
         });
     };
 
-    // ── Recurrence / last-day-of-month toggle ─────────────────────────────────
+    // -- Recurrence / month-mode toggles --------------------------------------
+    // Shows only the "when" block matching the chosen recurrence, so the form
+    // never asks for a value that recurrence type would throw away.
     window.handleRecurrenceChange = function () {
-        var rec     = document.getElementById('modal-recurrence').value;
-        var lastRow = document.getElementById('last-day-row');
-        lastRow.classList.toggle('hidden', rec !== 'monthly');
-        if (rec !== 'monthly') {
-            document.getElementById('modal-is-last-day').checked = false;
+        var rec = document.getElementById('modal-recurrence').value;
+        document.getElementById('when-yearly').classList.toggle('hidden',  rec !== 'yearly');
+        document.getElementById('when-monthly').classList.toggle('hidden', rec !== 'monthly');
+        document.getElementById('when-custom').classList.toggle('hidden',  rec !== 'custom');
+        document.getElementById('when-once').classList.toggle('hidden',    rec !== 'none');
+        // One-time and custom events carry real dates, so they size themselves.
+        document.getElementById('duration-row').classList.toggle('hidden',
+            rec === 'none' || rec === 'custom');
+
+        // Start the list with one empty row so the field is never a blank box.
+        if (rec === 'custom' && !document.querySelector('#custom-date-list .custom-date-row')) {
+            addCustomDateRow();
         }
-        handleLastDayChange();
     };
 
-    window.handleLastDayChange = function () {
-        var isLastDay  = document.getElementById('modal-is-last-day').checked;
-        var startInput = document.getElementById('modal-start');
-        startInput.disabled = isLastDay;
-        if (isLastDay && !startInput.value) {
-            // Default to the first of the current month so the saved record is valid.
-            var d = new Date();
-            startInput.value = d.getFullYear() + '-'
-                + String(d.getMonth() + 1).padStart(2, '0') + '-01';
+    // Warns when a yearly date cannot exist (Apr 31), or exists only in leap years.
+    window.handleYearlyDayChange = function () {
+        var month = +document.getElementById('modal-year-month').value;
+        var day   = +document.getElementById('modal-year-day').value;
+        var hint  = document.getElementById('yearly-date-hint');
+        var max   = MONTH_LENGTHS[month - 1];
+
+        if (day > max) {
+            hint.textContent = 'That date does not exist. Pick ' + max + ' or lower.';
+            hint.classList.remove('hidden');
+        } else if (month === 2 && day === 29) {
+            hint.textContent = 'Feb 29 only exists in leap years - other years are skipped.';
+            hint.classList.remove('hidden');
+        } else {
+            hint.classList.add('hidden');
         }
     };
+
+    window.handleMonthModeChange = function () {
+        var isLast = document.getElementById('month-mode-last').checked;
+        document.getElementById('modal-month-day').disabled = isLast;
+        handleMonthDayChange();
+    };
+
+    // Warns about day numbers that do not exist in every month.
+    window.handleMonthDayChange = function () {
+        var isLast = document.getElementById('month-mode-last').checked;
+        var day    = +document.getElementById('modal-month-day').value;
+        var hint   = document.getElementById('month-day-hint');
+
+        if (!isLast && day > 28) {
+            var skipped = MONTH_LENGTHS.filter(function (len) { return len < day; }).length;
+            hint.textContent = 'Day ' + day + ' does not exist in every month, so it is skipped in '
+                             + skipped + ' month' + (skipped === 1 ? '' : 's')
+                             + ' a year. Choose "Last day of month" if you mean month-end.';
+            hint.classList.remove('hidden');
+        } else {
+            hint.classList.add('hidden');
+        }
+    };
+
+    // ── Specific-date rows ────────────────────────────────────────────────────
+    // Each row is one occurrence: a required date, an optional "to" date for a
+    // multi-day stretch, and a remove button. The list is the whole input, so
+    // it is rebuilt from scratch whenever the modal opens.
+
+    function setCustomDates(list) {
+        var wrap = document.getElementById('custom-date-list');
+        wrap.innerHTML = '';
+        (list || []).forEach(function (occ) {
+            addCustomDateRow(occ.start_date, occ.end_date);
+        });
+        updateCustomDateHint();
+    }
+
+    window.addCustomDateRow = function (startVal, endVal) {
+        var wrap = document.getElementById('custom-date-list');
+
+        var row = document.createElement('div');
+        row.className = 'custom-date-row';
+
+        var start = document.createElement('input');
+        start.type      = 'date';
+        start.className = 'form-input custom-date-input';
+        start.value     = startVal || '';
+        start.setAttribute('aria-label', 'Date');
+        start.addEventListener('change', updateCustomDateHint);
+
+        var to = document.createElement('span');
+        to.className   = 'custom-date-to';
+        to.textContent = 'to';
+
+        var end = document.createElement('input');
+        end.type      = 'date';
+        end.className = 'form-input custom-date-input custom-date-end';
+        end.value     = endVal || '';
+        end.setAttribute('aria-label', 'End date (optional)');
+        end.addEventListener('change', updateCustomDateHint);
+
+        var del = document.createElement('button');
+        del.type      = 'button';
+        del.className = 'custom-date-remove';
+        del.innerHTML = '&times;';
+        del.title     = 'Remove this date';
+        del.setAttribute('aria-label', 'Remove this date');
+        del.onclick   = function () {
+            row.remove();
+            // Never leave the list completely empty - it reads as broken.
+            if (!document.querySelector('#custom-date-list .custom-date-row')) {
+                addCustomDateRow();
+            }
+            updateCustomDateHint();
+        };
+
+        row.appendChild(start);
+        row.appendChild(to);
+        row.appendChild(end);
+        row.appendChild(del);
+        wrap.appendChild(row);
+        updateCustomDateHint();
+    };
+
+    // Reads the rows into the shape the API expects, skipping blank ones.
+    function readCustomDates() {
+        var out = [];
+        document.querySelectorAll('#custom-date-list .custom-date-row').forEach(function (row) {
+            var inputs = row.querySelectorAll('input[type="date"]');
+            var start  = inputs[0].value;
+            var end    = inputs[1].value;
+            if (start) out.push({ start_date: start, end_date: end || null });
+        });
+        return out;
+    }
+
+    // Live feedback on how much evidence the list carries, using the same
+    // thresholds as the confidence badge on the events list.
+    function updateCustomDateHint() {
+        var hint = document.getElementById('custom-date-hint');
+        var n    = readCustomDates().length;
+
+        if (n === 0) {
+            hint.textContent = 'Add at least one date.';
+        } else if (n < 3) {
+            hint.textContent = n + ' date' + (n === 1 ? '' : 's') +
+                ' — add more so the system can tell a real effect from a one-off.';
+        } else if (n < 6) {
+            hint.textContent = n + ' dates — enough for a moderate estimate. 6 or more is stronger.';
+        } else {
+            hint.textContent = n + ' dates — enough for a strong estimate.';
+        }
+    }
+
+    // Turns the visible "when" controls into the two columns the API stores.
+    // Recurring events keep a placeholder date whose ignored parts are pinned to
+    // ANCHOR_YEAR / January, and carry their length as event_end = start + n-1.
+    function buildEventDates(recurrence) {
+        if (recurrence === 'custom') {
+            var dates = readCustomDates();
+            if (!dates.length) return { error: 'Add at least one date.' };
+
+            var seen = {};
+            for (var i = 0; i < dates.length; i++) {
+                var d = dates[i];
+                if (d.end_date && d.end_date < d.start_date) {
+                    return { error: 'Each row must end on or after the date it starts.' };
+                }
+                if (seen[d.start_date]) {
+                    return { error: 'The date ' + d.start_date + ' is listed twice.' };
+                }
+                seen[d.start_date] = true;
+            }
+
+            dates.sort(function (a, b) { return a.start_date < b.start_date ? -1 : 1; });
+            // event_start/end mirror the earliest row; the API re-derives them.
+            return {
+                start:       dates[0].start_date,
+                end:         dates[0].end_date || '',
+                isLastDay:   0,
+                occurrences: dates
+            };
+        }
+
+        if (recurrence === 'none') {
+            var s = document.getElementById('modal-start').value;
+            var e = document.getElementById('modal-end').value;
+            if (!s) return { error: 'Start date is required.' };
+            if (e && e < s) return { error: 'End date must be on or after the start date.' };
+            return { start: s, end: e, isLastDay: 0 };
+        }
+
+        var duration = parseInt(document.getElementById('modal-duration').value, 10);
+        if (!duration || duration < 1) return { error: 'Length must be at least 1 day.' };
+
+        var startDate, isLastDay = 0;
+
+        if (recurrence === 'yearly') {
+            var month = +document.getElementById('modal-year-month').value;
+            var day   = +document.getElementById('modal-year-day').value;
+            if (day > MONTH_LENGTHS[month - 1]) {
+                return { error: 'That date does not exist in the month you picked.' };
+            }
+            startDate = ANCHOR_YEAR + '-' + pad2(month) + '-' + pad2(day);
+        } else {
+            isLastDay = document.getElementById('month-mode-last').checked ? 1 : 0;
+            // January has 31 days, so any chosen day number is a valid anchor.
+            var mDay  = isLastDay ? 31 : +document.getElementById('modal-month-day').value;
+            startDate = ANCHOR_YEAR + '-01-' + pad2(mDay);
+        }
+
+        return {
+            start:     startDate,
+            end:       duration > 1 ? addDays(startDate, duration - 1) : '',
+            isLastDay: isLastDay
+        };
+    }
 
     // ── Save event (create or update) ─────────────────────────────────────────
     window.saveEvent = async function () {
         var id         = document.getElementById('modal-event-id').value;
         var name       = document.getElementById('modal-name').value.trim();
         var recurrence = document.getElementById('modal-recurrence').value;
-        var isLastDay  = document.getElementById('modal-is-last-day').checked ? 1 : 0;
-        var start      = document.getElementById('modal-start').value;
-        var end        = document.getElementById('modal-end').value;
         var color      = document.getElementById('modal-color').value || '#FF5722';
         var note       = document.getElementById('modal-note').value.trim();
 
-        if (!name || !start) {
-            showToast('Name and start date are required.', 'error');
+        if (!name) {
+            showToast('Event name is required.', 'error');
+            return;
+        }
+
+        // Assemble the stored columns from whichever "when" block is in use.
+        var built = buildEventDates(recurrence);
+        if (built.error) {
+            showToast(built.error, 'error');
             return;
         }
 
@@ -232,10 +484,13 @@
         formData.append('action',      id ? 'update' : 'create');
         if (id) formData.append('id', id);
         formData.append('name',        name);
-        formData.append('event_start', start);
-        formData.append('event_end',   end);
+        formData.append('event_start', built.start);
+        formData.append('event_end',   built.end);
         formData.append('recurrence',  recurrence);
-        formData.append('is_last_day', isLastDay);
+        formData.append('is_last_day', built.isLastDay);
+        if (recurrence === 'custom') {
+            formData.append('occurrences', JSON.stringify(built.occurrences));
+        }
         formData.append('color',       color);
         formData.append('impact_note', note);
 

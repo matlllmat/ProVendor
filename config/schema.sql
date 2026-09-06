@@ -27,6 +27,19 @@ CREATE TABLE IF NOT EXISTS `products` (
     `sku`                    VARCHAR(100)  DEFAULT NULL,
     `category`               VARCHAR(50)   DEFAULT NULL,
     `subcategory`            VARCHAR(50)   DEFAULT NULL,
+    -- Perishability — declared by the owner via the forecast page's batch
+    -- editor, NOT derived from the CSV (a real POS export has no expiry column).
+    -- is_perishable defaults off, matching most of a sari-sari catalogue.
+    -- shelf_life_min/max hold the owner's estimated "usual range" (e.g. pandesal
+    -- 2-4 days); the Newsvendor uses the MINIMUM as the effective shelf life —
+    -- a conservative choice, since overordering a perishable item (spoilage) is
+    -- the costly mistake this feature exists to prevent, and an occasional early
+    -- stockout is the cheaper error. Used to cap the ordering window (a 3-day
+    -- item is never stocked to a 30-day horizon) and decide whether leftover
+    -- stock carries over (salvage credit) or is a total loss.
+    `is_perishable`          TINYINT(1)    NOT NULL DEFAULT 0,
+    `shelf_life_min_days`    INT           DEFAULT NULL,
+    `shelf_life_max_days`    INT           DEFAULT NULL,
     `cost_price`             DECIMAL(10,2) DEFAULT NULL,
     `selling_price`          DECIMAL(10,2) DEFAULT NULL,
     -- The price the imported dataset originally provided. cost_price/selling_price
@@ -50,6 +63,15 @@ CREATE TABLE IF NOT EXISTS `products` (
     `accuracy_horizon_days`  INT           DEFAULT NULL,
     `accuracy_residual_rho`  DECIMAL(6,4)  DEFAULT NULL,
     `accuracy_computed_at`   TIMESTAMP     NULL DEFAULT NULL,
+    -- A store has exactly ONE dataset: each upload replaces it rather than being
+    -- stitched into what's there. A product that isn't in the newly uploaded file
+    -- is therefore no longer sold — but deleting it would throw away the owner's
+    -- pricing edits, horizon overrides and accuracy history, and orphan the
+    -- snapshots that earlier versions still reference. So it's deactivated
+    -- instead: kept in the catalogue (greyed, with an explanation) and excluded
+    -- from forecasting. Re-appearing in a later upload reactivates it.
+    `is_active`              TINYINT(1)    NOT NULL DEFAULT 1,
+    `deactivated_at`         TIMESTAMP     NULL DEFAULT NULL,
     `created_at`             TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     CONSTRAINT `fk_products_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
@@ -72,6 +94,18 @@ CREATE TABLE IF NOT EXISTS `products` (
 --     ADD COLUMN `orig_cost_price`    DECIMAL(10,2) DEFAULT NULL,
 --     ADD COLUMN `orig_selling_price` DECIMAL(10,2) DEFAULT NULL;
 --   UPDATE `products` SET `orig_cost_price` = `cost_price`, `orig_selling_price` = `selling_price`;
+-- Perishability (revised): owner-declared via the batch editor, not derived from
+-- import. Supersedes an earlier `shelf_life_days` single-value column.
+--   ALTER TABLE `products`
+--     DROP COLUMN `shelf_life_days`,
+--     ADD COLUMN `is_perishable`       TINYINT(1) NOT NULL DEFAULT 0,
+--     ADD COLUMN `shelf_life_min_days` INT DEFAULT NULL,
+--     ADD COLUMN `shelf_life_max_days` INT DEFAULT NULL;
+-- Single-dataset model (added later): products absent from the current upload are
+-- deactivated rather than deleted, so their settings and history survive.
+--   ALTER TABLE `products`
+--     ADD COLUMN `is_active`      TINYINT(1) NOT NULL DEFAULT 1,
+--     ADD COLUMN `deactivated_at` TIMESTAMP  NULL DEFAULT NULL;
 
 CREATE TABLE IF NOT EXISTS `sales` (
     `id`            INT       NOT NULL AUTO_INCREMENT,
@@ -171,7 +205,7 @@ CREATE TABLE IF NOT EXISTS `seasonal_events` (
     `name`        VARCHAR(100) NOT NULL,
     `event_start` DATE         NOT NULL,
     `event_end`   DATE         NULL,                             -- NULL = single-day event
-    `recurrence`  ENUM('none','yearly','monthly') NOT NULL DEFAULT 'none',
+    `recurrence`  ENUM('none','yearly','monthly','custom') NOT NULL DEFAULT 'none',
     `is_last_day` TINYINT(1)   NOT NULL DEFAULT 0,               -- monthly: use last day of month
     `is_seeded`   TINYINT(1)   NOT NULL DEFAULT 0,
     `color`       VARCHAR(7)   NOT NULL DEFAULT '#FF5722',
@@ -188,6 +222,28 @@ INSERT IGNORE INTO `seasonal_events` (`id`, `user_id`, `name`, `event_start`, `e
   (105, NULL, 'Christmas Eve',       '2024-12-24', NULL, 'yearly',  0, 1, '#F59E0B'),
   (106, NULL, 'Christmas Day',       '2024-12-25', NULL, 'yearly',  0, 1, '#EF4444'),
   (107, NULL, 'New Year\'s Eve',     '2024-12-31', NULL, 'yearly',  0, 1, '#6366F1');
+
+-- Concrete dates for `custom` events - irregular happenings that follow no
+-- calendar rule (storms, movable holidays like Holy Week or Chinese New Year).
+-- One row per occurrence; end_date NULL means a single-day occurrence.
+-- Only read when seasonal_events.recurrence = 'custom'; the other recurrence
+-- types generate their dates from event_start instead.
+--
+-- For existing databases, run:
+--   ALTER TABLE `seasonal_events`
+--     MODIFY `recurrence` ENUM('none','yearly','monthly','custom')
+--     NOT NULL DEFAULT 'none';
+--   (then the CREATE TABLE below)
+CREATE TABLE IF NOT EXISTS `event_occurrences` (
+    `id`         INT  NOT NULL AUTO_INCREMENT,
+    `event_id`   INT  NOT NULL,
+    `start_date` DATE NOT NULL,
+    `end_date`   DATE NULL,                    -- NULL = single-day occurrence
+    PRIMARY KEY (`id`),
+    KEY `idx_event_occurrences_event` (`event_id`, `start_date`),
+    CONSTRAINT `fk_event_occurrences_event`
+        FOREIGN KEY (`event_id`) REFERENCES `seasonal_events` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Prophet regressor coefficient cache — populated during forecast runs, read by the events page.
 -- coefficient is in additive mode (same units as daily sales quantity).
@@ -269,4 +325,29 @@ CREATE TABLE IF NOT EXISTS `sheet_links` (
     -- One linked sheet per owner: the whole feature is "this sheet is my data".
     UNIQUE KEY `sheet_links_user_unique` (`user_id`),
     CONSTRAINT `fk_sl_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ── Backtest-with-your-own-data runs (Reports tab, optional/secondary test) ──
+-- Only the MOST RECENT upload-backtest is kept per owner — a new run overwrites
+-- it, and "Clear" deletes it outright. The uploaded CSV itself is kept on disk
+-- (uploads/backtest_<user_id>.csv) so the owner can re-download exactly what
+-- they tested with; stored_path here is what api/download_backtest_csv.php and
+-- api/clear_backtest.php act on.
+CREATE TABLE IF NOT EXISTS `backtest_runs` (
+    `id`                     INT           NOT NULL AUTO_INCREMENT,
+    `user_id`                INT           NOT NULL,
+    `original_filename`      VARCHAR(255)  NOT NULL,
+    `stored_path`            VARCHAR(255)  NOT NULL,
+    `evaluated_count`        INT           NOT NULL DEFAULT 0,
+    `total_count`            INT           NOT NULL DEFAULT 0,
+    `weighted_mape`          DECIMAL(8,2)  DEFAULT NULL,
+    `weighted_mae`           DECIMAL(8,2)  DEFAULT NULL,
+    `weighted_rmse`          DECIMAL(8,2)  DEFAULT NULL,
+    `weighted_accuracy_pct`  DECIMAL(5,2)  DEFAULT NULL,
+    `rows_parsed`            INT           NOT NULL DEFAULT 0,
+    `rows_dropped`           INT           NOT NULL DEFAULT 0,
+    `created_at`             TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `backtest_runs_user_unique` (`user_id`),
+    CONSTRAINT `fk_br_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

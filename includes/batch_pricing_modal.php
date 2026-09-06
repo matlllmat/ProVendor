@@ -1,8 +1,12 @@
 <?php
 // includes/batch_pricing_modal.php
-// "Batch edit" table for the forecast page: fill in cost price, selling price and
-// current stock for the whole catalogue in one pass, instead of opening each
-// product's restock panel one at a time.
+// "Batch edit" table for the forecast page: fill in cost price, selling price,
+// current stock, and perishability for the whole catalogue in one pass, instead
+// of opening each product's restock panel one at a time.
+//
+// Perishability (is it perishable, and what's the usual shelf-life range) is
+// declared HERE and only here — a real POS export has no expiry column, so
+// this is the sole source of that data, unlike price which is also import-fed.
 //
 // Self-contained: it loads its own data, so any authenticated page can include it
 // (the forecast page and the dashboard's Suggested Restock both do) without having
@@ -76,6 +80,8 @@ foreach ($_bpRows as $r) {
                         <th>Cost price</th>
                         <th>Selling price</th>
                         <th>Current stock</th>
+                        <th>Perishable?</th>
+                        <th>Usual shelf life</th>
                         <th class="bp-t-reset"></th>
                     </tr>
                 </thead>
@@ -91,6 +97,12 @@ foreach ($_bpRows as $r) {
                         // forecast, written whenever Newsvendor runs.
                         $stock = ($fc && $fc['current_stock'] !== null) ? (int) $fc['current_stock'] : 0;
                         $missing = ($cost === null || $price === null);
+                        // Perishability has no "imported" original — it's only ever
+                        // declared here — so like stock it's only tracked against
+                        // what it was when this table opened.
+                        $isPerishable = !empty($p['is_perishable']);
+                        $shelfMin = $p['shelf_life_min_days'] !== null ? (int) $p['shelf_life_min_days'] : null;
+                        $shelfMax = $p['shelf_life_max_days'] !== null ? (int) $p['shelf_life_max_days'] : null;
                     ?>
                     <tr class="bp-row<?php echo $missing ? ' is-missing' : ''; ?>"
                         data-id="<?php echo $pid; ?>"
@@ -99,7 +111,10 @@ foreach ($_bpRows as $r) {
                         data-orig-price="<?php echo $oPrice !== null ? $oPrice : ''; ?>"
                         data-start-cost="<?php echo $cost !== null ? $cost : ''; ?>"
                         data-start-price="<?php echo $price !== null ? $price : ''; ?>"
-                        data-start-stock="<?php echo $stock; ?>">
+                        data-start-stock="<?php echo $stock; ?>"
+                        data-start-perishable="<?php echo $isPerishable ? 1 : 0; ?>"
+                        data-start-shelf-min="<?php echo $shelfMin !== null ? $shelfMin : ''; ?>"
+                        data-start-shelf-max="<?php echo $shelfMax !== null ? $shelfMax : ''; ?>">
                         <td class="bp-t-left">
                             <span class="bp-name"><?php echo htmlspecialchars($p['name']); ?></span>
                             <?php if ($missing): ?><span class="bp-badge">no price</span><?php endif; ?>
@@ -125,6 +140,25 @@ foreach ($_bpRows as $r) {
                                 <input type="number" class="bp-input bp-stock" min="0" step="1"
                                        value="<?php echo $stock; ?>" oninput="bpRowChanged(this)">
                                 <span class="bp-affix bp-affix-right">units</span>
+                            </span>
+                        </td>
+                        <td>
+                            <label class="bp-check">
+                                <input type="checkbox" class="bp-perishable"
+                                       <?php echo $isPerishable ? 'checked' : ''; ?>
+                                       onchange="bpPerishableToggled(this)">
+                            </label>
+                        </td>
+                        <td>
+                            <span class="bp-shelf-wrap" <?php echo $isPerishable ? '' : 'style="display:none"'; ?>>
+                                <input type="number" class="bp-input bp-shelf-min" min="1" step="1" style="width:3.4rem"
+                                       value="<?php echo $shelfMin !== null ? $shelfMin : ''; ?>"
+                                       placeholder="min" oninput="bpRowChanged(this)">
+                                <span class="bp-affix">–</span>
+                                <input type="number" class="bp-input bp-shelf-max" min="1" step="1" style="width:3.4rem"
+                                       value="<?php echo $shelfMax !== null ? $shelfMax : ''; ?>"
+                                       placeholder="max" oninput="bpRowChanged(this)">
+                                <span class="bp-affix bp-affix-right">days</span>
                             </span>
                         </td>
                         <td class="bp-t-reset">
@@ -190,11 +224,19 @@ function bpMarkRow(row) {
     mark(cost, oCost);
     mark(price, oPrice);
 
-    // Stock has no imported original — it's only ever entered by the owner — so it
-    // is flagged against what it was when this table opened.
+    // Stock and perishability have no imported original — they're only ever set
+    // here — so, like stock, they're flagged against what they were when this
+    // table opened.
     var sStart = _bpNum(row.dataset.startStock);
     var sNow   = _bpNum(stock.value);
     stock.classList.toggle('is-custom', sStart !== null && sNow !== null && sNow !== sStart);
+
+    var shelfMin = row.querySelector('.bp-shelf-min');
+    var shelfMax = row.querySelector('.bp-shelf-max');
+    var minChanged = _bpNum(shelfMin.value) !== _bpNum(row.dataset.startShelfMin);
+    var maxChanged = _bpNum(shelfMax.value) !== _bpNum(row.dataset.startShelfMax);
+    shelfMin.classList.toggle('is-custom', minChanged);
+    shelfMax.classList.toggle('is-custom', maxChanged);
 
     row.classList.toggle('is-changed', bpRowIsChanged(row));
 }
@@ -212,7 +254,16 @@ function bpRowIsChanged(row) {
         if (a === null || b === null) return true;
         return Math.abs(a - b) >= 0.005;
     };
-    return diff(c, sc) || diff(p, sp) || diff(s, ss);
+
+    var perishNow    = row.querySelector('.bp-perishable').checked;
+    var perishStart  = row.dataset.startPerishable === '1';
+    var minNow       = _bpNum(row.querySelector('.bp-shelf-min').value);
+    var maxNow       = _bpNum(row.querySelector('.bp-shelf-max').value);
+    var minStart     = _bpNum(row.dataset.startShelfMin);
+    var maxStart     = _bpNum(row.dataset.startShelfMax);
+
+    return diff(c, sc) || diff(p, sp) || diff(s, ss)
+        || perishNow !== perishStart || diff(minNow, minStart) || diff(maxNow, maxStart);
 }
 
 function bpRowChanged(input) {
@@ -220,7 +271,22 @@ function bpRowChanged(input) {
     bpUpdateCount();
 }
 
-// Undo one row back to the imported price + the stock it had on open.
+// Showing/hiding the shelf-life inputs is only cosmetic — bpSave still reads
+// whatever is in them — so unchecking clears the values too, or a save right
+// after unchecking would silently resubmit the old range.
+function bpPerishableToggled(checkbox) {
+    var row  = checkbox.closest('.bp-row');
+    var wrap = row.querySelector('.bp-shelf-wrap');
+    wrap.style.display = checkbox.checked ? '' : 'none';
+    if (!checkbox.checked) {
+        row.querySelector('.bp-shelf-min').value = '';
+        row.querySelector('.bp-shelf-max').value = '';
+    }
+    bpMarkRow(row);
+    bpUpdateCount();
+}
+
+// Undo one row back to the imported price + whatever it had when this table opened.
 function bpResetRow(btn) {
     var row = btn.closest('.bp-row');
     var oCost  = row.dataset.origCost;
@@ -228,6 +294,14 @@ function bpResetRow(btn) {
     row.querySelector('.bp-cost').value  = oCost  !== '' ? parseFloat(oCost).toFixed(2)  : row.dataset.startCost;
     row.querySelector('.bp-price').value = oPrice !== '' ? parseFloat(oPrice).toFixed(2) : row.dataset.startPrice;
     row.querySelector('.bp-stock').value = row.dataset.startStock;
+
+    var perishable = row.dataset.startPerishable === '1';
+    var checkbox = row.querySelector('.bp-perishable');
+    checkbox.checked = perishable;
+    row.querySelector('.bp-shelf-wrap').style.display = perishable ? '' : 'none';
+    row.querySelector('.bp-shelf-min').value = row.dataset.startShelfMin;
+    row.querySelector('.bp-shelf-max').value = row.dataset.startShelfMax;
+
     bpMarkRow(row);
     bpUpdateCount();
 }
@@ -237,6 +311,13 @@ function bpResetAll() {
         row.querySelector('.bp-cost').value  = row.dataset.startCost;
         row.querySelector('.bp-price').value = row.dataset.startPrice;
         row.querySelector('.bp-stock').value = row.dataset.startStock;
+
+        var perishable = row.dataset.startPerishable === '1';
+        row.querySelector('.bp-perishable').checked = perishable;
+        row.querySelector('.bp-shelf-wrap').style.display = perishable ? '' : 'none';
+        row.querySelector('.bp-shelf-min').value = row.dataset.startShelfMin;
+        row.querySelector('.bp-shelf-max').value = row.dataset.startShelfMax;
+
         bpMarkRow(row);
     });
     bpUpdateCount();
@@ -281,21 +362,40 @@ function _bpMsg(text, type) {
 
 function bpSave() {
     var items = [];
-    var invalid = 0;
+    var invalidPrice = 0;
+    var invalidShelf = 0;
 
     document.querySelectorAll('#bp-rows .bp-row').forEach(function (row) {
         if (!bpRowIsChanged(row)) return;
         var c = _bpNum(row.querySelector('.bp-cost').value);
         var p = _bpNum(row.querySelector('.bp-price').value);
         var s = _bpNum(row.querySelector('.bp-stock').value);
-        if (c === null || p === null || c <= 0 || p <= c) { invalid++; row.classList.add('is-invalid'); return; }
+        if (c === null || p === null || c <= 0 || p <= c) { invalidPrice++; row.classList.add('is-invalid'); return; }
+
+        var isPerishable = row.querySelector('.bp-perishable').checked;
+        var shelfMin = _bpNum(row.querySelector('.bp-shelf-min').value);
+        var shelfMax = _bpNum(row.querySelector('.bp-shelf-max').value);
+        if (isPerishable && (shelfMin === null || shelfMax === null || shelfMin <= 0 || shelfMax < shelfMin)) {
+            invalidShelf++; row.classList.add('is-invalid'); return;
+        }
+
         row.classList.remove('is-invalid');
-        items.push({ id: parseInt(row.dataset.id, 10), cost_price: c, selling_price: p, current_stock: s || 0 });
+        items.push({
+            id: parseInt(row.dataset.id, 10),
+            cost_price: c, selling_price: p, current_stock: s || 0,
+            is_perishable: isPerishable,
+            shelf_life_min_days: isPerishable ? shelfMin : null,
+            shelf_life_max_days: isPerishable ? shelfMax : null,
+        });
     });
 
-    if (invalid > 0) {
-        _bpMsg(invalid + ' row' + (invalid === 1 ? ' needs' : 's need') +
-               ' a cost above 0 and a selling price higher than the cost.', 'error');
+    if (invalidPrice > 0 || invalidShelf > 0) {
+        var msgs = [];
+        if (invalidPrice > 0) msgs.push(invalidPrice + ' row' + (invalidPrice === 1 ? ' needs' : 's need') +
+               ' a cost above 0 and a selling price higher than the cost');
+        if (invalidShelf > 0) msgs.push(invalidShelf + ' row' + (invalidShelf === 1 ? ' needs' : 's need') +
+               ' a shelf-life range (both days above 0, min no greater than max)');
+        _bpMsg(msgs.join('; ') + '.', 'error');
         return;
     }
     if (!items.length) { _bpMsg('Nothing to save.', 'error'); return; }

@@ -51,6 +51,17 @@ function formatEventSchedule(array $event): string
             if ($event['is_last_day']) return 'Last day of month · Every month';
             return ordinal((int) $start->format('d')) . ' · Every month';
 
+        case 'custom':
+            $dates = $event['occurrences'] ?? [];
+            $n     = count($dates);
+            if ($n === 0) return 'No dates set';
+            $first = new DateTime($dates[0]['start_date']);
+            $last  = new DateTime($dates[$n - 1]['start_date']);
+            $span  = $first->format('M Y') === $last->format('M Y')
+                ? $first->format('M Y')
+                : $first->format('M Y') . '–' . $last->format('M Y');
+            return $n . ' specific date' . ($n !== 1 ? 's' : '') . ' · ' . $span;
+
         default: // none
             $str = $start->format('M j, Y');
             if ($end) $str .= ' – ' . $end->format('M j, Y');
@@ -71,6 +82,15 @@ function getConfidence(array $event): ?array
         if ($count >= 12) return ['label' => 'Strong',   'css' => 'strong',   'title' => $detail];
         if ($count >= 6)  return ['label' => 'Moderate', 'css' => 'moderate', 'title' => $detail];
         return                   ['label' => 'Weak',     'css' => 'weak',     'title' => $detail];
+    }
+
+    if ($rec === 'custom') {
+        // Custom dates carry no calendar rule, so evidence comes only from how
+        // many listed dates fall inside real sales history.
+        $detail = $count . ' of the listed dates fall in your sales history';
+        if ($count >= 6) return ['label' => 'Strong',   'css' => 'strong',   'title' => $detail];
+        if ($count >= 3) return ['label' => 'Moderate', 'css' => 'moderate', 'title' => $detail];
+        return                  ['label' => 'Weak',     'css' => 'weak',     'title' => $detail];
     }
 
     // yearly (or legacy none)

@@ -196,6 +196,25 @@
    how wide the product name is. Using grid instead of flex avoids
    the alignment issues that appear when <button> elements use flex.
 */
+/* Product that isn't in the store's current dataset. Kept in the catalogue so
+   the owner can see what happened to it (and its settings/history survive), but
+   dimmed and excluded from forecasting until an upload includes it again. */
+.product-row-inactive            { opacity: 0.5; }
+.product-row-inactive:hover      { opacity: 0.75; }
+
+.product-row-inactive-badge {
+    display: inline-block;
+    font-size: 0.62rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+    background: rgba(38,31,14,0.10);
+    border: 1px solid rgba(38,31,14,0.22);
+    color: #261F0E;
+}
+
 .product-row {
     display: grid;
     grid-template-columns: 1fr auto auto;

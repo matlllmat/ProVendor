@@ -131,6 +131,82 @@ function recoverUnambiguousDate(string $raw): ?string
     return null;
 }
 
+// ── Field limits ──────────────────────────────────────────────────────────────
+// These mirror config/schema.sql exactly. PHP validates products.name (<= 100)
+// but historically checked none of the others, so an over-length category or a
+// price past DECIMAL(10,2) reached MySQL and threw — rolling back the *entire*
+// import with a generic "Database error". Everything that writes to those
+// columns clamps through the helpers below instead.
+const FIELD_LIMITS = [
+    'sku'         => 100,  // products.sku          VARCHAR(100)
+    'category'    => 50,   // products.category     VARCHAR(50)
+    'subcategory' => 50,   // products.subcategory  VARCHAR(50)
+];
+const MONEY_MAX      = 99999999.99;  // DECIMAL(10,2)
+const VERSION_LABEL_MAX = 150;       // dataset_versions.label VARCHAR(150)
+
+// Parses a money cell the way a real export writes it: "₱240.00", "1,200.00",
+// "PHP 45", " 38.00 ". Returns [?float $value, bool $reformatted] — $reformatted
+// is true when something had to be stripped, so the caller can disclose it.
+//
+// Deliberately conservative about commas: they're only removed when the value is
+// unambiguously thousands-grouped (1,200.00 / 12,345). A European decimal comma
+// like "240,00" is left alone and comes back null rather than being silently
+// turned into 24000 — guessing there is exactly the corruption we're avoiding.
+function parseMoney($raw): array
+{
+    $s = trim((string) $raw);
+    if ($s === '') return [null, false];
+
+    if (is_numeric($s)) return [(float) $s, false];
+
+    $cleaned = $s;
+
+    // Leading currency token: ₱, P, PHP, $ (optionally followed by space).
+    $cleaned = preg_replace('/^\s*(?:₱|PHP|Php|php|\$|P(?=\s*[\d.]))\s*/u', '', $cleaned);
+    // Trailing currency word, e.g. "45.00 PHP".
+    $cleaned = preg_replace('/\s*(?:₱|PHP|Php|php|\$)\s*$/u', '', $cleaned);
+    $cleaned = trim($cleaned);
+
+    // Thousands separators only in unambiguous grouped form.
+    if (preg_match('/^-?\d{1,3}(?:,\d{3})+(?:\.\d+)?$/', $cleaned)) {
+        $cleaned = str_replace(',', '', $cleaned);
+    }
+
+    if ($cleaned !== '' && is_numeric($cleaned)) {
+        return [(float) $cleaned, true];
+    }
+
+    return [null, false];
+}
+
+// Clamps an optional text field to its DB column width. Returns
+// [?string $value, ?string $original] — $original is non-null only when the
+// value had to be shortened, so the caller can flag it for review.
+function clampFieldLength(?string $value, string $field): array
+{
+    $limit = FIELD_LIMITS[$field] ?? null;
+    if ($value === null || $limit === null) return [$value, null];
+
+    if (mb_strlen($value) > $limit) {
+        return [mb_substr($value, 0, $limit), $value];
+    }
+    return [$value, null];
+}
+
+// Clamps a money value to DECIMAL(10,2). Out-of-range becomes null (the sale is
+// worth keeping; the price isn't worth aborting the import over). Returns
+// [?float $value, ?string $reason].
+function clampMoney(?float $value): array
+{
+    if ($value === null) return [null, null];
+
+    if (abs($value) > MONEY_MAX) {
+        return [null, 'exceeds the maximum of 99,999,999.99'];
+    }
+    return [round($value, 2), null];
+}
+
 // ── Helper: suggest which CSV column maps to which required field ─────────────
 function detectColumnMapping(array $headers, array $rows): array
 {
@@ -226,7 +302,7 @@ function detectColumnMapping(array $headers, array $rows): array
         }
     }
 
-    // Fallback: if date not found by name, find first column where values parse as dates
+    // Fallback: if date not found by name, find first column where values parse as dates.
     if ($suggestions['date'] === null) {
         foreach ($headers as $col) {
             $sample = array_column($rows, $col);

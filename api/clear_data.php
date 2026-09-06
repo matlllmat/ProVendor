@@ -3,7 +3,7 @@
 // Permanently deletes all imported sales data for the authenticated user.
 // Preserves the user account and store name.
 // After success the client redirects to the landing page (pre-data state).
-// Accepts POST: (no body required — identity comes from session)
+// Accepts POST: password (must match the user's current password)
 // Returns JSON: { success: true } or { error: string }
 
 require_once __DIR__ . '/../config/bootstrap.php';
@@ -16,8 +16,22 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+$password = $_POST['password'] ?? '';
+
+if ($password === '') {
+    echo json_encode(['error' => 'Please enter your password.']);
+    exit;
+}
+
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../queries/user.query.php';
+
+$passwordHash = getUserPasswordHash($pdo, (int) $_SESSION['user_id']);
+
+if (!$passwordHash || !password_verify($password, $passwordHash)) {
+    echo json_encode(['error' => 'Incorrect password.']);
+    exit;
+}
 
 clearUserData($pdo, (int) $_SESSION['user_id']);
 

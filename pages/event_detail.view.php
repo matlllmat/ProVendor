@@ -11,6 +11,7 @@ require_once __DIR__ . '/../includes/header.php';
 $scheduleLabel = match($event['recurrence']) {
     'yearly'  => 'Every year',
     'monthly' => $event['is_last_day'] ? 'Last day of every month' : 'Every month',
+    'custom'  => count($event['occurrences'] ?? []) . ' specific dates',
     default   => 'One-time',
 };
 
@@ -36,6 +37,10 @@ if ($hasProphet) {
     if ($rec === 'monthly') {
         $confCss   = $maxOcc >= 12 ? 'strong' : ($maxOcc >= 6 ? 'moderate' : 'weak');
         $confLabel = $maxOcc >= 12 ? 'Strong' : ($maxOcc >= 6 ? 'Moderate' : 'Weak');
+    } elseif ($rec === 'custom') {
+        // Same thresholds as getConfidence() in pages/events.logic.php.
+        $confCss   = $maxOcc >= 6 ? 'strong' : ($maxOcc >= 3 ? 'moderate' : 'weak');
+        $confLabel = $maxOcc >= 6 ? 'Strong' : ($maxOcc >= 3 ? 'Moderate' : 'Weak');
     } else {
         $confCss   = $maxOcc >= 4  ? 'strong' : ($maxOcc >= 2 ? 'moderate' : 'weak');
         $confLabel = $maxOcc >= 4  ? 'Strong' : ($maxOcc >= 2 ? 'Moderate' : 'Weak');

@@ -113,10 +113,66 @@ $pickField = function (array $r, ?string $col): ?string {
     $v = trim((string) ($r[$col] ?? ''));
     return $v === '' ? null : $v;
 };
-$pickNumeric = function (array $r, ?string $col): ?float {
-    if (!$col) return null;
-    $v = $r[$col] ?? '';
-    return is_numeric($v) ? (float) $v : null;
+
+// Money cells that only needed a ₱ or a thousands separator stripped. Lossless,
+// so it's reported once at file level rather than flagged row by row.
+$moneyReformatted = 0;
+
+// Extracts the optional metadata (sku/category/subcategory/cost/price), clamped
+// to what the DB columns can actually hold. Without this, a 60-character
+// category or a price past DECIMAL(10,2) reached MySQL and threw, rolling back
+// the entire import with a generic error and no indication of which row.
+//
+// Lossless repairs are applied silently; lossy ones (truncation, out-of-range
+// money) are recorded in 'warnings' for the user to review. A bad optional
+// field never invalidates the sale — quantity and date are the real data.
+$pickOptional = function (array $r) use (
+    $pickField, $colSku, $colCategory, $colSubcategory, $colCost, $colPrice, &$moneyReformatted
+): array {
+    $out      = [];
+    $warnings = [];
+
+    foreach (['sku' => $colSku, 'category' => $colCategory, 'subcategory' => $colSubcategory] as $field => $col) {
+        [$value, $original] = clampFieldLength($pickField($r, $col), $field);
+        if ($original !== null) {
+            $warnings[] = [
+                'field'    => $field,
+                'original' => $original,
+                'applied'  => $value,
+                'reason'   => 'Shortened to ' . FIELD_LIMITS[$field] . ' characters to fit',
+            ];
+        }
+        $out[$field] = $value;
+    }
+
+    foreach (['cost' => $colCost, 'price' => $colPrice] as $field => $col) {
+        $raw = $col ? trim((string) ($r[$col] ?? '')) : '';
+        [$parsed, $reformatted] = parseMoney($raw);
+        [$value, $reason]       = clampMoney($parsed);
+
+        if ($reformatted) $moneyReformatted++;
+
+        if ($reason !== null) {
+            $warnings[] = [
+                'field'    => $field,
+                'original' => $raw,
+                'applied'  => null,
+                'reason'   => 'Left empty — ' . $reason,
+            ];
+        } elseif ($parsed === null && $raw !== '') {
+            $warnings[] = [
+                'field'    => $field,
+                'original' => $raw,
+                'applied'  => null,
+                'reason'   => 'Not a number — left empty',
+            ];
+        }
+
+        $out[$field] = $value;
+    }
+
+    $out['warnings'] = $warnings;
+    return $out;
 };
 
 foreach ($bufferedRows as $row) {
@@ -170,12 +226,7 @@ foreach ($bufferedRows as $row) {
             'status'    => 'invalid',
             // Optional fields preserved so the user can edit & re-submit without
             // losing sku/category/cost/price metadata that was valid on this row.
-            'sku'         => $pickField($r, $colSku),
-            'category'    => $pickField($r, $colCategory),
-            'subcategory' => $pickField($r, $colSubcategory),
-            'cost'        => $pickNumeric($r, $colCost),
-            'price'       => $pickNumeric($r, $colPrice),
-        ];
+        ] + $pickOptional($r);
         continue;
     }
 
@@ -192,40 +243,28 @@ foreach ($bufferedRows as $row) {
             'product'     => $productName,
             'date'        => $date,
             'qty'         => $qty,
-            'sku'         => $pickField($r, $colSku),
-            'category'    => $pickField($r, $colCategory),
-            'subcategory' => $pickField($r, $colSubcategory),
-            'cost'        => $pickNumeric($r, $colCost),
-            'price'       => $pickNumeric($r, $colPrice),
-        ];
+        ] + $pickOptional($r);
     }
 }
 
-// ── Cross-check against existing DB rows ──────────────────────────────────────
+// ── Classify ─────────────────────────────────────────────────────────────────
+// A store holds one dataset and this upload becomes it, so there is nothing to
+// reconcile against: every valid row is simply imported. The old
+// new/overlap/no-op classification described a merge that no longer happens —
+// on a routine re-upload of the same export it would have reported every row as
+// a "conflict", which is exactly the confusion the single-dataset model removes.
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../queries/import.query.php';
+require_once __DIR__ . '/../queries/version.query.php';
 
-$existing = getExistingSalesByName($pdo, $_SESSION['user_id']);
-
-$newCount    = 0;
+$newCount     = 0;
 $overlapCount = 0;
-$noopCount   = 0;
-$outRows     = [];
+$noopCount    = 0;
+$outRows      = [];
 
 foreach ($validByPair as $key => $v) {
-    $existingKey = mb_strtolower($v['product']) . '|' . $v['date'];
-    if (!isset($existing[$existingKey])) {
-        $v['status'] = 'new';
-        $newCount++;
-    } elseif ((int) $existing[$existingKey] === $v['qty']) {
-        $v['status']       = 'noop';
-        $v['existing_qty'] = (int) $existing[$existingKey];
-        $noopCount++;
-    } else {
-        $v['status']       = 'overlap';
-        $v['existing_qty'] = (int) $existing[$existingKey];
-        $overlapCount++;
-    }
+    $v['status'] = 'new';
+    $newCount++;
     $outRows[] = $v;
 }
 
@@ -243,10 +282,89 @@ usort($outRows, function ($a, $b) use ($statusOrder) {
     return $a['rowNum'] - $b['rowNum'];
 });
 
+$warningsCount = 0;
+foreach ($outRows as $r) {
+    if (!empty($r['warnings'])) $warningsCount++;
+}
+
+// ── What this upload would replace ───────────────────────────────────────────
+// Replacing is the one irreversible-feeling action in the app, so the commit
+// screen has to be able to say exactly what changes. The dangerous case is a
+// partial export — someone whose POS defaults to "last 30 days" uploading over
+// five years of history — so the incoming and stored date ranges are compared
+// directly rather than left for the owner to infer from row counts.
+$stmt = $pdo->prepare(
+    'SELECT COUNT(*) AS rows_now, MIN(s.sale_date) AS first_date, MAX(s.sale_date) AS last_date,
+            COUNT(DISTINCT s.product_id) AS products_now
+     FROM sales s JOIN products p ON p.id = s.product_id
+     WHERE p.user_id = ?'
+);
+$stmt->execute([$_SESSION['user_id']]);
+$current = $stmt->fetch();
+
+$incomingDates    = array_column($outRows, 'date');
+$incomingDates    = array_values(array_filter($incomingDates, fn($d) => $d !== null && $d !== ''));
+$incomingProducts = [];
+foreach ($outRows as $r) {
+    if ($r['status'] !== 'invalid' && $r['product'] !== '') {
+        $incomingProducts[mb_strtolower($r['product'])] = true;
+    }
+}
+
+// Products that would drop out of the catalogue (kept, but deactivated).
+$stmt = $pdo->prepare(
+    'SELECT DISTINCT p.name FROM products p
+     JOIN sales s ON s.product_id = p.id
+     WHERE p.user_id = ? AND p.is_active = 1'
+);
+$stmt->execute([$_SESSION['user_id']]);
+$leaving = [];
+foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $name) {
+    if (!isset($incomingProducts[mb_strtolower($name)])) $leaving[] = $name;
+}
+
+$replaces = [
+    'rows_now'         => (int) $current['rows_now'],
+    'rows_incoming'    => $newCount,
+    'products_now'     => (int) $current['products_now'],
+    'products_incoming'=> count($incomingProducts),
+    'first_date_now'   => $current['first_date'],
+    'last_date_now'    => $current['last_date'],
+    'first_date_new'   => $incomingDates ? min($incomingDates) : null,
+    'last_date_new'    => $incomingDates ? max($incomingDates) : null,
+    'products_leaving' => $leaving,
+];
+// The loud case: the incoming file covers a strictly narrower period than what's
+// stored, i.e. history would be dropped rather than refreshed.
+$replaces['narrows_history'] = $replaces['rows_now'] > 0
+    && $replaces['first_date_new'] !== null
+    && ($replaces['first_date_new'] > $current['first_date']
+        || $replaces['last_date_new'] < $current['last_date']);
+
+// Version retention: history is capped, so say which version this upload pushes
+// out while the owner can still download it.
+$versionsNow  = listDatasetVersions($pdo, (int) $_SESSION['user_id']);
+$prunedByThis = null;
+if (count($versionsNow) >= MAX_VERSIONS_PER_USER) {
+    $oldest = $versionsNow[count($versionsNow) - 1];
+    $prunedByThis = [
+        'id'         => (int) $oldest['id'],
+        'label'      => $oldest['label'],
+        'total_rows' => (int) $oldest['total_rows'],
+        'created_at' => $oldest['created_at'],
+        'max'        => MAX_VERSIONS_PER_USER,
+    ];
+}
+
 echo json_encode([
-    'date_format'     => $dateFormat,
-    'csv_rows'        => count($bufferedRows),
-    'recovered_count' => $recoveredCount,
+    'replaces'           => $replaces,
+    'pruned_version'     => $prunedByThis,
+    'date_format'        => $dateFormat,
+    'csv_rows'           => count($bufferedRows),
+    'recovered_count'    => $recoveredCount,
+    'warnings_count'     => $warningsCount,
+    'money_reformatted'  => $moneyReformatted,
+    'encoding_converted' => !empty($_SESSION['temp_csv_encoding_conv']),
     'summary'         => [
         'new'              => $newCount,
         'overlap'          => $overlapCount,

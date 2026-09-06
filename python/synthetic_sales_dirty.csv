@@ -181,7 +181,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2023-08-10,Nescafé 3-in-1 Original,BEV-N3N-01,7,Beverages,5.00,7.00
 2023-08-10,San Miguel Pale Pilsen 330ml,BEV-SMB-330,7,Beverages,50.00,65.00
 2023-08-10,Coca-Cola 1.5L,BEV-CCR-15L,4,Beverages,55.00,70.00
-2023-08-10,Milo Powdered Drink 33g Sachet,BEV-MIL-33,4,Beverages,6.00,9.00
+31/1/24,Milo Powdered Drink 33g Sachet,BEV-MIL-33,4,Beverages,6.00,9.00
 2023-08-10,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,11,Beverages,6.00,9.00
 2023-08-10,Sky Flakes Crackers,SNK-SKF-01,5,Snacks,8.00,12.00
 2023-08-10,Chippy Barbecue 110g,SNK-CHP-110,11,Snacks,12.00,18.00
@@ -297,7 +297,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2023-08-16,Lucky Me Pancit Canton,PNT-LMC-55G,15,Pantry,10.00,14.00
 2023-08-16,Century Tuna Flakes in Oil,CAN-CTF-155,2,Canned Goods,38.00,48.00
 2023-08-16,Nescafé 3-in-1 Original,BEV-N3N-01,7,Beverages,5.00,7.00
-2023-08-16,San Miguel Pale Pilsen 330ml,BEV-SMB-330,5,Beverages,50.00,65.00
+2023-08-16,San Miguel Pale Pilsen 330ml,BEV-SMB-330,5,Grocery > Canned Goods > Fish > Sardines in Tomato Sauce,50.00,65.00
 2023-08-16,Coca-Cola 1.5L,BEV-CCR-15L,8,Beverages,55.00,70.00
 2023-08-16,Milo Powdered Drink 33g Sachet,BEV-MIL-33,5,Beverages,6.00,9.00
 2023-08-16,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,6,Beverages,6.00,9.00
@@ -332,7 +332,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2023-08-17,Fresh Eggs Tray 30s,FRS-EGG-30,3,Fresh,210.00,260.00
 2023-08-17,CDO Hotdog 1kg,FRS-HTD-1K,7,Fresh,180.00,230.00
 2023-08-18,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,7,Pantry,60.00,75.00
-2023-08-18,Lucky Me Pancit Canton,PNT-LMC-55G,17,Pantry,10.00,14.00
+2023-08-18,Lucky Me Pancit Canton,PNT-LMC-55G,17,Pantry,₱10.00,14.00
 2023-08-18,Argentina Corned Beef 175g,CAN-ACB-175,1,Canned Goods,45.00,55.00
 2023-08-18,Century Tuna Flakes in Oil,CAN-CTF-155,6,Canned Goods,38.00,48.00
 2023-08-18,Nescafé 3-in-1 Original,BEV-N3N-01,13,Beverages,5.00,7.00
@@ -574,7 +574,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2023-08-30,Nescafé 3-in-1 Original,BEV-N3N-01,9,Beverages,5.00,7.00
 2023-08-30,San Miguel Pale Pilsen 330ml,BEV-SMB-330,10,Beverages,50.00,65.00
 2023-08-30,Coca-Cola 1.5L,BEV-CCR-15L,8,Beverages,55.00,70.00
-2023-08-30,Milo Powdered Drink 33g Sachet,BEV-MIL-33,6,Beverages,6.00,9.00
+2023-08-30,Milo Powdered Drink 33g Sachet,BEV-MIL-33,1e3,Beverages,6.00,9.00
 2023-08-30,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,12,Beverages,6.00,9.00
 2023-08-30,Sky Flakes Crackers,SNK-SKF-01,5,Snacks,8.00,12.00
 2023-08-30,Chippy Barbecue 110g,SNK-CHP-110,11,Snacks,12.00,18.00
@@ -819,7 +819,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2023-09-11,Surf Detergent Powder 65g,HSH-SRF-65,8,Household,6.00,9.00
 2023-09-11,Safeguard Soap 90g,BDY-SFG-90,3,Body Care,22.00,30.00
 2023-09-11,Colgate Toothpaste 150g,BDY-COL-150,1,Body Care,55.00,72.00
-2023-09-11,Palmolive Shampoo Sachet,BDY-PLM-01,5,Body Care,5.00,8.00
+2023-09-11,Palmolive Shampoo Sachet,BDY-PLM-01,5,Body Care,₱5.00,8.00
 2023-09-11,Datu Puti Soy Sauce 385ml,CON-DTP-385,5,Condiments,18.00,25.00
 2023-09-11,Bear Brand Powdered Milk 320g,DRY-BBM-320,4,Dairy,70.00,90.00
 2023-09-11,Pandesal 10pcs,BKY-PDS-10,12,Bakery,45.00,60.00
@@ -833,7 +833,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2023-09-12,San Miguel Pale Pilsen 330ml,BEV-SMB-330,8,Beverages,50.00,65.00
 2023-09-12,Coca-Cola 1.5L,BEV-CCR-15L,6,Beverages,55.00,70.00
 2023-09-12,Milo Powdered Drink 33g Sachet,BEV-MIL-33,8,Beverages,6.00,9.00
-2023-09-12,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,5,Beverages,6.00,9.00
+2023-09-12,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,-2,Beverages,6.00,9.00
 2023-09-12,Sky Flakes Crackers,SNK-SKF-01,4,Snacks,8.00,12.00
 2023-09-12,Chippy Barbecue 110g,SNK-CHP-110,7,Snacks,12.00,18.00
 2023-09-12,Surf Detergent Powder 65g,HSH-SRF-65,5,Household,6.00,9.00
@@ -861,7 +861,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2023-09-13,Colgate Toothpaste 150g,BDY-COL-150,1,Body Care,55.00,72.00
 2023-09-13,Palmolive Shampoo Sachet,BDY-PLM-01,7,Body Care,5.00,8.00
 2023-09-13,Datu Puti Soy Sauce 385ml,CON-DTP-385,8,Condiments,18.00,25.00
-2023-09-13,Bear Brand Powdered Milk 320g,DRY-BBM-320,3,Dairy,70.00,90.00
+2023-09-13,Bear Brand Powdered Milk 320g ,DRY-BBM-320,3,Dairy,70.00,90.00
 2023-09-13,Pandesal 10pcs,BKY-PDS-10,5,Bakery,45.00,60.00
 2023-09-13,Fresh Eggs Tray 30s,FRS-EGG-30,2,Fresh,210.00,260.00
 2023-09-13,CDO Hotdog 1kg,FRS-HTD-1K,1,Fresh,180.00,230.00
@@ -886,7 +886,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2023-09-14,Fresh Eggs Tray 30s,FRS-EGG-30,5,Fresh,210.00,260.00
 2023-09-14,CDO Hotdog 1kg,FRS-HTD-1K,3,Fresh,180.00,230.00
 2023-09-15,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,3,Pantry,60.00,75.00
-2023-09-15,Lucky Me Pancit Canton,PNT-LMC-55G,17,Pantry,10.00,14.00
+2023-09-15,Lucky Me Pancit Canton ,PNT-LMC-55G,17,Pantry,10.00,14.00
 2023-09-15,Argentina Corned Beef 175g,CAN-ACB-175,5,Canned Goods,45.00,55.00
 2023-09-15,Century Tuna Flakes in Oil,CAN-CTF-155,4,Canned Goods,38.00,48.00
 2023-09-15,Nescafé 3-in-1 Original,BEV-N3N-01,10,Beverages,5.00,7.00
@@ -905,6 +905,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2023-09-15,Pandesal 10pcs,BKY-PDS-10,15,Bakery,45.00,60.00
 2023-09-15,Fresh Eggs Tray 30s,FRS-EGG-30,8,Fresh,210.00,260.00
 2023-09-15,CDO Hotdog 1kg,FRS-HTD-1K,3,Fresh,180.00,230.00
+date,product,sku,quantity,category,cost_price,selling_price
 2023-09-16,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,5,Pantry,60.00,75.00
 2023-09-16,Lucky Me Pancit Canton,PNT-LMC-55G,13,Pantry,10.00,14.00
 2023-09-16,Argentina Corned Beef 175g,CAN-ACB-175,2,Canned Goods,45.00,55.00
@@ -933,7 +934,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2023-09-17,Coca-Cola 1.5L,BEV-CCR-15L,11,Beverages,55.00,70.00
 2023-09-17,Milo Powdered Drink 33g Sachet,BEV-MIL-33,11,Beverages,6.00,9.00
 2023-09-17,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,6,Beverages,6.00,9.00
-2023-09-17,Sky Flakes Crackers,SNK-SKF-01,5,Snacks,8.00,12.00
+2023-09-17,Sky Flakes Crackers,SNK-SKF-01,"1,200",Snacks,8.00,12.00
 2023-09-17,Chippy Barbecue 110g,SNK-CHP-110,9,Snacks,12.00,18.00
 2023-09-17,Surf Detergent Powder 65g,HSH-SRF-65,4,Household,6.00,9.00
 2023-09-17,Safeguard Soap 90g,BDY-SFG-90,6,Body Care,22.00,30.00
@@ -981,7 +982,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2023-09-19,Datu Puti Soy Sauce 385ml,CON-DTP-385,5,Condiments,18.00,25.00
 2023-09-19,Bear Brand Powdered Milk 320g,DRY-BBM-320,2,Dairy,70.00,90.00
 2023-09-19,Pandesal 10pcs,BKY-PDS-10,7,Bakery,45.00,60.00
-2023-09-19,Fresh Eggs Tray 30s,FRS-EGG-30,3,Fresh,210.00,260.00
+2023-09-19,Fresh Eggs Tray 30s,FRS-EGG-30,0,Fresh,210.00,260.00
 2023-09-19,CDO Hotdog 1kg,FRS-HTD-1K,5,Fresh,180.00,230.00
 2023-09-20,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,5,Pantry,60.00,75.00
 2023-09-20,Lucky Me Pancit Canton,PNT-LMC-55G,11,Pantry,10.00,14.00
@@ -1679,7 +1680,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2023-10-25,Lucky Me Pancit Canton,PNT-LMC-55G,11,Pantry,10.00,14.00
 2023-10-25,Argentina Corned Beef 175g,CAN-ACB-175,5,Canned Goods,45.00,55.00
 2023-10-25,Century Tuna Flakes in Oil,CAN-CTF-155,4,Canned Goods,38.00,48.00
-2023-10-25,Nescafé 3-in-1 Original,BEV-N3N-01,4,Beverages,5.00,7.00
+2023-10-25,Nescafé 3-in-1 Original ,BEV-N3N-01,4,Beverages,5.00,7.00
 2023-10-25,San Miguel Pale Pilsen 330ml,BEV-SMB-330,3,Beverages,50.00,65.00
 2023-10-25,Coca-Cola 1.5L,BEV-CCR-15L,8,Beverages,55.00,70.00
 2023-10-25,Milo Powdered Drink 33g Sachet,BEV-MIL-33,5,Beverages,6.00,9.00
@@ -2033,6 +2034,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2023-11-12,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,3,Pantry,60.00,75.00
 2023-11-12,Lucky Me Pancit Canton,PNT-LMC-55G,11,Pantry,10.00,14.00
 2023-11-12,Argentina Corned Beef 175g,CAN-ACB-175,5,Canned Goods,45.00,55.00
+2023-11-12,Century Tuna Flakes in Oil,CAN-CTF-155,1,Canned Goods,38.00,48.00
 2023-11-12,Century Tuna Flakes in Oil,CAN-CTF-155,3,Canned Goods,38.00,48.00
 2023-11-12,Nescafé 3-in-1 Original,BEV-N3N-01,3,Beverages,5.00,7.00
 2023-11-12,San Miguel Pale Pilsen 330ml,BEV-SMB-330,7,Beverages,50.00,65.00
@@ -2052,7 +2054,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2023-11-12,CDO Hotdog 1kg,FRS-HTD-1K,6,Fresh,180.00,230.00
 2023-11-13,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,3,Pantry,60.00,75.00
 2023-11-13,Lucky Me Pancit Canton,PNT-LMC-55G,14,Pantry,10.00,14.00
-2023-11-13,Argentina Corned Beef 175g,CAN-ACB-175,4,Canned Goods,45.00,55.00
+,Argentina Corned Beef 175g,CAN-ACB-175,4,Canned Goods,45.00,55.00
 2023-11-13,Nescafé 3-in-1 Original,BEV-N3N-01,10,Beverages,5.00,7.00
 2023-11-13,San Miguel Pale Pilsen 330ml,BEV-SMB-330,9,Beverages,50.00,65.00
 2023-11-13,Coca-Cola 1.5L,BEV-CCR-15L,5,Beverages,55.00,70.00
@@ -2331,7 +2333,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2023-11-27,San Miguel Pale Pilsen 330ml,BEV-SMB-330,6,Beverages,50.00,65.00
 2023-11-27,Coca-Cola 1.5L,BEV-CCR-15L,6,Beverages,55.00,70.00
 2023-11-27,Milo Powdered Drink 33g Sachet,BEV-MIL-33,11,Beverages,6.00,9.00
-2023-11-27,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,8,Beverages,6.00,9.00
+27/11/2023,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,8,Beverages,6.00,9.00
 2023-11-27,Sky Flakes Crackers,SNK-SKF-01,6,Snacks,8.00,12.00
 2023-11-27,Chippy Barbecue 110g,SNK-CHP-110,2,Snacks,12.00,18.00
 2023-11-27,Surf Detergent Powder 65g,HSH-SRF-65,1,Household,6.00,9.00
@@ -2417,6 +2419,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2023-12-01,Safeguard Soap 90g,BDY-SFG-90,10,Body Care,22.00,30.00
 2023-12-01,Colgate Toothpaste 150g,BDY-COL-150,6,Body Care,55.00,72.00
 2023-12-01,Palmolive Shampoo Sachet,BDY-PLM-01,8,Body Care,5.00,8.00
+2023-12-01,Datu Puti Soy Sauce 385ml,CON-DTP-385,7,Condiments,18.00
 2023-12-01,Datu Puti Soy Sauce 385ml,CON-DTP-385,7,Condiments,18.00,25.00
 2023-12-01,Bear Brand Powdered Milk 320g,DRY-BBM-320,7,Dairy,70.00,90.00
 2023-12-01,Pandesal 10pcs,BKY-PDS-10,10,Bakery,45.00,60.00
@@ -2568,6 +2571,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2023-12-09,San Miguel Pale Pilsen 330ml,BEV-SMB-330,1,Beverages,50.00,65.00
 2023-12-09,Coca-Cola 1.5L,BEV-CCR-15L,5,Beverages,55.00,70.00
 2023-12-09,Milo Powdered Drink 33g Sachet,BEV-MIL-33,10,Beverages,6.00,9.00
+2023-12-09,Rice, Premium 5kg,BEV-KPK-01,3,Beverages,6.00,9.00
 2023-12-09,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,3,Beverages,6.00,9.00
 2023-12-09,Sky Flakes Crackers,SNK-SKF-01,3,Snacks,8.00,12.00
 2023-12-09,Chippy Barbecue 110g,SNK-CHP-110,7,Snacks,12.00,18.00
@@ -2634,7 +2638,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2023-12-12,Surf Detergent Powder 65g,HSH-SRF-65,4,Household,6.00,9.00
 2023-12-12,Safeguard Soap 90g,BDY-SFG-90,3,Body Care,22.00,30.00
 2023-12-12,Colgate Toothpaste 150g,BDY-COL-150,3,Body Care,55.00,72.00
-2023-12-12,Palmolive Shampoo Sachet,BDY-PLM-01,6,Body Care,5.00,8.00
+12-Dec-23,Palmolive Shampoo Sachet,BDY-PLM-01,6,Body Care,5.00,8.00
 2023-12-12,Datu Puti Soy Sauce 385ml,CON-DTP-385,5,Condiments,18.00,25.00
 2023-12-12,Bear Brand Powdered Milk 320g,DRY-BBM-320,4,Dairy,70.00,90.00
 2023-12-12,Pandesal 10pcs,BKY-PDS-10,13,Bakery,45.00,60.00
@@ -2820,6 +2824,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2023-12-22,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,11,Pantry,60.00,75.00
 2023-12-22,Lucky Me Pancit Canton,PNT-LMC-55G,27,Pantry,10.00,14.00
 2023-12-22,Argentina Corned Beef 175g,CAN-ACB-175,5,Canned Goods,45.00,55.00
+2023-12-22,Century Tuna Flakes in Oil,CAN-CTF-155,2,Canned Goods,38.00,48.00
 2023-12-22,Century Tuna Flakes in Oil,CAN-CTF-155,4,Canned Goods,38.00,48.00
 2023-12-22,Nescafé 3-in-1 Original,BEV-N3N-01,11,Beverages,5.00,7.00
 2023-12-22,San Miguel Pale Pilsen 330ml,BEV-SMB-330,10,Beverages,50.00,65.00
@@ -2849,7 +2854,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2023-12-23,Sky Flakes Crackers,SNK-SKF-01,14,Snacks,8.00,12.00
 2023-12-23,Chippy Barbecue 110g,SNK-CHP-110,11,Snacks,12.00,18.00
 2023-12-23,Surf Detergent Powder 65g,HSH-SRF-65,14,Household,6.00,9.00
-2023-12-23,Safeguard Soap 90g,BDY-SFG-90,5,Body Care,22.00,30.00
+23/12/2023,Safeguard Soap 90g,BDY-SFG-90,5,Body Care,22.00,30.00
 2023-12-23,Colgate Toothpaste 150g,BDY-COL-150,6,Body Care,55.00,72.00
 2023-12-23,Palmolive Shampoo Sachet,BDY-PLM-01,14,Body Care,5.00,8.00
 2023-12-23,Datu Puti Soy Sauce 385ml,CON-DTP-385,5,Condiments,18.00,25.00
@@ -3202,6 +3207,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-01-10,Milo Powdered Drink 33g Sachet,BEV-MIL-33,9,Beverages,6.00,9.00
 2024-01-10,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,6,Beverages,6.00,9.00
 2024-01-10,Sky Flakes Crackers,SNK-SKF-01,5,Snacks,8.00,12.00
+
 2024-01-10,Chippy Barbecue 110g,SNK-CHP-110,12,Snacks,12.00,18.00
 2024-01-10,Surf Detergent Powder 65g,HSH-SRF-65,2,Household,6.00,9.00
 2024-01-10,Safeguard Soap 90g,BDY-SFG-90,6,Body Care,22.00,30.00
@@ -3378,7 +3384,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-01-19,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,7,Beverages,6.00,9.00
 2024-01-19,Sky Flakes Crackers,SNK-SKF-01,10,Snacks,8.00,12.00
 2024-01-19,Chippy Barbecue 110g,SNK-CHP-110,13,Snacks,12.00,18.00
-2024-01-19,Surf Detergent Powder 65g,HSH-SRF-65,9,Household,6.00,9.00
+2024-01-19,Surf Detergent Powder 65g,HSH-SRF-65,9,Household,₱6.00,9.00
 2024-01-19,Safeguard Soap 90g,BDY-SFG-90,10,Body Care,22.00,30.00
 2024-01-19,Colgate Toothpaste 150g,BDY-COL-150,7,Body Care,55.00,72.00
 2024-01-19,Palmolive Shampoo Sachet,BDY-PLM-01,14,Body Care,5.00,8.00
@@ -3395,10 +3401,11 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-01-20,San Miguel Pale Pilsen 330ml,BEV-SMB-330,7,Beverages,50.00,65.00
 2024-01-20,Coca-Cola 1.5L,BEV-CCR-15L,13,Beverages,55.00,70.00
 2024-01-20,Milo Powdered Drink 33g Sachet,BEV-MIL-33,15,Beverages,6.00,9.00
+date,product,sku,quantity,category,cost_price,selling_price
 2024-01-20,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,6,Beverages,6.00,9.00
 2024-01-20,Sky Flakes Crackers,SNK-SKF-01,8,Snacks,8.00,12.00
 2024-01-20,Chippy Barbecue 110g,SNK-CHP-110,8,Snacks,12.00,18.00
-2024-01-20,Surf Detergent Powder 65g,HSH-SRF-65,8,Household,6.00,9.00
+2024-01-20,Surf Detergent Powder 65g ,HSH-SRF-65,8,Household,6.00,9.00
 2024-01-20,Safeguard Soap 90g,BDY-SFG-90,3,Body Care,22.00,30.00
 2024-01-20,Colgate Toothpaste 150g,BDY-COL-150,7,Body Care,55.00,72.00
 2024-01-20,Palmolive Shampoo Sachet,BDY-PLM-01,16,Body Care,5.00,8.00
@@ -3485,7 +3492,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-01-24,Datu Puti Soy Sauce 385ml,CON-DTP-385,2,Condiments,18.00,25.00
 2024-01-24,Pandesal 10pcs,BKY-PDS-10,9,Bakery,45.00,60.00
 2024-01-24,CDO Hotdog 1kg,FRS-HTD-1K,5,Fresh,180.00,230.00
-2024-01-25,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,7,Pantry,60.00,75.00
+2024-01-25,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,1,Pantry,60.00,75.00
 2024-01-25,Lucky Me Pancit Canton,PNT-LMC-55G,13,Pantry,10.00,14.00
 2024-01-25,Argentina Corned Beef 175g,CAN-ACB-175,5,Canned Goods,45.00,55.00
 2024-01-25,Century Tuna Flakes in Oil,CAN-CTF-155,5,Canned Goods,38.00,48.00
@@ -3664,7 +3671,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-02-02,CDO Hotdog 1kg,FRS-HTD-1K,7,Fresh,180.00,230.00
 2024-02-03,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,9,Pantry,60.00,75.00
 2024-02-03,Lucky Me Pancit Canton,PNT-LMC-55G,23,Pantry,10.00,14.00
-2024-02-03,Argentina Corned Beef 175g,CAN-ACB-175,8,Canned Goods,45.00,55.00
+2024-02-03,Argentina Corned Beef 175g ,CAN-ACB-175,8,Canned Goods,45.00,55.00
 2024-02-03,Century Tuna Flakes in Oil,CAN-CTF-155,4,Canned Goods,38.00,48.00
 2024-02-03,Nescafé 3-in-1 Original,BEV-N3N-01,9,Beverages,5.00,7.00
 2024-02-03,San Miguel Pale Pilsen 330ml,BEV-SMB-330,11,Beverages,50.00,65.00
@@ -3713,7 +3720,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-02-05,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,12,Beverages,6.00,9.00
 2024-02-05,Sky Flakes Crackers,SNK-SKF-01,10,Snacks,8.00,12.00
 2024-02-05,Chippy Barbecue 110g,SNK-CHP-110,4,Snacks,12.00,18.00
-2024-02-05,Surf Detergent Powder 65g,HSH-SRF-65,2,Household,6.00,9.00
+2024-02-05,Surf Detergent Powder 65g,SUP-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-,2,Household,6.00,9.00
 2024-02-05,Colgate Toothpaste 150g,BDY-COL-150,3,Body Care,55.00,72.00
 2024-02-05,Palmolive Shampoo Sachet,BDY-PLM-01,6,Body Care,5.00,8.00
 2024-02-05,Datu Puti Soy Sauce 385ml,CON-DTP-385,3,Condiments,18.00,25.00
@@ -3979,7 +3986,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-02-19,Lucky Me Pancit Canton,PNT-LMC-55G,11,Pantry,10.00,14.00
 2024-02-19,Argentina Corned Beef 175g,CAN-ACB-175,2,Canned Goods,45.00,55.00
 2024-02-19,Century Tuna Flakes in Oil,CAN-CTF-155,5,Canned Goods,38.00,48.00
-2024-02-19,Nescafé 3-in-1 Original,BEV-N3N-01,8,Beverages,5.00,7.00
+2024-02-19,Nescafé 3-in-1 Original,BEV-N3N-01,2.5,Beverages,5.00,7.00
 2024-02-19,San Miguel Pale Pilsen 330ml,BEV-SMB-330,8,Beverages,50.00,65.00
 2024-02-19,Coca-Cola 1.5L,BEV-CCR-15L,6,Beverages,55.00,70.00
 2024-02-19,Milo Powdered Drink 33g Sachet,BEV-MIL-33,9,Beverages,6.00,9.00
@@ -4024,7 +4031,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-02-21,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,8,Beverages,6.00,9.00
 2024-02-21,Sky Flakes Crackers,SNK-SKF-01,3,Snacks,8.00,12.00
 2024-02-21,Chippy Barbecue 110g,SNK-CHP-110,6,Snacks,12.00,18.00
-2024-02-21,Surf Detergent Powder 65g,HSH-SRF-65,9,Household,6.00,9.00
+2024-02-21,,HSH-SRF-65,9,Household,6.00,9.00
 2024-02-21,Safeguard Soap 90g,BDY-SFG-90,6,Body Care,22.00,30.00
 2024-02-21,Colgate Toothpaste 150g,BDY-COL-150,5,Body Care,55.00,72.00
 2024-02-21,Palmolive Shampoo Sachet,BDY-PLM-01,10,Body Care,5.00,8.00
@@ -4206,7 +4213,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-03-01,Surf Detergent Powder 65g,HSH-SRF-65,12,Household,6.00,9.00
 2024-03-01,Safeguard Soap 90g,BDY-SFG-90,8,Body Care,22.00,30.00
 2024-03-01,Colgate Toothpaste 150g,BDY-COL-150,4,Body Care,55.00,72.00
-2024-03-01,Palmolive Shampoo Sachet,BDY-PLM-01,10,Body Care,5.00,8.00
+2024-03-01,Palmolive Shampoo Sachet,BDY-PLM-01,"1,200",Body Care,5.00,8.00
 2024-03-01,Datu Puti Soy Sauce 385ml,CON-DTP-385,2,Condiments,18.00,25.00
 2024-03-01,Pandesal 10pcs,BKY-PDS-10,13,Bakery,45.00,60.00
 2024-03-01,Fresh Eggs Tray 30s,FRS-EGG-30,6,Fresh,210.00,260.00
@@ -4293,7 +4300,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-03-06,Argentina Corned Beef 175g,CAN-ACB-175,3,Canned Goods,45.00,55.00
 2024-03-06,Century Tuna Flakes in Oil,CAN-CTF-155,5,Canned Goods,38.00,48.00
 2024-03-06,Nescafé 3-in-1 Original,BEV-N3N-01,7,Beverages,5.00,7.00
-2024-03-06,San Miguel Pale Pilsen 330ml,BEV-SMB-330,4,Beverages,50.00,65.00
+2024-03-06,San Miguel Pale Pilsen 330ml ,BEV-SMB-330,4,Beverages,50.00,65.00
 2024-03-06,Coca-Cola 1.5L,BEV-CCR-15L,5,Beverages,55.00,70.00
 2024-03-06,Milo Powdered Drink 33g Sachet,BEV-MIL-33,5,Beverages,6.00,9.00
 2024-03-06,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,7,Beverages,6.00,9.00
@@ -4366,7 +4373,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-03-09,Pandesal 10pcs,BKY-PDS-10,11,Bakery,45.00,60.00
 2024-03-09,Fresh Eggs Tray 30s,FRS-EGG-30,8,Fresh,210.00,260.00
 2024-03-09,CDO Hotdog 1kg,FRS-HTD-1K,5,Fresh,180.00,230.00
-2024-03-10,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,7,Pantry,60.00,75.00
+2024-03-10,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,0,Pantry,60.00,75.00
 2024-03-10,Lucky Me Pancit Canton,PNT-LMC-55G,16,Pantry,10.00,14.00
 2024-03-10,Argentina Corned Beef 175g,CAN-ACB-175,10,Canned Goods,45.00,55.00
 2024-03-10,Century Tuna Flakes in Oil,CAN-CTF-155,5,Canned Goods,38.00,48.00
@@ -4437,6 +4444,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-03-13,Chippy Barbecue 110g,SNK-CHP-110,10,Snacks,12.00,18.00
 2024-03-13,Surf Detergent Powder 65g,HSH-SRF-65,7,Household,6.00,9.00
 2024-03-13,Safeguard Soap 90g,BDY-SFG-90,6,Body Care,22.00,30.00
+2024-03-13,Colgate Toothpaste 150g,BDY-COL-150,2,Body Care,55.00
 2024-03-13,Colgate Toothpaste 150g,BDY-COL-150,2,Body Care,55.00,72.00
 2024-03-13,Palmolive Shampoo Sachet,BDY-PLM-01,11,Body Care,5.00,8.00
 2024-03-13,Datu Puti Soy Sauce 385ml,CON-DTP-385,3,Condiments,18.00,25.00
@@ -4599,6 +4607,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-03-21,Datu Puti Soy Sauce 385ml,CON-DTP-385,4,Condiments,18.00,25.00
 2024-03-21,Bear Brand Powdered Milk 320g,DRY-BBM-320,4,Dairy,70.00,90.00
 2024-03-21,Pandesal 10pcs,BKY-PDS-10,22,Bakery,45.00,60.00
+2024-03-21,Fresh Eggs Tray 30s,FRS-EGG-30,2,Fresh,210.00
 2024-03-21,Fresh Eggs Tray 30s,FRS-EGG-30,2,Fresh,210.00,260.00
 2024-03-21,CDO Hotdog 1kg,FRS-HTD-1K,5,Fresh,180.00,230.00
 2024-03-22,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,7,Pantry,60.00,75.00
@@ -4710,11 +4719,11 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-03-27,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,7,Beverages,6.00,9.00
 2024-03-27,Sky Flakes Crackers,SNK-SKF-01,4,Snacks,8.00,12.00
 2024-03-27,Chippy Barbecue 110g,SNK-CHP-110,10,Snacks,12.00,18.00
-2024-03-27,Surf Detergent Powder 65g,HSH-SRF-65,5,Household,6.00,9.00
+2024-03-27,Surf Detergent Powder 65g,HSH-SRF-65,,Household,6.00,9.00
 2024-03-27,Safeguard Soap 90g,BDY-SFG-90,3,Body Care,22.00,30.00
 2024-03-27,Colgate Toothpaste 150g,BDY-COL-150,4,Body Care,55.00,72.00
 2024-03-27,Palmolive Shampoo Sachet,BDY-PLM-01,13,Body Care,5.00,8.00
-2024-03-27,Datu Puti Soy Sauce 385ml,CON-DTP-385,4,Condiments,18.00,25.00
+2024-03-27,Datu Puti Soy Sauce 385ml ,CON-DTP-385,4,Condiments,18.00,25.00
 2024-03-27,Bear Brand Powdered Milk 320g,DRY-BBM-320,3,Dairy,70.00,90.00
 2024-03-27,Pandesal 10pcs,BKY-PDS-10,12,Bakery,45.00,60.00
 2024-03-27,Fresh Eggs Tray 30s,FRS-EGG-30,5,Fresh,210.00,260.00
@@ -5042,7 +5051,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-04-13,Nescafé 3-in-1 Original,BEV-N3N-01,10,Beverages,5.00,7.00
 2024-04-13,San Miguel Pale Pilsen 330ml,BEV-SMB-330,6,Beverages,50.00,65.00
 2024-04-13,Coca-Cola 1.5L,BEV-CCR-15L,7,Beverages,55.00,70.00
-2024-04-13,Milo Powdered Drink 33g Sachet,BEV-MIL-33,12,Beverages,6.00,9.00
+2024-04-13,Milo Powdered Drink 33g Sachet ,BEV-MIL-33,12,Beverages,6.00,9.00
 2024-04-13,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,7,Beverages,6.00,9.00
 2024-04-13,Sky Flakes Crackers,SNK-SKF-01,6,Snacks,8.00,12.00
 2024-04-13,Chippy Barbecue 110g,SNK-CHP-110,9,Snacks,12.00,18.00
@@ -5123,6 +5132,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-04-17,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,3,Beverages,6.00,9.00
 2024-04-17,Sky Flakes Crackers,SNK-SKF-01,9,Snacks,8.00,12.00
 2024-04-17,Chippy Barbecue 110g,SNK-CHP-110,8,Snacks,12.00,18.00
+2024-04-17,Rice, Premium 5kg,HSH-SRF-65,2,Household,6.00,9.00
 2024-04-17,Surf Detergent Powder 65g,HSH-SRF-65,2,Household,6.00,9.00
 2024-04-17,Safeguard Soap 90g,BDY-SFG-90,4,Body Care,22.00,30.00
 2024-04-17,Colgate Toothpaste 150g,BDY-COL-150,1,Body Care,55.00,72.00
@@ -5158,7 +5168,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-04-19,Nescafé 3-in-1 Original,BEV-N3N-01,11,Beverages,5.00,7.00
 2024-04-19,San Miguel Pale Pilsen 330ml,BEV-SMB-330,11,Beverages,50.00,65.00
 2024-04-19,Coca-Cola 1.5L,BEV-CCR-15L,14,Beverages,55.00,70.00
-2024-04-19,Milo Powdered Drink 33g Sachet,BEV-MIL-33,6,Beverages,6.00,9.00
+2024-04-19,Milo Powdered Drink 33g Sachet,BEV-MIL-33,2.5,Beverages,6.00,9.00
 2024-04-19,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,15,Beverages,6.00,9.00
 2024-04-19,Sky Flakes Crackers,SNK-SKF-01,4,Snacks,8.00,12.00
 2024-04-19,Chippy Barbecue 110g,SNK-CHP-110,8,Snacks,12.00,18.00
@@ -5209,7 +5219,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-04-21,Pandesal 10pcs,BKY-PDS-10,11,Bakery,45.00,60.00
 2024-04-21,Fresh Eggs Tray 30s,FRS-EGG-30,6,Fresh,210.00,260.00
 2024-04-21,CDO Hotdog 1kg,FRS-HTD-1K,5,Fresh,180.00,230.00
-2024-04-22,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,6,Pantry,60.00,75.00
+2024-04-22,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,2.5,Pantry,60.00,75.00
 2024-04-22,Lucky Me Pancit Canton,PNT-LMC-55G,6,Pantry,10.00,14.00
 2024-04-22,Argentina Corned Beef 175g,CAN-ACB-175,2,Canned Goods,45.00,55.00
 2024-04-22,Century Tuna Flakes in Oil,CAN-CTF-155,5,Canned Goods,38.00,48.00
@@ -5391,7 +5401,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-04-30,CDO Hotdog 1kg,FRS-HTD-1K,3,Fresh,180.00,230.00
 2024-05-01,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,2,Pantry,60.00,75.00
 2024-05-01,Lucky Me Pancit Canton,PNT-LMC-55G,13,Pantry,10.00,14.00
-2024-05-01,Argentina Corned Beef 175g,CAN-ACB-175,3,Canned Goods,45.00,55.00
+2024-05-01,Argentina Corned Beef 175g,CAN-ACB-175,3,Canned Goods,N/A,55.00
 2024-05-01,Century Tuna Flakes in Oil,CAN-CTF-155,4,Canned Goods,38.00,48.00
 2024-05-01,Nescafé 3-in-1 Original,BEV-N3N-01,3,Beverages,5.00,7.00
 2024-05-01,San Miguel Pale Pilsen 330ml,BEV-SMB-330,8,Beverages,50.00,65.00
@@ -5503,7 +5513,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-05-06,Safeguard Soap 90g,BDY-SFG-90,9,Body Care,22.00,30.00
 2024-05-06,Colgate Toothpaste 150g,BDY-COL-150,2,Body Care,55.00,72.00
 2024-05-06,Palmolive Shampoo Sachet,BDY-PLM-01,11,Body Care,5.00,8.00
-2024-05-06,Datu Puti Soy Sauce 385ml,CON-DTP-385,1,Condiments,18.00,25.00
+"May 06, 2024",Datu Puti Soy Sauce 385ml,CON-DTP-385,1,Condiments,18.00,25.00
 2024-05-06,Bear Brand Powdered Milk 320g,DRY-BBM-320,4,Dairy,70.00,90.00
 2024-05-06,Pandesal 10pcs,BKY-PDS-10,8,Bakery,45.00,60.00
 2024-05-06,Fresh Eggs Tray 30s,FRS-EGG-30,6,Fresh,210.00,260.00
@@ -5534,7 +5544,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-05-08,Coca-Cola 1.5L,BEV-CCR-15L,3,Beverages,55.00,70.00
 2024-05-08,Milo Powdered Drink 33g Sachet,BEV-MIL-33,10,Beverages,6.00,9.00
 2024-05-08,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,12,Beverages,6.00,9.00
-2024-05-08,Sky Flakes Crackers,SNK-SKF-01,2,Snacks,8.00,12.00
+8-May-24,Sky Flakes Crackers,SNK-SKF-01,2,Snacks,8.00,12.00
 2024-05-08,Chippy Barbecue 110g,SNK-CHP-110,4,Snacks,12.00,18.00
 2024-05-08,Surf Detergent Powder 65g,HSH-SRF-65,3,Household,6.00,9.00
 2024-05-08,Safeguard Soap 90g,BDY-SFG-90,2,Body Care,22.00,30.00
@@ -5558,7 +5568,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-05-09,Surf Detergent Powder 65g,HSH-SRF-65,5,Household,6.00,9.00
 2024-05-09,Safeguard Soap 90g,BDY-SFG-90,1,Body Care,22.00,30.00
 2024-05-09,Colgate Toothpaste 150g,BDY-COL-150,1,Body Care,55.00,72.00
-2024-05-09,Palmolive Shampoo Sachet,BDY-PLM-01,10,Body Care,5.00,8.00
+2024-05-09,  Palmolive Shampoo Sachet  ,BDY-PLM-01,10,Body Care,5.00,8.00
 2024-05-09,Datu Puti Soy Sauce 385ml,CON-DTP-385,3,Condiments,18.00,25.00
 2024-05-09,Bear Brand Powdered Milk 320g,DRY-BBM-320,6,Dairy,70.00,90.00
 2024-05-09,Pandesal 10pcs,BKY-PDS-10,13,Bakery,45.00,60.00
@@ -5573,7 +5583,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-05-10,Coca-Cola 1.5L,BEV-CCR-15L,3,Beverages,55.00,70.00
 2024-05-10,Milo Powdered Drink 33g Sachet,BEV-MIL-33,8,Beverages,6.00,9.00
 2024-05-10,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,5,Beverages,6.00,9.00
-2024-05-10,Sky Flakes Crackers,SNK-SKF-01,8,Snacks,8.00,12.00
+03-05-2024,Sky Flakes Crackers,SNK-SKF-01,8,Snacks,8.00,12.00
 2024-05-10,Chippy Barbecue 110g,SNK-CHP-110,9,Snacks,12.00,18.00
 2024-05-10,Surf Detergent Powder 65g,HSH-SRF-65,8,Household,6.00,9.00
 2024-05-10,Safeguard Soap 90g,BDY-SFG-90,6,Body Care,22.00,30.00
@@ -5675,7 +5685,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-05-15,Sky Flakes Crackers,SNK-SKF-01,7,Snacks,8.00,12.00
 2024-05-15,Chippy Barbecue 110g,SNK-CHP-110,5,Snacks,12.00,18.00
 2024-05-15,Surf Detergent Powder 65g,HSH-SRF-65,3,Household,6.00,9.00
-2024-05-15,Safeguard Soap 90g,BDY-SFG-90,2,Body Care,22.00,30.00
+2024-05-15,,BDY-SFG-90,2,Body Care,22.00,30.00
 2024-05-15,Colgate Toothpaste 150g,BDY-COL-150,1,Body Care,55.00,72.00
 2024-05-15,Palmolive Shampoo Sachet,BDY-PLM-01,17,Body Care,5.00,8.00
 2024-05-15,Datu Puti Soy Sauce 385ml,CON-DTP-385,3,Condiments,18.00,25.00
@@ -5949,7 +5959,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-05-29,Milo Powdered Drink 33g Sachet,BEV-MIL-33,9,Beverages,6.00,9.00
 2024-05-29,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,9,Beverages,6.00,9.00
 2024-05-29,Sky Flakes Crackers,SNK-SKF-01,8,Snacks,8.00,12.00
-2024-05-29,Chippy Barbecue 110g,SNK-CHP-110,11,Snacks,12.00,18.00
+2024-05-29,Chippy Barbecue 110g,SNK-CHP-110,,Snacks,12.00,18.00
 2024-05-29,Surf Detergent Powder 65g,HSH-SRF-65,10,Household,6.00,9.00
 2024-05-29,Safeguard Soap 90g,BDY-SFG-90,5,Body Care,22.00,30.00
 2024-05-29,Colgate Toothpaste 150g,BDY-COL-150,3,Body Care,55.00,72.00
@@ -6051,7 +6061,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-06-03,Surf Detergent Powder 65g,HSH-SRF-65,3,Household,6.00,9.00
 2024-06-03,Safeguard Soap 90g,BDY-SFG-90,6,Body Care,22.00,30.00
 2024-06-03,Palmolive Shampoo Sachet,BDY-PLM-01,4,Body Care,5.00,8.00
-2024-06-03,Datu Puti Soy Sauce 385ml,CON-DTP-385,1,Condiments,18.00,25.00
+2024-06-03,Datu Puti Soy Sauce 385ml ,CON-DTP-385,1,Condiments,18.00,25.00
 2024-06-03,Bear Brand Powdered Milk 320g,DRY-BBM-320,4,Dairy,70.00,90.00
 2024-06-03,Pandesal 10pcs,BKY-PDS-10,7,Bakery,45.00,60.00
 2024-06-03,Fresh Eggs Tray 30s,FRS-EGG-30,7,Fresh,210.00,260.00
@@ -6108,7 +6118,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-06-06,Chippy Barbecue 110g,SNK-CHP-110,7,Snacks,12.00,18.00
 2024-06-06,Safeguard Soap 90g,BDY-SFG-90,5,Body Care,22.00,30.00
 2024-06-06,Colgate Toothpaste 150g,BDY-COL-150,5,Body Care,55.00,72.00
-2024-06-06,Palmolive Shampoo Sachet,BDY-PLM-01,5,Body Care,5.00,8.00
+2024-06-06,Palmolive Shampoo Sachet,BDY-PLM-01,0,Body Care,5.00,8.00
 2024-06-06,Datu Puti Soy Sauce 385ml,CON-DTP-385,6,Condiments,18.00,25.00
 2024-06-06,Bear Brand Powdered Milk 320g,DRY-BBM-320,5,Dairy,70.00,90.00
 2024-06-06,Pandesal 10pcs,BKY-PDS-10,12,Bakery,45.00,60.00
@@ -6186,8 +6196,11 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-06-10,Sky Flakes Crackers,SNK-SKF-01,9,Snacks,8.00,12.00
 2024-06-10,Chippy Barbecue 110g,SNK-CHP-110,6,Snacks,12.00,18.00
 2024-06-10,Surf Detergent Powder 65g,HSH-SRF-65,3,Household,6.00,9.00
+
 2024-06-10,Safeguard Soap 90g,BDY-SFG-90,7,Body Care,22.00,30.00
 2024-06-10,Colgate Toothpaste 150g,BDY-COL-150,3,Body Care,55.00,72.00
+2024-06-10,Palmolive Shampoo Sachet,"Delivered 8am
+via Ramon",9,Body Care,5.00,8.00
 2024-06-10,Palmolive Shampoo Sachet,BDY-PLM-01,9,Body Care,5.00,8.00
 2024-06-10,Datu Puti Soy Sauce 385ml,CON-DTP-385,4,Condiments,18.00,25.00
 2024-06-10,Bear Brand Powdered Milk 320g,DRY-BBM-320,2,Dairy,70.00,90.00
@@ -6760,7 +6773,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-07-09,Colgate Toothpaste 150g,BDY-COL-150,9,Body Care,55.00,72.00
 2024-07-09,Palmolive Shampoo Sachet,BDY-PLM-01,4,Body Care,5.00,8.00
 2024-07-09,Datu Puti Soy Sauce 385ml,CON-DTP-385,5,Condiments,18.00,25.00
-2024-07-09,Bear Brand Powdered Milk 320g,DRY-BBM-320,6,Dairy,70.00,90.00
+2024-07-09,Bear Brand Powdered Milk 320g ,DRY-BBM-320,6,Dairy,70.00,90.00
 2024-07-09,Pandesal 10pcs,BKY-PDS-10,6,Bakery,45.00,60.00
 2024-07-09,Fresh Eggs Tray 30s,FRS-EGG-30,2,Fresh,210.00,260.00
 2024-07-09,CDO Hotdog 1kg,FRS-HTD-1K,3,Fresh,180.00,230.00
@@ -6794,7 +6807,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-07-11,Milo Powdered Drink 33g Sachet,BEV-MIL-33,8,Beverages,6.00,9.00
 2024-07-11,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,11,Beverages,6.00,9.00
 2024-07-11,Sky Flakes Crackers,SNK-SKF-01,3,Snacks,8.00,12.00
-2024-07-11,Chippy Barbecue 110g,SNK-CHP-110,6,Snacks,12.00,18.00
+2024-07-11,Chippy Barbecue 110g,SNK-CHP-110,6,Snacks,12.00,"1,250.00"
 2024-07-11,Surf Detergent Powder 65g,HSH-SRF-65,8,Household,6.00,9.00
 2024-07-11,Safeguard Soap 90g,BDY-SFG-90,9,Body Care,22.00,30.00
 2024-07-11,Colgate Toothpaste 150g,BDY-COL-150,2,Body Care,55.00,72.00
@@ -6884,7 +6897,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-07-15,Pandesal 10pcs,BKY-PDS-10,15,Bakery,45.00,60.00
 2024-07-15,Fresh Eggs Tray 30s,FRS-EGG-30,1,Fresh,210.00,260.00
 2024-07-15,CDO Hotdog 1kg,FRS-HTD-1K,2,Fresh,180.00,230.00
-2024-07-16,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,4,Pantry,60.00,75.00
+2024-07-16,Golden Fiesta Cooking Oil 1L ,PNT-OIL-1L,4,Pantry,60.00,75.00
 2024-07-16,Lucky Me Pancit Canton,PNT-LMC-55G,11,Pantry,10.00,14.00
 2024-07-16,Argentina Corned Beef 175g,CAN-ACB-175,8,Canned Goods,45.00,55.00
 2024-07-16,Century Tuna Flakes in Oil,CAN-CTF-155,3,Canned Goods,38.00,48.00
@@ -7156,9 +7169,9 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-07-29,Datu Puti Soy Sauce 385ml,CON-DTP-385,3,Condiments,18.00,25.00
 2024-07-29,Bear Brand Powdered Milk 320g,DRY-BBM-320,5,Dairy,70.00,90.00
 2024-07-29,Pandesal 10pcs,BKY-PDS-10,8,Bakery,45.00,60.00
-2024-07-29,Fresh Eggs Tray 30s,FRS-EGG-30,9,Fresh,210.00,260.00
+2023-02-29,Fresh Eggs Tray 30s,FRS-EGG-30,9,Fresh,210.00,260.00
 2024-07-29,CDO Hotdog 1kg,FRS-HTD-1K,3,Fresh,180.00,230.00
-2024-07-30,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,4,Pantry,60.00,75.00
+2024-07-30,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,4,Pantry,₱60.00,75.00
 2024-07-30,Lucky Me Pancit Canton,PNT-LMC-55G,21,Pantry,10.00,14.00
 2024-07-30,Argentina Corned Beef 175g,CAN-ACB-175,6,Canned Goods,45.00,55.00
 2024-07-30,Century Tuna Flakes in Oil,CAN-CTF-155,10,Canned Goods,38.00,48.00
@@ -7198,7 +7211,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-07-31,Pandesal 10pcs,BKY-PDS-10,7,Bakery,45.00,60.00
 2024-07-31,Fresh Eggs Tray 30s,FRS-EGG-30,6,Fresh,210.00,260.00
 2024-07-31,CDO Hotdog 1kg,FRS-HTD-1K,9,Fresh,180.00,230.00
-2024-08-01,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,3,Pantry,60.00,75.00
+2024-08-01,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,3,Pantry,"240,00",75.00
 2024-08-01,Lucky Me Pancit Canton,PNT-LMC-55G,17,Pantry,10.00,14.00
 2024-08-01,Argentina Corned Beef 175g,CAN-ACB-175,4,Canned Goods,45.00,55.00
 2024-08-01,Century Tuna Flakes in Oil,CAN-CTF-155,1,Canned Goods,38.00,48.00
@@ -7329,7 +7342,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-08-07,Sky Flakes Crackers,SNK-SKF-01,14,Snacks,8.00,12.00
 2024-08-07,Chippy Barbecue 110g,SNK-CHP-110,9,Snacks,12.00,18.00
 2024-08-07,Surf Detergent Powder 65g,HSH-SRF-65,2,Household,6.00,9.00
-2024-08-07,Safeguard Soap 90g,BDY-SFG-90,5,Body Care,22.00,30.00
+2024-08-07,Safeguard Soap 90g,BDY-SFG-90,5.0,Body Care,22.00,30.00
 2024-08-07,Colgate Toothpaste 150g,BDY-COL-150,2,Body Care,55.00,72.00
 2024-08-07,Palmolive Shampoo Sachet,BDY-PLM-01,6,Body Care,5.00,8.00
 2024-08-07,Datu Puti Soy Sauce 385ml,CON-DTP-385,2,Condiments,18.00,25.00
@@ -7378,7 +7391,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-08-09,Fresh Eggs Tray 30s,FRS-EGG-30,5,Fresh,210.00,260.00
 2024-08-09,CDO Hotdog 1kg,FRS-HTD-1K,7,Fresh,180.00,230.00
 2024-08-10,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,7,Pantry,60.00,75.00
-2024-08-10,Lucky Me Pancit Canton,PNT-LMC-55G,19,Pantry,10.00,14.00
+2024-08-10,Lucky Me Pancit Canton,SUP-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-,19,Pantry,10.00,14.00
 2024-08-10,Argentina Corned Beef 175g,CAN-ACB-175,3,Canned Goods,45.00,55.00
 2024-08-10,Century Tuna Flakes in Oil,CAN-CTF-155,6,Canned Goods,38.00,48.00
 2024-08-10,Nescafé 3-in-1 Original,BEV-N3N-01,14,Beverages,5.00,7.00
@@ -7401,7 +7414,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-08-11,Lucky Me Pancit Canton,PNT-LMC-55G,23,Pantry,10.00,14.00
 2024-08-11,Argentina Corned Beef 175g,CAN-ACB-175,7,Canned Goods,45.00,55.00
 2024-08-11,Century Tuna Flakes in Oil,CAN-CTF-155,3,Canned Goods,38.00,48.00
-2024-08-11,Nescafé 3-in-1 Original,BEV-N3N-01,10,Beverages,5.00,7.00
+2024-08-11,Nescafé 3-in-1 Original ,BEV-N3N-01,10,Beverages,5.00,7.00
 2024-08-11,San Miguel Pale Pilsen 330ml,BEV-SMB-330,9,Beverages,50.00,65.00
 2024-08-11,Coca-Cola 1.5L,BEV-CCR-15L,12,Beverages,55.00,70.00
 2024-08-11,Milo Powdered Drink 33g Sachet,BEV-MIL-33,12,Beverages,6.00,9.00
@@ -7413,7 +7426,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-08-11,Colgate Toothpaste 150g,BDY-COL-150,7,Body Care,55.00,72.00
 2024-08-11,Palmolive Shampoo Sachet,BDY-PLM-01,6,Body Care,5.00,8.00
 2024-08-11,Datu Puti Soy Sauce 385ml,CON-DTP-385,2,Condiments,18.00,25.00
-2024-08-11,Bear Brand Powdered Milk 320g,DRY-BBM-320,3,Dairy,70.00,90.00
+2024-08-11,Bear Brand Powdered Milk 320g,DRY-BBM-320,1,Dairy,70.00,90.00
 2024-08-11,Pandesal 10pcs,BKY-PDS-10,12,Bakery,45.00,60.00
 2024-08-11,Fresh Eggs Tray 30s,FRS-EGG-30,5,Fresh,210.00,260.00
 2024-08-11,CDO Hotdog 1kg,FRS-HTD-1K,5,Fresh,180.00,230.00
@@ -7569,7 +7582,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-08-19,Safeguard Soap 90g,BDY-SFG-90,3,Body Care,22.00,30.00
 2024-08-19,Colgate Toothpaste 150g,BDY-COL-150,1,Body Care,55.00,72.00
 2024-08-19,Palmolive Shampoo Sachet,BDY-PLM-01,11,Body Care,5.00,8.00
-2024-08-19,Datu Puti Soy Sauce 385ml,CON-DTP-385,4,Condiments,18.00,25.00
+2024-08-19,DATU PUTI SOY SAUCE 385ML,CON-DTP-385,4,Condiments,18.00,25.00
 2024-08-19,Bear Brand Powdered Milk 320g,DRY-BBM-320,3,Dairy,70.00,90.00
 2024-08-19,Pandesal 10pcs,BKY-PDS-10,9,Bakery,45.00,60.00
 2024-08-19,Fresh Eggs Tray 30s,FRS-EGG-30,4,Fresh,210.00,260.00
@@ -7624,7 +7637,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-08-22,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,5,Beverages,6.00,9.00
 2024-08-22,Sky Flakes Crackers,SNK-SKF-01,5,Snacks,8.00,12.00
 2024-08-22,Chippy Barbecue 110g,SNK-CHP-110,2,Snacks,12.00,18.00
-2024-08-22,Surf Detergent Powder 65g,HSH-SRF-65,2,Household,6.00,9.00
+22/08/2024,Surf Detergent Powder 65g,HSH-SRF-65,2,Household,6.00,9.00
 2024-08-22,Safeguard Soap 90g,BDY-SFG-90,4,Body Care,22.00,30.00
 2024-08-22,Colgate Toothpaste 150g,BDY-COL-150,3,Body Care,55.00,72.00
 2024-08-22,Palmolive Shampoo Sachet,BDY-PLM-01,9,Body Care,5.00,8.00
@@ -7720,7 +7733,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-08-27,Nescafé 3-in-1 Original,BEV-N3N-01,3,Beverages,5.00,7.00
 2024-08-27,San Miguel Pale Pilsen 330ml,BEV-SMB-330,3,Beverages,50.00,65.00
 2024-08-27,Coca-Cola 1.5L,BEV-CCR-15L,7,Beverages,55.00,70.00
-2024-08-27,Milo Powdered Drink 33g Sachet,BEV-MIL-33,7,Beverages,6.00,9.00
+,Milo Powdered Drink 33g Sachet,BEV-MIL-33,7,Beverages,6.00,9.00
 2024-08-27,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,14,Beverages,6.00,9.00
 2024-08-27,Sky Flakes Crackers,SNK-SKF-01,5,Snacks,8.00,12.00
 2024-08-27,Chippy Barbecue 110g,SNK-CHP-110,6,Snacks,12.00,18.00
@@ -7849,7 +7862,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-09-02,Palmolive Shampoo Sachet,BDY-PLM-01,10,Body Care,5.00,8.00
 2024-09-02,Datu Puti Soy Sauce 385ml,CON-DTP-385,6,Condiments,18.00,25.00
 2024-09-02,Bear Brand Powdered Milk 320g,DRY-BBM-320,5,Dairy,70.00,90.00
-2024-09-02,Pandesal 10pcs,BKY-PDS-10,9,Bakery,45.00,60.00
+2024-09-02,,BKY-PDS-10,9,Bakery,45.00,60.00
 2024-09-02,Fresh Eggs Tray 30s,FRS-EGG-30,10,Fresh,210.00,260.00
 2024-09-02,CDO Hotdog 1kg,FRS-HTD-1K,5,Fresh,180.00,230.00
 2024-09-03,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,1,Pantry,60.00,75.00
@@ -8091,7 +8104,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-09-14,CDO Hotdog 1kg,FRS-HTD-1K,9,Fresh,180.00,230.00
 2024-09-15,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,11,Pantry,60.00,75.00
 2024-09-15,Lucky Me Pancit Canton,PNT-LMC-55G,12,Pantry,10.00,14.00
-2024-09-15,Argentina Corned Beef 175g,CAN-ACB-175,2,Canned Goods,45.00,55.00
+2024-09-15,Argentina Corned Beef 175g,CAN-ACB-175,2,Canned Goods,N/A,55.00
 2024-09-15,Century Tuna Flakes in Oil,CAN-CTF-155,1,Canned Goods,38.00,48.00
 2024-09-15,Nescafé 3-in-1 Original,BEV-N3N-01,12,Beverages,5.00,7.00
 2024-09-15,San Miguel Pale Pilsen 330ml,BEV-SMB-330,7,Beverages,50.00,65.00
@@ -8187,7 +8200,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-09-19,Fresh Eggs Tray 30s,FRS-EGG-30,4,Fresh,210.00,260.00
 2024-09-19,CDO Hotdog 1kg,FRS-HTD-1K,4,Fresh,180.00,230.00
 2024-09-20,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,2,Pantry,60.00,75.00
-2024-09-20,Lucky Me Pancit Canton,PNT-LMC-55G,6,Pantry,10.00,14.00
+2024-09-20,Lucky Me Pancit Canton,4.80E+12,6,Pantry,10.00,14.00
 2024-09-20,Argentina Corned Beef 175g,CAN-ACB-175,3,Canned Goods,45.00,55.00
 2024-09-20,Century Tuna Flakes in Oil,CAN-CTF-155,4,Canned Goods,38.00,48.00
 2024-09-20,Nescafé 3-in-1 Original,BEV-N3N-01,6,Beverages,5.00,7.00
@@ -8209,7 +8222,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-09-21,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,10,Pantry,60.00,75.00
 2024-09-21,Lucky Me Pancit Canton,PNT-LMC-55G,31,Pantry,10.00,14.00
 2024-09-21,Argentina Corned Beef 175g,CAN-ACB-175,4,Canned Goods,45.00,55.00
-2024-09-21,Century Tuna Flakes in Oil,CAN-CTF-155,4,Canned Goods,38.00,48.00
+2024-09-21,Century Tuna Flakes in Oil,CAN-CTF-155,5.0,Canned Goods,38.00,48.00
 2024-09-21,Nescafé 3-in-1 Original,BEV-N3N-01,17,Beverages,5.00,7.00
 2024-09-21,San Miguel Pale Pilsen 330ml,BEV-SMB-330,7,Beverages,50.00,65.00
 2024-09-21,Coca-Cola 1.5L,BEV-CCR-15L,11,Beverages,55.00,70.00
@@ -8359,7 +8372,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-09-28,Surf Detergent Powder 65g,HSH-SRF-65,11,Household,6.00,9.00
 2024-09-28,Safeguard Soap 90g,BDY-SFG-90,10,Body Care,22.00,30.00
 2024-09-28,Colgate Toothpaste 150g,BDY-COL-150,9,Body Care,55.00,72.00
-2024-09-28,Palmolive Shampoo Sachet,BDY-PLM-01,12,Body Care,5.00,8.00
+2024-09-28,Palmolive Shampoo Sachet,BDY-PLM-01,12,Body Care,5.00,"1,250.00"
 2024-09-28,Datu Puti Soy Sauce 385ml,CON-DTP-385,3,Condiments,18.00,25.00
 2024-09-28,Bear Brand Powdered Milk 320g,DRY-BBM-320,8,Dairy,70.00,90.00
 2024-09-28,Pandesal 10pcs,BKY-PDS-10,19,Bakery,45.00,60.00
@@ -8476,7 +8489,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-10-04,Sky Flakes Crackers,SNK-SKF-01,13,Snacks,8.00,12.00
 2024-10-04,Chippy Barbecue 110g,SNK-CHP-110,8,Snacks,12.00,18.00
 2024-10-04,Surf Detergent Powder 65g,HSH-SRF-65,7,Household,6.00,9.00
-2024-10-04,Safeguard Soap 90g,BDY-SFG-90,3,Body Care,22.00,30.00
+4-Oct-24,Safeguard Soap 90g,BDY-SFG-90,3,Body Care,22.00,30.00
 2024-10-04,Colgate Toothpaste 150g,BDY-COL-150,6,Body Care,55.00,72.00
 2024-10-04,Palmolive Shampoo Sachet,BDY-PLM-01,7,Body Care,5.00,8.00
 2024-10-04,Datu Puti Soy Sauce 385ml,CON-DTP-385,2,Condiments,18.00,25.00
@@ -8848,7 +8861,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-10-23,Sky Flakes Crackers,SNK-SKF-01,4,Snacks,8.00,12.00
 2024-10-23,Chippy Barbecue 110g,SNK-CHP-110,4,Snacks,12.00,18.00
 2024-10-23,Surf Detergent Powder 65g,HSH-SRF-65,6,Household,6.00,9.00
-2024-10-23,Safeguard Soap 90g,BDY-SFG-90,3,Body Care,22.00,30.00
+2024-10-23 14:30:00,Safeguard Soap 90g,BDY-SFG-90,3,Body Care,22.00,30.00
 2024-10-23,Colgate Toothpaste 150g,BDY-COL-150,3,Body Care,55.00,72.00
 2024-10-23,Palmolive Shampoo Sachet,BDY-PLM-01,3,Body Care,5.00,8.00
 2024-10-23,Datu Puti Soy Sauce 385ml,CON-DTP-385,4,Condiments,18.00,25.00
@@ -9045,14 +9058,14 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-11-02,Coca-Cola 1.5L,BEV-CCR-15L,12,Beverages,55.00,70.00
 2024-11-02,Milo Powdered Drink 33g Sachet,BEV-MIL-33,17,Beverages,6.00,9.00
 2024-11-02,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,19,Beverages,6.00,9.00
-2024-11-02,Sky Flakes Crackers,SNK-SKF-01,9,Snacks,8.00,12.00
+2024-11-02,Sky Flakes Crackers,4.80E+12,9,Snacks,8.00,12.00
 2024-11-02,Chippy Barbecue 110g,SNK-CHP-110,4,Snacks,12.00,18.00
 2024-11-02,Surf Detergent Powder 65g,HSH-SRF-65,4,Household,6.00,9.00
 2024-11-02,Colgate Toothpaste 150g,BDY-COL-150,4,Body Care,55.00,72.00
 2024-11-02,Palmolive Shampoo Sachet,BDY-PLM-01,7,Body Care,5.00,8.00
 2024-11-02,Datu Puti Soy Sauce 385ml,CON-DTP-385,4,Condiments,18.00,25.00
 2024-11-02,Bear Brand Powdered Milk 320g,DRY-BBM-320,7,Dairy,70.00,90.00
-2024-11-02,Pandesal 10pcs,BKY-PDS-10,19,Bakery,45.00,60.00
+31/1/24,Pandesal 10pcs,BKY-PDS-10,19,Bakery,45.00,60.00
 2024-11-02,Fresh Eggs Tray 30s,FRS-EGG-30,4,Fresh,210.00,260.00
 2024-11-02,CDO Hotdog 1kg,FRS-HTD-1K,8,Fresh,180.00,230.00
 2024-11-03,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,6,Pantry,60.00,75.00
@@ -9063,7 +9076,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-11-03,San Miguel Pale Pilsen 330ml,BEV-SMB-330,8,Beverages,50.00,65.00
 2024-11-03,Coca-Cola 1.5L,BEV-CCR-15L,4,Beverages,55.00,70.00
 2024-11-03,Milo Powdered Drink 33g Sachet,BEV-MIL-33,10,Beverages,6.00,9.00
-2024-11-03,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,13,Beverages,6.00,9.00
+2024-11-03,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,0,Beverages,6.00,9.00
 2024-11-03,Sky Flakes Crackers,SNK-SKF-01,7,Snacks,8.00,12.00
 2024-11-03,Chippy Barbecue 110g,SNK-CHP-110,7,Snacks,12.00,18.00
 2024-11-03,Surf Detergent Powder 65g,HSH-SRF-65,7,Household,6.00,9.00
@@ -9302,7 +9315,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-11-15,Coca-Cola 1.5L,BEV-CCR-15L,6,Beverages,55.00,70.00
 2024-11-15,Milo Powdered Drink 33g Sachet,BEV-MIL-33,10,Beverages,6.00,9.00
 2024-11-15,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,10,Beverages,6.00,9.00
-2024-11-15,Sky Flakes Crackers,SNK-SKF-01,3,Snacks,8.00,12.00
+"November 15, 2024",Sky Flakes Crackers,SNK-SKF-01,3,Snacks,8.00,12.00
 2024-11-15,Chippy Barbecue 110g,SNK-CHP-110,9,Snacks,12.00,18.00
 2024-11-15,Surf Detergent Powder 65g,HSH-SRF-65,9,Household,6.00,9.00
 2024-11-15,Safeguard Soap 90g,BDY-SFG-90,5,Body Care,22.00,30.00
@@ -9515,7 +9528,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-11-26,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,6,Pantry,60.00,75.00
 2024-11-26,Lucky Me Pancit Canton,PNT-LMC-55G,5,Pantry,10.00,14.00
 2024-11-26,Argentina Corned Beef 175g,CAN-ACB-175,4,Canned Goods,45.00,55.00
-2024-11-26,Century Tuna Flakes in Oil,CAN-CTF-155,3,Canned Goods,38.00,48.00
+2024-11-26,Century Tuna Flakes in Oil,4.80E+12,3,Canned Goods,38.00,48.00
 2024-11-26,Nescafé 3-in-1 Original,BEV-N3N-01,8,Beverages,5.00,7.00
 2024-11-26,San Miguel Pale Pilsen 330ml,BEV-SMB-330,8,Beverages,50.00,65.00
 2024-11-26,Coca-Cola 1.5L,BEV-CCR-15L,3,Beverages,55.00,70.00
@@ -9819,7 +9832,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-12-11,San Miguel Pale Pilsen 330ml,BEV-SMB-330,5,Beverages,50.00,65.00
 2024-12-11,Coca-Cola 1.5L,BEV-CCR-15L,5,Beverages,55.00,70.00
 2024-12-11,Milo Powdered Drink 33g Sachet,BEV-MIL-33,6,Beverages,6.00,9.00
-2024-12-11,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,14,Beverages,6.00,9.00
+2024-12-11,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,14,Beverages,6.00,1234567890.00
 2024-12-11,Sky Flakes Crackers,SNK-SKF-01,8,Snacks,8.00,12.00
 2024-12-11,Chippy Barbecue 110g,SNK-CHP-110,10,Snacks,12.00,18.00
 2024-12-11,Surf Detergent Powder 65g,HSH-SRF-65,5,Household,6.00,9.00
@@ -10130,7 +10143,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-12-26,Fresh Eggs Tray 30s,FRS-EGG-30,6,Fresh,210.00,260.00
 2024-12-26,CDO Hotdog 1kg,FRS-HTD-1K,12,Fresh,180.00,230.00
 2024-12-27,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,7,Pantry,60.00,75.00
-2024-12-27,Lucky Me Pancit Canton,PNT-LMC-55G,33,Pantry,10.00,14.00
+2024-12-27,  Lucky Me Pancit Canton  ,PNT-LMC-55G,33,Pantry,10.00,14.00
 2024-12-27,Argentina Corned Beef 175g,CAN-ACB-175,5,Canned Goods,45.00,55.00
 2024-12-27,Century Tuna Flakes in Oil,CAN-CTF-155,8,Canned Goods,38.00,48.00
 2024-12-27,Nescafé 3-in-1 Original,BEV-N3N-01,7,Beverages,5.00,7.00
@@ -10229,6 +10242,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2024-12-31,CDO Hotdog 1kg,FRS-HTD-1K,9,Fresh,180.00,230.00
 2025-01-01,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,9,Pantry,60.00,75.00
 2025-01-01,Lucky Me Pancit Canton,PNT-LMC-55G,25,Pantry,10.00,14.00
+2025-01-01,Argentina Corned Beef 175g,CAN-ACB-175,1,Canned Goods,45.00,55.00
 2025-01-01,Argentina Corned Beef 175g,CAN-ACB-175,2,Canned Goods,45.00,55.00
 2025-01-01,Century Tuna Flakes in Oil,CAN-CTF-155,4,Canned Goods,38.00,48.00
 2025-01-01,Nescafé 3-in-1 Original,BEV-N3N-01,12,Beverages,5.00,7.00
@@ -10409,7 +10423,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-01-10,Lucky Me Pancit Canton,PNT-LMC-55G,17,Pantry,10.00,14.00
 2025-01-10,Century Tuna Flakes in Oil,CAN-CTF-155,4,Canned Goods,38.00,48.00
 2025-01-10,Nescafé 3-in-1 Original,BEV-N3N-01,5,Beverages,5.00,7.00
-2025-01-10,San Miguel Pale Pilsen 330ml,BEV-SMB-330,7,Beverages,50.00,65.00
+2025-01-10,San Miguel Pale Pilsen 330ml ,BEV-SMB-330,7,Beverages,50.00,65.00
 2025-01-10,Coca-Cola 1.5L,BEV-CCR-15L,8,Beverages,55.00,70.00
 2025-01-10,Milo Powdered Drink 33g Sachet,BEV-MIL-33,12,Beverages,6.00,9.00
 2025-01-10,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,14,Beverages,6.00,9.00
@@ -10519,7 +10533,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-01-15,Colgate Toothpaste 150g,BDY-COL-150,4,Body Care,55.00,72.00
 2025-01-15,Palmolive Shampoo Sachet,BDY-PLM-01,5,Body Care,5.00,8.00
 2025-01-15,Datu Puti Soy Sauce 385ml,CON-DTP-385,8,Condiments,18.00,25.00
-2025-01-15,Bear Brand Powdered Milk 320g,DRY-BBM-320,4,Dairy,70.00,90.00
+03-05-2024,Bear Brand Powdered Milk 320g,DRY-BBM-320,4,Dairy,70.00,90.00
 2025-01-15,Pandesal 10pcs,BKY-PDS-10,11,Bakery,45.00,60.00
 2025-01-15,Fresh Eggs Tray 30s,FRS-EGG-30,6,Fresh,210.00,260.00
 2025-01-15,CDO Hotdog 1kg,FRS-HTD-1K,2,Fresh,180.00,230.00
@@ -10567,7 +10581,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-01-18,Lucky Me Pancit Canton,PNT-LMC-55G,24,Pantry,10.00,14.00
 2025-01-18,Argentina Corned Beef 175g,CAN-ACB-175,3,Canned Goods,45.00,55.00
 2025-01-18,Century Tuna Flakes in Oil,CAN-CTF-155,6,Canned Goods,38.00,48.00
-2025-01-18,Nescafé 3-in-1 Original,BEV-N3N-01,7,Beverages,5.00,7.00
+2025-01-18,Nescafé 3-in-1 Original,BEV-N3N-01,0,Beverages,5.00,7.00
 2025-01-18,San Miguel Pale Pilsen 330ml,BEV-SMB-330,10,Beverages,50.00,65.00
 2025-01-18,Coca-Cola 1.5L,BEV-CCR-15L,10,Beverages,55.00,70.00
 2025-01-18,Milo Powdered Drink 33g Sachet,BEV-MIL-33,7,Beverages,6.00,9.00
@@ -10583,7 +10597,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-01-18,Pandesal 10pcs,BKY-PDS-10,15,Bakery,45.00,60.00
 2025-01-18,Fresh Eggs Tray 30s,FRS-EGG-30,7,Fresh,210.00,260.00
 2025-01-18,CDO Hotdog 1kg,FRS-HTD-1K,10,Fresh,180.00,230.00
-2025-01-19,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,3,Pantry,60.00,75.00
+2025-01-19,  Golden Fiesta Cooking Oil 1L  ,PNT-OIL-1L,3,Pantry,60.00,75.00
 2025-01-19,Lucky Me Pancit Canton,PNT-LMC-55G,18,Pantry,10.00,14.00
 2025-01-19,Argentina Corned Beef 175g,CAN-ACB-175,2,Canned Goods,45.00,55.00
 2025-01-19,Century Tuna Flakes in Oil,CAN-CTF-155,8,Canned Goods,38.00,48.00
@@ -10675,7 +10689,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-01-23,Chippy Barbecue 110g,SNK-CHP-110,6,Snacks,12.00,18.00
 2025-01-23,Surf Detergent Powder 65g,HSH-SRF-65,3,Household,6.00,9.00
 2025-01-23,Safeguard Soap 90g,BDY-SFG-90,2,Body Care,22.00,30.00
-2025-01-23,Colgate Toothpaste 150g,BDY-COL-150,4,Body Care,55.00,72.00
+2025-01-23,Colgate Toothpaste 150g ,BDY-COL-150,4,Body Care,55.00,72.00
 2025-01-23,Palmolive Shampoo Sachet,BDY-PLM-01,9,Body Care,5.00,8.00
 2025-01-23,Datu Puti Soy Sauce 385ml,CON-DTP-385,6,Condiments,18.00,25.00
 2025-01-23,Bear Brand Powdered Milk 320g,DRY-BBM-320,2,Dairy,70.00,90.00
@@ -11088,18 +11102,18 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-02-13,Safeguard Soap 90g,BDY-SFG-90,3,Body Care,22.00,30.00
 2025-02-13,Colgate Toothpaste 150g,BDY-COL-150,6,Body Care,55.00,72.00
 2025-02-13,Palmolive Shampoo Sachet,BDY-PLM-01,11,Body Care,5.00,8.00
-2025-02-13,Datu Puti Soy Sauce 385ml,CON-DTP-385,5,Condiments,18.00,25.00
+2025-02-13,Assorted Sari-Sari Goods Bundle Pack Family Size Promotional Combo With Free Sachet Items Included Extra,CON-DTP-385,5,Condiments,18.00,25.00
 2025-02-13,Bear Brand Powdered Milk 320g,DRY-BBM-320,3,Dairy,70.00,90.00
 2025-02-13,Pandesal 10pcs,BKY-PDS-10,10,Bakery,45.00,60.00
 2025-02-13,Fresh Eggs Tray 30s,FRS-EGG-30,7,Fresh,210.00,260.00
-2025-02-13,CDO Hotdog 1kg,FRS-HTD-1K,3,Fresh,180.00,230.00
+31/1/24,CDO Hotdog 1kg,FRS-HTD-1K,3,Fresh,180.00,230.00
 2025-02-14,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,6,Pantry,60.00,75.00
 2025-02-14,Lucky Me Pancit Canton,PNT-LMC-55G,12,Pantry,10.00,14.00
 2025-02-14,Argentina Corned Beef 175g,CAN-ACB-175,4,Canned Goods,45.00,55.00
 2025-02-14,Century Tuna Flakes in Oil,CAN-CTF-155,2,Canned Goods,38.00,48.00
 2025-02-14,Nescafé 3-in-1 Original,BEV-N3N-01,7,Beverages,5.00,7.00
 2025-02-14,San Miguel Pale Pilsen 330ml,BEV-SMB-330,12,Beverages,50.00,65.00
-2025-02-14,Coca-Cola 1.5L,BEV-CCR-15L,13,Beverages,55.00,70.00
+2025-02-14,Coca-Cola 1.5L,BEV-CCR-15L,,Beverages,55.00,70.00
 2025-02-14,Milo Powdered Drink 33g Sachet,BEV-MIL-33,12,Beverages,6.00,9.00
 2025-02-14,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,13,Beverages,6.00,9.00
 2025-02-14,Sky Flakes Crackers,SNK-SKF-01,5,Snacks,8.00,12.00
@@ -11358,7 +11372,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-02-27,Nescafé 3-in-1 Original,BEV-N3N-01,9,Beverages,5.00,7.00
 2025-02-27,San Miguel Pale Pilsen 330ml,BEV-SMB-330,6,Beverages,50.00,65.00
 2025-02-27,Coca-Cola 1.5L,BEV-CCR-15L,11,Beverages,55.00,70.00
-2025-02-27,Milo Powdered Drink 33g Sachet,BEV-MIL-33,13,Beverages,6.00,9.00
+2025-02-27,  Milo Powdered Drink 33g Sachet  ,BEV-MIL-33,13,Beverages,6.00,9.00
 2025-02-27,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,11,Beverages,6.00,9.00
 2025-02-27,Sky Flakes Crackers,SNK-SKF-01,12,Snacks,8.00,12.00
 2025-02-27,Chippy Barbecue 110g,SNK-CHP-110,9,Snacks,12.00,18.00
@@ -11634,7 +11648,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-03-13,Milo Powdered Drink 33g Sachet,BEV-MIL-33,11,Beverages,6.00,9.00
 2025-03-13,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,14,Beverages,6.00,9.00
 2025-03-13,Sky Flakes Crackers,SNK-SKF-01,4,Snacks,8.00,12.00
-2025-03-13,Chippy Barbecue 110g,SNK-CHP-110,5,Snacks,12.00,18.00
+2025-03-13,Chippy Barbecue 110g,SNK-CHP-110,5,Snacks,N/A,18.00
 2025-03-13,Surf Detergent Powder 65g,HSH-SRF-65,2,Household,6.00,9.00
 2025-03-13,Safeguard Soap 90g,BDY-SFG-90,3,Body Care,22.00,30.00
 2025-03-13,Palmolive Shampoo Sachet,BDY-PLM-01,8,Body Care,5.00,8.00
@@ -11666,6 +11680,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-03-15,Lucky Me Pancit Canton,PNT-LMC-55G,15,Pantry,10.00,14.00
 2025-03-15,Argentina Corned Beef 175g,CAN-ACB-175,7,Canned Goods,45.00,55.00
 2025-03-15,Century Tuna Flakes in Oil,CAN-CTF-155,6,Canned Goods,38.00,48.00
+
 2025-03-15,Nescafé 3-in-1 Original,BEV-N3N-01,6,Beverages,5.00,7.00
 2025-03-15,San Miguel Pale Pilsen 330ml,BEV-SMB-330,11,Beverages,50.00,65.00
 2025-03-15,Coca-Cola 1.5L,BEV-CCR-15L,10,Beverages,55.00,70.00
@@ -11723,7 +11738,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-03-17,CDO Hotdog 1kg,FRS-HTD-1K,7,Fresh,180.00,230.00
 2025-03-18,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,6,Pantry,60.00,75.00
 2025-03-18,Century Tuna Flakes in Oil,CAN-CTF-155,4,Canned Goods,38.00,48.00
-2025-03-18,Nescafé 3-in-1 Original,BEV-N3N-01,7,Beverages,5.00,7.00
+2025-03-18,Assorted Sari-Sari Goods Bundle Pack Family Size Promotional Combo With Free Sachet Items Included Extra,BEV-N3N-01,7,Beverages,5.00,7.00
 2025-03-18,San Miguel Pale Pilsen 330ml,BEV-SMB-330,4,Beverages,50.00,65.00
 2025-03-18,Coca-Cola 1.5L,BEV-CCR-15L,11,Beverages,55.00,70.00
 2025-03-18,Milo Powdered Drink 33g Sachet,BEV-MIL-33,11,Beverages,6.00,9.00
@@ -12050,7 +12065,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-04-03,Safeguard Soap 90g,BDY-SFG-90,10,Body Care,22.00,30.00
 2025-04-03,Colgate Toothpaste 150g,BDY-COL-150,2,Body Care,55.00,72.00
 2025-04-03,Palmolive Shampoo Sachet,BDY-PLM-01,9,Body Care,5.00,8.00
-2025-04-03,Bear Brand Powdered Milk 320g,DRY-BBM-320,5,Dairy,70.00,90.00
+2025-04-03,Bear Brand Powdered Milk 320g,DRY-BBM-320,5.0,Dairy,70.00,90.00
 2025-04-03,Pandesal 10pcs,BKY-PDS-10,15,Bakery,45.00,60.00
 2025-04-03,Fresh Eggs Tray 30s,FRS-EGG-30,3,Fresh,210.00,260.00
 2025-04-03,CDO Hotdog 1kg,FRS-HTD-1K,3,Fresh,180.00,230.00
@@ -12229,7 +12244,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-04-12,Colgate Toothpaste 150g,BDY-COL-150,10,Body Care,55.00,72.00
 2025-04-12,Palmolive Shampoo Sachet,BDY-PLM-01,12,Body Care,5.00,8.00
 2025-04-12,Datu Puti Soy Sauce 385ml,CON-DTP-385,7,Condiments,18.00,25.00
-2025-04-12,Bear Brand Powdered Milk 320g,DRY-BBM-320,4,Dairy,70.00,90.00
+2025-04-12,Bear Brand Powdered Milk 320g ,DRY-BBM-320,4,Dairy,70.00,90.00
 2025-04-12,Pandesal 10pcs,BKY-PDS-10,11,Bakery,45.00,60.00
 2025-04-12,Fresh Eggs Tray 30s,FRS-EGG-30,5,Fresh,210.00,260.00
 2025-04-12,CDO Hotdog 1kg,FRS-HTD-1K,6,Fresh,180.00,230.00
@@ -12365,7 +12380,8 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-04-19,Palmolive Shampoo Sachet,BDY-PLM-01,11,Body Care,5.00,8.00
 2025-04-19,Datu Puti Soy Sauce 385ml,CON-DTP-385,9,Condiments,18.00,25.00
 2025-04-19,Bear Brand Powdered Milk 320g,DRY-BBM-320,5,Dairy,70.00,90.00
-2025-04-19,Pandesal 10pcs,BKY-PDS-10,15,Bakery,45.00,60.00
+2025-04-19,Pandesal 10pcs,BKY-PDS-10,15,Bakery,45.00,1234567890.00
+2025-04-19,Rice, Premium 5kg,FRS-EGG-30,4,Fresh,210.00,260.00
 2025-04-19,Fresh Eggs Tray 30s,FRS-EGG-30,4,Fresh,210.00,260.00
 2025-04-19,CDO Hotdog 1kg,FRS-HTD-1K,9,Fresh,180.00,230.00
 2025-04-20,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,6,Pantry,60.00,75.00
@@ -12466,13 +12482,13 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-04-25,Argentina Corned Beef 175g,CAN-ACB-175,2,Canned Goods,45.00,55.00
 2025-04-25,Century Tuna Flakes in Oil,CAN-CTF-155,3,Canned Goods,38.00,48.00
 2025-04-25,Nescafé 3-in-1 Original,BEV-N3N-01,8,Beverages,5.00,7.00
-2025-04-25,San Miguel Pale Pilsen 330ml,BEV-SMB-330,5,Beverages,50.00,65.00
+2025-04-25,San Miguel Pale Pilsen 330ml,BEV-SMB-330,0,Beverages,50.00,65.00
 2025-04-25,Coca-Cola 1.5L,BEV-CCR-15L,10,Beverages,55.00,70.00
 2025-04-25,Milo Powdered Drink 33g Sachet,BEV-MIL-33,14,Beverages,6.00,9.00
 2025-04-25,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,5,Beverages,6.00,9.00
 2025-04-25,Sky Flakes Crackers,SNK-SKF-01,6,Snacks,8.00,12.00
 2025-04-25,Chippy Barbecue 110g,SNK-CHP-110,5,Snacks,12.00,18.00
-2025-04-25,Surf Detergent Powder 65g,HSH-SRF-65,3,Household,6.00,9.00
+2025-04-25,SURF DETERGENT POWDER 65G,HSH-SRF-65,3,Household,6.00,9.00
 2025-04-25,Safeguard Soap 90g,BDY-SFG-90,8,Body Care,22.00,30.00
 2025-04-25,Colgate Toothpaste 150g,BDY-COL-150,5,Body Care,55.00,72.00
 2025-04-25,Palmolive Shampoo Sachet,BDY-PLM-01,9,Body Care,5.00,8.00
@@ -12528,7 +12544,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-04-28,San Miguel Pale Pilsen 330ml,BEV-SMB-330,15,Beverages,50.00,65.00
 2025-04-28,Coca-Cola 1.5L,BEV-CCR-15L,8,Beverages,55.00,70.00
 2025-04-28,Milo Powdered Drink 33g Sachet,BEV-MIL-33,8,Beverages,6.00,9.00
-2025-04-28,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,10,Beverages,6.00,9.00
+2025-04-28,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,10,Grocery > Canned Goods > Fish > Sardines in Tomato Sauce,6.00,9.00
 2025-04-28,Sky Flakes Crackers,SNK-SKF-01,7,Snacks,8.00,12.00
 2025-04-28,Chippy Barbecue 110g,SNK-CHP-110,4,Snacks,12.00,18.00
 2025-04-28,Surf Detergent Powder 65g,HSH-SRF-65,9,Household,6.00,9.00
@@ -12638,6 +12654,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-05-03,Pandesal 10pcs,BKY-PDS-10,15,Bakery,45.00,60.00
 2025-05-03,Fresh Eggs Tray 30s,FRS-EGG-30,3,Fresh,210.00,260.00
 2025-05-03,CDO Hotdog 1kg,FRS-HTD-1K,7,Fresh,180.00,230.00
+2025-05-04,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,3,Pantry,60.00,75.00
 2025-05-04,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,6,Pantry,60.00,75.00
 2025-05-04,Lucky Me Pancit Canton,PNT-LMC-55G,20,Pantry,10.00,14.00
 2025-05-04,Argentina Corned Beef 175g,CAN-ACB-175,1,Canned Goods,45.00,55.00
@@ -12837,7 +12854,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-05-14,Lucky Me Pancit Canton,PNT-LMC-55G,15,Pantry,10.00,14.00
 2025-05-14,Argentina Corned Beef 175g,CAN-ACB-175,4,Canned Goods,45.00,55.00
 2025-05-14,Century Tuna Flakes in Oil,CAN-CTF-155,4,Canned Goods,38.00,48.00
-2025-05-14,Nescafé 3-in-1 Original,BEV-N3N-01,6,Beverages,5.00,7.00
+2025-05-14,Nescafé 3-in-1 Original,BEV-N3N-01,0,Beverages,5.00,7.00
 2025-05-14,San Miguel Pale Pilsen 330ml,BEV-SMB-330,2,Beverages,50.00,65.00
 2025-05-14,Coca-Cola 1.5L,BEV-CCR-15L,6,Beverages,55.00,70.00
 2025-05-14,Milo Powdered Drink 33g Sachet,BEV-MIL-33,4,Beverages,6.00,9.00
@@ -13004,7 +13021,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-05-22,Colgate Toothpaste 150g,BDY-COL-150,2,Body Care,55.00,72.00
 2025-05-22,Palmolive Shampoo Sachet,BDY-PLM-01,2,Body Care,5.00,8.00
 2025-05-22,Datu Puti Soy Sauce 385ml,CON-DTP-385,4,Condiments,18.00,25.00
-2025-05-22,Bear Brand Powdered Milk 320g,DRY-BBM-320,4,Dairy,70.00,90.00
+2025-05-22,  Bear Brand Powdered Milk 320g  ,DRY-BBM-320,4,Dairy,70.00,90.00
 2025-05-22,Pandesal 10pcs,BKY-PDS-10,14,Bakery,45.00,60.00
 2025-05-22,Fresh Eggs Tray 30s,FRS-EGG-30,6,Fresh,210.00,260.00
 2025-05-22,CDO Hotdog 1kg,FRS-HTD-1K,3,Fresh,180.00,230.00
@@ -13303,7 +13320,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-06-06,CDO Hotdog 1kg,FRS-HTD-1K,5,Fresh,180.00,230.00
 2025-06-07,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,4,Pantry,60.00,75.00
 2025-06-07,Lucky Me Pancit Canton,PNT-LMC-55G,21,Pantry,10.00,14.00
-2025-06-07,Argentina Corned Beef 175g,CAN-ACB-175,5,Canned Goods,45.00,55.00
+2025-06-07,  Argentina Corned Beef 175g  ,CAN-ACB-175,5,Canned Goods,45.00,55.00
 2025-06-07,Century Tuna Flakes in Oil,CAN-CTF-155,3,Canned Goods,38.00,48.00
 2025-06-07,Nescafé 3-in-1 Original,BEV-N3N-01,13,Beverages,5.00,7.00
 2025-06-07,San Miguel Pale Pilsen 330ml,BEV-SMB-330,7,Beverages,50.00,65.00
@@ -13670,7 +13687,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-06-25,Datu Puti Soy Sauce 385ml,CON-DTP-385,5,Condiments,18.00,25.00
 2025-06-25,Bear Brand Powdered Milk 320g,DRY-BBM-320,3,Dairy,70.00,90.00
 2025-06-25,Pandesal 10pcs,BKY-PDS-10,9,Bakery,45.00,60.00
-2025-06-25,Fresh Eggs Tray 30s,FRS-EGG-30,5,Fresh,210.00,260.00
+2025-06-25,Fresh Eggs Tray 30s,FRS-EGG-30,0,Fresh,210.00,260.00
 2025-06-25,CDO Hotdog 1kg,FRS-HTD-1K,3,Fresh,180.00,230.00
 2025-06-26,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,10,Pantry,60.00,75.00
 2025-06-26,Lucky Me Pancit Canton,PNT-LMC-55G,12,Pantry,10.00,14.00
@@ -13691,7 +13708,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-06-26,Bear Brand Powdered Milk 320g,DRY-BBM-320,4,Dairy,70.00,90.00
 2025-06-26,Pandesal 10pcs,BKY-PDS-10,9,Bakery,45.00,60.00
 2025-06-26,Fresh Eggs Tray 30s,FRS-EGG-30,5,Fresh,210.00,260.00
-2025-06-26,CDO Hotdog 1kg,FRS-HTD-1K,7,Fresh,180.00,230.00
+2025-06-26,CDO Hotdog 1kg,FRS-HTD-1K,999999,Fresh,180.00,230.00
 2025-06-27,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,9,Pantry,60.00,75.00
 2025-06-27,Lucky Me Pancit Canton,PNT-LMC-55G,14,Pantry,10.00,14.00
 2025-06-27,Argentina Corned Beef 175g,CAN-ACB-175,2,Canned Goods,45.00,55.00
@@ -13899,7 +13916,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-07-07,Milo Powdered Drink 33g Sachet,BEV-MIL-33,4,Beverages,6.00,9.00
 2025-07-07,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,7,Beverages,6.00,9.00
 2025-07-07,Sky Flakes Crackers,SNK-SKF-01,6,Snacks,8.00,12.00
-2025-07-07,Chippy Barbecue 110g,SNK-CHP-110,6,Snacks,12.00,18.00
+2025-07-07,Chippy Barbecue 110g,SNK-CHP-110,1000000,Snacks,12.00,18.00
 2025-07-07,Surf Detergent Powder 65g,HSH-SRF-65,5,Household,6.00,9.00
 2025-07-07,Safeguard Soap 90g,BDY-SFG-90,6,Body Care,22.00,30.00
 2025-07-07,Colgate Toothpaste 150g,BDY-COL-150,1,Body Care,55.00,72.00
@@ -13952,7 +13969,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-07-10,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,7,Pantry,60.00,75.00
 2025-07-10,Lucky Me Pancit Canton,PNT-LMC-55G,27,Pantry,10.00,14.00
 2025-07-10,Argentina Corned Beef 175g,CAN-ACB-175,7,Canned Goods,45.00,55.00
-2025-07-10,Century Tuna Flakes in Oil,CAN-CTF-155,4,Canned Goods,38.00,48.00
+2025-07-10,Century Tuna Flakes in Oil,CAN-CTF-155,4,Canned Goods,N/A,48.00
 2025-07-10,Nescafé 3-in-1 Original,BEV-N3N-01,7,Beverages,5.00,7.00
 2025-07-10,San Miguel Pale Pilsen 330ml,BEV-SMB-330,11,Beverages,50.00,65.00
 2025-07-10,Coca-Cola 1.5L,BEV-CCR-15L,8,Beverages,55.00,70.00
@@ -13964,7 +13981,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-07-10,Safeguard Soap 90g,BDY-SFG-90,3,Body Care,22.00,30.00
 2025-07-10,Colgate Toothpaste 150g,BDY-COL-150,3,Body Care,55.00,72.00
 2025-07-10,Palmolive Shampoo Sachet,BDY-PLM-01,15,Body Care,5.00,8.00
-2025-07-10,Datu Puti Soy Sauce 385ml,CON-DTP-385,5,Condiments,18.00,25.00
+2025-07-10,Datu Puti Soy Sauce 385ml,CON-DTP-385,5,Condiments,"240,00",25.00
 2025-07-10,Bear Brand Powdered Milk 320g,DRY-BBM-320,2,Dairy,70.00,90.00
 2025-07-10,Pandesal 10pcs,BKY-PDS-10,9,Bakery,45.00,60.00
 2025-07-10,Fresh Eggs Tray 30s,FRS-EGG-30,2,Fresh,210.00,260.00
@@ -13983,7 +14000,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-07-11,Surf Detergent Powder 65g,HSH-SRF-65,6,Household,6.00,9.00
 2025-07-11,Safeguard Soap 90g,BDY-SFG-90,8,Body Care,22.00,30.00
 2025-07-11,Colgate Toothpaste 150g,BDY-COL-150,5,Body Care,55.00,72.00
-2025-07-11,Palmolive Shampoo Sachet,BDY-PLM-01,11,Body Care,5.00,8.00
+2025-07-11,Palmolive Shampoo Sachet,BDY-PLM-01,11,Body Care,₱5.00,8.00
 2025-07-11,Datu Puti Soy Sauce 385ml,CON-DTP-385,7,Condiments,18.00,25.00
 2025-07-11,Bear Brand Powdered Milk 320g,DRY-BBM-320,5,Dairy,70.00,90.00
 2025-07-11,Pandesal 10pcs,BKY-PDS-10,8,Bakery,45.00,60.00
@@ -14139,7 +14156,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-07-19,Chippy Barbecue 110g,SNK-CHP-110,5,Snacks,12.00,18.00
 2025-07-19,Surf Detergent Powder 65g,HSH-SRF-65,6,Household,6.00,9.00
 2025-07-19,Safeguard Soap 90g,BDY-SFG-90,4,Body Care,22.00,30.00
-2025-07-19,Colgate Toothpaste 150g,BDY-COL-150,1,Body Care,55.00,72.00
+2025-07-19,Colgate Toothpaste 150g,BDY-COL-150,1,Body Care,"240,00",72.00
 2025-07-19,Palmolive Shampoo Sachet,BDY-PLM-01,6,Body Care,5.00,8.00
 2025-07-19,Datu Puti Soy Sauce 385ml,CON-DTP-385,6,Condiments,18.00,25.00
 2025-07-19,Bear Brand Powdered Milk 320g,DRY-BBM-320,6,Dairy,70.00,90.00
@@ -14172,7 +14189,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-07-21,Nescafé 3-in-1 Original,BEV-N3N-01,5,Beverages,5.00,7.00
 2025-07-21,San Miguel Pale Pilsen 330ml,BEV-SMB-330,12,Beverages,50.00,65.00
 2025-07-21,Coca-Cola 1.5L,BEV-CCR-15L,7,Beverages,55.00,70.00
-2025-07-21,Milo Powdered Drink 33g Sachet,BEV-MIL-33,11,Beverages,6.00,9.00
+2025-07-21,Milo Powdered Drink 33g Sachet,BEV-MIL-33,11,Beverages,6.00,"1,250.00"
 2025-07-21,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,10,Beverages,6.00,9.00
 2025-07-21,Sky Flakes Crackers,SNK-SKF-01,7,Snacks,8.00,12.00
 2025-07-21,Chippy Barbecue 110g,SNK-CHP-110,7,Snacks,12.00,18.00
@@ -14198,7 +14215,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-07-22,Chippy Barbecue 110g,SNK-CHP-110,3,Snacks,12.00,18.00
 2025-07-22,Surf Detergent Powder 65g,HSH-SRF-65,6,Household,6.00,9.00
 2025-07-22,Safeguard Soap 90g,BDY-SFG-90,5,Body Care,22.00,30.00
-2025-07-22,Colgate Toothpaste 150g,BDY-COL-150,3,Body Care,55.00,72.00
+2025-07-22,COLGATE TOOTHPASTE 150G,BDY-COL-150,3,Body Care,55.00,72.00
 2025-07-22,Palmolive Shampoo Sachet,BDY-PLM-01,9,Body Care,5.00,8.00
 2025-07-22,Datu Puti Soy Sauce 385ml,CON-DTP-385,4,Condiments,18.00,25.00
 2025-07-22,Pandesal 10pcs,BKY-PDS-10,4,Bakery,45.00,60.00
@@ -14518,12 +14535,13 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-08-08,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,5,Pantry,60.00,75.00
 2025-08-08,Lucky Me Pancit Canton,PNT-LMC-55G,18,Pantry,10.00,14.00
 2025-08-08,Argentina Corned Beef 175g,CAN-ACB-175,11,Canned Goods,45.00,55.00
+,Total,,18092,,,
 2025-08-08,Century Tuna Flakes in Oil,CAN-CTF-155,6,Canned Goods,38.00,48.00
 2025-08-08,Nescafé 3-in-1 Original,BEV-N3N-01,9,Beverages,5.00,7.00
 2025-08-08,San Miguel Pale Pilsen 330ml,BEV-SMB-330,9,Beverages,50.00,65.00
 2025-08-08,Coca-Cola 1.5L,BEV-CCR-15L,7,Beverages,55.00,70.00
 2025-08-08,Milo Powdered Drink 33g Sachet,BEV-MIL-33,10,Beverages,6.00,9.00
-2025-08-08,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,9,Beverages,6.00,9.00
+2025-08-08 14:30:00,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,9,Beverages,6.00,9.00
 2025-08-08,Sky Flakes Crackers,SNK-SKF-01,11,Snacks,8.00,12.00
 2025-08-08,Chippy Barbecue 110g,SNK-CHP-110,9,Snacks,12.00,18.00
 2025-08-08,Surf Detergent Powder 65g,HSH-SRF-65,4,Household,6.00,9.00
@@ -14669,7 +14687,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-08-15,Datu Puti Soy Sauce 385ml,CON-DTP-385,5,Condiments,18.00,25.00
 2025-08-15,Bear Brand Powdered Milk 320g,DRY-BBM-320,3,Dairy,70.00,90.00
 2025-08-15,Pandesal 10pcs,BKY-PDS-10,25,Bakery,45.00,60.00
-2025-08-15,Fresh Eggs Tray 30s,FRS-EGG-30,9,Fresh,210.00,260.00
+,Fresh Eggs Tray 30s,FRS-EGG-30,9,Fresh,210.00,260.00
 2025-08-15,CDO Hotdog 1kg,FRS-HTD-1K,6,Fresh,180.00,230.00
 2025-08-16,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,5,Pantry,60.00,75.00
 2025-08-16,Lucky Me Pancit Canton,PNT-LMC-55G,19,Pantry,10.00,14.00
@@ -14743,7 +14761,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-08-19,Chippy Barbecue 110g,SNK-CHP-110,7,Snacks,12.00,18.00
 2025-08-19,Surf Detergent Powder 65g,HSH-SRF-65,2,Household,6.00,9.00
 2025-08-19,Safeguard Soap 90g,BDY-SFG-90,2,Body Care,22.00,30.00
-2025-08-19,Colgate Toothpaste 150g,BDY-COL-150,4,Body Care,55.00,72.00
+2025-08-19,Colgate Toothpaste 150g,BDY-COL-150,999999,Body Care,55.00,72.00
 2025-08-19,Palmolive Shampoo Sachet,BDY-PLM-01,4,Body Care,5.00,8.00
 2025-08-19,Bear Brand Powdered Milk 320g,DRY-BBM-320,2,Dairy,70.00,90.00
 2025-08-19,Pandesal 10pcs,BKY-PDS-10,8,Bakery,45.00,60.00
@@ -15137,7 +15155,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-09-08,Chippy Barbecue 110g,SNK-CHP-110,6,Snacks,12.00,18.00
 2025-09-08,Surf Detergent Powder 65g,HSH-SRF-65,6,Household,6.00,9.00
 2025-09-08,Safeguard Soap 90g,BDY-SFG-90,7,Body Care,22.00,30.00
-2025-09-08,Colgate Toothpaste 150g,BDY-COL-150,6,Body Care,55.00,72.00
+2025-09-08,Colgate Toothpaste 150g,BDY-COL-150,1e3,Body Care,55.00,72.00
 2025-09-08,Palmolive Shampoo Sachet,BDY-PLM-01,6,Body Care,5.00,8.00
 2025-09-08,Datu Puti Soy Sauce 385ml,CON-DTP-385,5,Condiments,18.00,25.00
 2025-09-08,Bear Brand Powdered Milk 320g,DRY-BBM-320,3,Dairy,70.00,90.00
@@ -15214,7 +15232,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-09-12,Milo Powdered Drink 33g Sachet,BEV-MIL-33,9,Beverages,6.00,9.00
 2025-09-12,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,15,Beverages,6.00,9.00
 2025-09-12,Sky Flakes Crackers,SNK-SKF-01,7,Snacks,8.00,12.00
-2025-09-12,Chippy Barbecue 110g,SNK-CHP-110,8,Snacks,12.00,18.00
+2025-09-12,Chippy Barbecue 110g ,SNK-CHP-110,8,Snacks,12.00,18.00
 2025-09-12,Surf Detergent Powder 65g,HSH-SRF-65,6,Household,6.00,9.00
 2025-09-12,Safeguard Soap 90g,BDY-SFG-90,5,Body Care,22.00,30.00
 2025-09-12,Colgate Toothpaste 150g,BDY-COL-150,5,Body Care,55.00,72.00
@@ -15374,11 +15392,11 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-09-20,Safeguard Soap 90g,BDY-SFG-90,9,Body Care,22.00,30.00
 2025-09-20,Colgate Toothpaste 150g,BDY-COL-150,3,Body Care,55.00,72.00
 2025-09-20,Palmolive Shampoo Sachet,BDY-PLM-01,16,Body Care,5.00,8.00
-2025-09-20,Datu Puti Soy Sauce 385ml,CON-DTP-385,5,Condiments,18.00,25.00
+2025-09-20,Datu Puti Soy Sauce 385ml ,CON-DTP-385,5,Condiments,18.00,25.00
 2025-09-20,Bear Brand Powdered Milk 320g,DRY-BBM-320,2,Dairy,70.00,90.00
 2025-09-20,Pandesal 10pcs,BKY-PDS-10,9,Bakery,45.00,60.00
 2025-09-20,Fresh Eggs Tray 30s,FRS-EGG-30,10,Fresh,210.00,260.00
-2025-09-20,CDO Hotdog 1kg,FRS-HTD-1K,7,Fresh,180.00,230.00
+2025-09-20,CDO HOTDOG 1KG,FRS-HTD-1K,7,Fresh,180.00,230.00
 2025-09-21,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,15,Pantry,60.00,75.00
 2025-09-21,Lucky Me Pancit Canton,PNT-LMC-55G,19,Pantry,10.00,14.00
 2025-09-21,Argentina Corned Beef 175g,CAN-ACB-175,4,Canned Goods,45.00,55.00
@@ -15400,7 +15418,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-09-21,Fresh Eggs Tray 30s,FRS-EGG-30,4,Fresh,210.00,260.00
 2025-09-21,CDO Hotdog 1kg,FRS-HTD-1K,6,Fresh,180.00,230.00
 2025-09-22,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,6,Pantry,60.00,75.00
-2025-09-22,Lucky Me Pancit Canton,PNT-LMC-55G,13,Pantry,10.00,14.00
+2025-09-22,Lucky Me Pancit Canton,PNT-LMC-55G,13,Pantry,10.00,1234567890.00
 2025-09-22,Argentina Corned Beef 175g,CAN-ACB-175,2,Canned Goods,45.00,55.00
 2025-09-22,Nescafé 3-in-1 Original,BEV-N3N-01,10,Beverages,5.00,7.00
 2025-09-22,San Miguel Pale Pilsen 330ml,BEV-SMB-330,4,Beverages,50.00,65.00
@@ -15430,7 +15448,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-09-23,Sky Flakes Crackers,SNK-SKF-01,7,Snacks,8.00,12.00
 2025-09-23,Chippy Barbecue 110g,SNK-CHP-110,3,Snacks,12.00,18.00
 2025-09-23,Surf Detergent Powder 65g,HSH-SRF-65,2,Household,6.00,9.00
-2025-09-23,Safeguard Soap 90g,BDY-SFG-90,6,Body Care,22.00,30.00
+2025-09-23,Safeguard Soap 90g,BDY-SFG-90,-2,Body Care,22.00,30.00
 2025-09-23,Colgate Toothpaste 150g,BDY-COL-150,1,Body Care,55.00,72.00
 2025-09-23,Palmolive Shampoo Sachet,BDY-PLM-01,7,Body Care,5.00,8.00
 2025-09-23,Datu Puti Soy Sauce 385ml,CON-DTP-385,1,Condiments,18.00,25.00
@@ -15563,7 +15581,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-09-30,San Miguel Pale Pilsen 330ml,BEV-SMB-330,9,Beverages,50.00,65.00
 2025-09-30,Coca-Cola 1.5L,BEV-CCR-15L,10,Beverages,55.00,70.00
 2025-09-30,Milo Powdered Drink 33g Sachet,BEV-MIL-33,7,Beverages,6.00,9.00
-2025-09-30,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,10,Beverages,6.00,9.00
+2025-09-30,KOPIKO 3-IN-1 COFFEE SACHET,BEV-KPK-01,10,Beverages,6.00,9.00
 2025-09-30,Sky Flakes Crackers,SNK-SKF-01,13,Snacks,8.00,12.00
 2025-09-30,Chippy Barbecue 110g,SNK-CHP-110,10,Snacks,12.00,18.00
 2025-09-30,Surf Detergent Powder 65g,HSH-SRF-65,9,Household,6.00,9.00
@@ -15670,7 +15688,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-10-05,Palmolive Shampoo Sachet,BDY-PLM-01,12,Body Care,5.00,8.00
 2025-10-05,Datu Puti Soy Sauce 385ml,CON-DTP-385,4,Condiments,18.00,25.00
 2025-10-05,Bear Brand Powdered Milk 320g,DRY-BBM-320,2,Dairy,70.00,90.00
-2025-10-05,Pandesal 10pcs,BKY-PDS-10,11,Bakery,45.00,60.00
+2025-10-05,Pandesal 10pcs,BKY-PDS-10,2.5,Bakery,45.00,60.00
 2025-10-05,Fresh Eggs Tray 30s,FRS-EGG-30,8,Fresh,210.00,260.00
 2025-10-05,CDO Hotdog 1kg,FRS-HTD-1K,4,Fresh,180.00,230.00
 2025-10-06,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,3,Pantry,60.00,75.00
@@ -15759,7 +15777,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-10-10,Nescafé 3-in-1 Original,BEV-N3N-01,2,Beverages,5.00,7.00
 2025-10-10,San Miguel Pale Pilsen 330ml,BEV-SMB-330,10,Beverages,50.00,65.00
 2025-10-10,Coca-Cola 1.5L,BEV-CCR-15L,10,Beverages,55.00,70.00
-2025-10-10,Milo Powdered Drink 33g Sachet,BEV-MIL-33,12,Beverages,6.00,9.00
+10-Oct-25,Milo Powdered Drink 33g Sachet,BEV-MIL-33,12,Beverages,6.00,9.00
 2025-10-10,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,5,Beverages,6.00,9.00
 2025-10-10,Sky Flakes Crackers,SNK-SKF-01,7,Snacks,8.00,12.00
 2025-10-10,Chippy Barbecue 110g,SNK-CHP-110,8,Snacks,12.00,18.00
@@ -15839,7 +15857,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-10-14,Nescafé 3-in-1 Original,BEV-N3N-01,9,Beverages,5.00,7.00
 2025-10-14,San Miguel Pale Pilsen 330ml,BEV-SMB-330,9,Beverages,50.00,65.00
 2025-10-14,Coca-Cola 1.5L,BEV-CCR-15L,3,Beverages,55.00,70.00
-2025-10-14,Milo Powdered Drink 33g Sachet,BEV-MIL-33,7,Beverages,6.00,9.00
+"October 14, 2025",Milo Powdered Drink 33g Sachet,BEV-MIL-33,7,Beverages,6.00,9.00
 2025-10-14,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,7,Beverages,6.00,9.00
 2025-10-14,Sky Flakes Crackers,SNK-SKF-01,7,Snacks,8.00,12.00
 2025-10-14,Chippy Barbecue 110g,SNK-CHP-110,6,Snacks,12.00,18.00
@@ -15975,7 +15993,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-10-21,Argentina Corned Beef 175g,CAN-ACB-175,2,Canned Goods,45.00,55.00
 2025-10-21,Century Tuna Flakes in Oil,CAN-CTF-155,3,Canned Goods,38.00,48.00
 2025-10-21,Nescafé 3-in-1 Original,BEV-N3N-01,6,Beverages,5.00,7.00
-2025-10-21,San Miguel Pale Pilsen 330ml,BEV-SMB-330,5,Beverages,50.00,65.00
+2025-10-21 14:30:00,San Miguel Pale Pilsen 330ml,BEV-SMB-330,5,Beverages,50.00,65.00
 2025-10-21,Coca-Cola 1.5L,BEV-CCR-15L,3,Beverages,55.00,70.00
 2025-10-21,Milo Powdered Drink 33g Sachet,BEV-MIL-33,9,Beverages,6.00,9.00
 2025-10-21,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,7,Beverages,6.00,9.00
@@ -16010,7 +16028,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-10-22,Fresh Eggs Tray 30s,FRS-EGG-30,5,Fresh,210.00,260.00
 2025-10-22,CDO Hotdog 1kg,FRS-HTD-1K,8,Fresh,180.00,230.00
 2025-10-23,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,3,Pantry,60.00,75.00
-2025-10-23,Lucky Me Pancit Canton,PNT-LMC-55G,15,Pantry,10.00,14.00
+2025-10-23,Lucky Me Pancit Canton,SUP-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-4821-,15,Pantry,10.00,14.00
 2025-10-23,Argentina Corned Beef 175g,CAN-ACB-175,6,Canned Goods,45.00,55.00
 2025-10-23,Century Tuna Flakes in Oil,CAN-CTF-155,3,Canned Goods,38.00,48.00
 2025-10-23,Nescafé 3-in-1 Original,BEV-N3N-01,7,Beverages,5.00,7.00
@@ -16065,7 +16083,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-10-25,Colgate Toothpaste 150g,BDY-COL-150,3,Body Care,55.00,72.00
 2025-10-25,Palmolive Shampoo Sachet,BDY-PLM-01,10,Body Care,5.00,8.00
 2025-10-25,Datu Puti Soy Sauce 385ml,CON-DTP-385,7,Condiments,18.00,25.00
-2025-10-25,Bear Brand Powdered Milk 320g,DRY-BBM-320,2,Dairy,70.00,90.00
+2025-10-25,Bear Brand Powdered Milk 320g,DRY-BBM-320,2,Dairy,"240,00",90.00
 2025-10-25,Pandesal 10pcs,BKY-PDS-10,10,Bakery,45.00,60.00
 2025-10-25,Fresh Eggs Tray 30s,FRS-EGG-30,11,Fresh,210.00,260.00
 2025-10-25,CDO Hotdog 1kg,FRS-HTD-1K,6,Fresh,180.00,230.00
@@ -16232,7 +16250,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-11-03,Century Tuna Flakes in Oil,CAN-CTF-155,6,Canned Goods,38.00,48.00
 2025-11-03,Nescafé 3-in-1 Original,BEV-N3N-01,3,Beverages,5.00,7.00
 2025-11-03,San Miguel Pale Pilsen 330ml,BEV-SMB-330,3,Beverages,50.00,65.00
-2025-11-03,Coca-Cola 1.5L,BEV-CCR-15L,5,Beverages,55.00,70.00
+2025-11-03,Coca-Cola 1.5L,BEV-CCR-15L,-2,Beverages,55.00,70.00
 2025-11-03,Milo Powdered Drink 33g Sachet,BEV-MIL-33,5,Beverages,6.00,9.00
 2025-11-03,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,12,Beverages,6.00,9.00
 2025-11-03,Sky Flakes Crackers,SNK-SKF-01,3,Snacks,8.00,12.00
@@ -16304,7 +16322,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-11-06,Datu Puti Soy Sauce 385ml,CON-DTP-385,7,Condiments,18.00,25.00
 2025-11-06,Bear Brand Powdered Milk 320g,DRY-BBM-320,5,Dairy,70.00,90.00
 2025-11-06,Pandesal 10pcs,BKY-PDS-10,13,Bakery,45.00,60.00
-2025-11-06,Fresh Eggs Tray 30s,FRS-EGG-30,6,Fresh,210.00,260.00
+2025-11-06,FRESH EGGS TRAY 30S,FRS-EGG-30,6,Fresh,210.00,260.00
 2025-11-06,CDO Hotdog 1kg,FRS-HTD-1K,3,Fresh,180.00,230.00
 2025-11-07,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,7,Pantry,60.00,75.00
 2025-11-07,Lucky Me Pancit Canton,PNT-LMC-55G,22,Pantry,10.00,14.00
@@ -16541,7 +16559,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-11-18,Bear Brand Powdered Milk 320g,DRY-BBM-320,4,Dairy,70.00,90.00
 2025-11-18,Pandesal 10pcs,BKY-PDS-10,8,Bakery,45.00,60.00
 2025-11-18,Fresh Eggs Tray 30s,FRS-EGG-30,4,Fresh,210.00,260.00
-2025-11-18,CDO Hotdog 1kg,FRS-HTD-1K,6,Fresh,180.00,230.00
+2025-11-18,CDO Hotdog 1kg,FRS-HTD-1K,6,Grocery > Canned Goods > Fish > Sardines in Tomato Sauce,180.00,230.00
 2025-11-19,Lucky Me Pancit Canton,PNT-LMC-55G,11,Pantry,10.00,14.00
 2025-11-19,Argentina Corned Beef 175g,CAN-ACB-175,2,Canned Goods,45.00,55.00
 2025-11-19,Century Tuna Flakes in Oil,CAN-CTF-155,4,Canned Goods,38.00,48.00
@@ -16637,7 +16655,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-11-23,Palmolive Shampoo Sachet,BDY-PLM-01,11,Body Care,5.00,8.00
 2025-11-23,Datu Puti Soy Sauce 385ml,CON-DTP-385,6,Condiments,18.00,25.00
 2025-11-23,Bear Brand Powdered Milk 320g,DRY-BBM-320,6,Dairy,70.00,90.00
-2025-11-23,Pandesal 10pcs,BKY-PDS-10,20,Bakery,45.00,60.00
+2025-11-23,Pandesal 10pcs,BKY-PDS-10,"1,200",Bakery,45.00,60.00
 2025-11-23,Fresh Eggs Tray 30s,FRS-EGG-30,4,Fresh,210.00,260.00
 2025-11-23,CDO Hotdog 1kg,FRS-HTD-1K,5,Fresh,180.00,230.00
 2025-11-24,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,1,Pantry,60.00,75.00
@@ -16683,7 +16701,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-11-26,Lucky Me Pancit Canton,PNT-LMC-55G,19,Pantry,10.00,14.00
 2025-11-26,Argentina Corned Beef 175g,CAN-ACB-175,2,Canned Goods,45.00,55.00
 2025-11-26,Century Tuna Flakes in Oil,CAN-CTF-155,1,Canned Goods,38.00,48.00
-2025-11-26,Nescafé 3-in-1 Original,BEV-N3N-01,7,Beverages,5.00,7.00
+2025-11-26,Nescafé 3-in-1 Original,BEV-N3N-01,7,Grocery > Canned Goods > Fish > Sardines in Tomato Sauce,5.00,7.00
 2025-11-26,San Miguel Pale Pilsen 330ml,BEV-SMB-330,5,Beverages,50.00,65.00
 2025-11-26,Coca-Cola 1.5L,BEV-CCR-15L,8,Beverages,55.00,70.00
 2025-11-26,Milo Powdered Drink 33g Sachet,BEV-MIL-33,4,Beverages,6.00,9.00
@@ -16950,7 +16968,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-12-09,Palmolive Shampoo Sachet,BDY-PLM-01,10,Body Care,5.00,8.00
 2025-12-09,Datu Puti Soy Sauce 385ml,CON-DTP-385,1,Condiments,18.00,25.00
 2025-12-09,Bear Brand Powdered Milk 320g,DRY-BBM-320,1,Dairy,70.00,90.00
-2025-12-09,Pandesal 10pcs,BKY-PDS-10,11,Bakery,45.00,60.00
+2025-12-09,Pandesal 10pcs,BKY-PDS-10,-2,Bakery,45.00,60.00
 2025-12-09,Fresh Eggs Tray 30s,FRS-EGG-30,8,Fresh,210.00,260.00
 2025-12-09,CDO Hotdog 1kg,FRS-HTD-1K,4,Fresh,180.00,230.00
 2025-12-10,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,5,Pantry,60.00,75.00
@@ -17012,7 +17030,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-12-12,Fresh Eggs Tray 30s,FRS-EGG-30,3,Fresh,210.00,260.00
 2025-12-12,CDO Hotdog 1kg,FRS-HTD-1K,2,Fresh,180.00,230.00
 2025-12-13,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,4,Pantry,60.00,75.00
-2025-12-13,Lucky Me Pancit Canton,PNT-LMC-55G,23,Pantry,10.00,14.00
+03-05-2024,Lucky Me Pancit Canton,PNT-LMC-55G,23,Pantry,10.00,14.00
 2025-12-13,Argentina Corned Beef 175g,CAN-ACB-175,5,Canned Goods,45.00,55.00
 2025-12-13,Nescafé 3-in-1 Original,BEV-N3N-01,10,Beverages,5.00,7.00
 2025-12-13,San Miguel Pale Pilsen 330ml,BEV-SMB-330,8,Beverages,50.00,65.00
@@ -17044,7 +17062,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2025-12-14,Surf Detergent Powder 65g,HSH-SRF-65,13,Household,6.00,9.00
 2025-12-14,Safeguard Soap 90g,BDY-SFG-90,3,Body Care,22.00,30.00
 2025-12-14,Colgate Toothpaste 150g,BDY-COL-150,1,Body Care,55.00,72.00
-2025-12-14,Palmolive Shampoo Sachet,BDY-PLM-01,10,Body Care,5.00,8.00
+2025-12-14,Palmolive Shampoo Sachet ,BDY-PLM-01,10,Body Care,5.00,8.00
 2025-12-14,Datu Puti Soy Sauce 385ml,CON-DTP-385,3,Condiments,18.00,25.00
 2025-12-14,Bear Brand Powdered Milk 320g,DRY-BBM-320,11,Dairy,70.00,90.00
 2025-12-14,Pandesal 10pcs,BKY-PDS-10,9,Bakery,45.00,60.00
@@ -17443,7 +17461,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2026-01-03,Datu Puti Soy Sauce 385ml,CON-DTP-385,4,Condiments,18.00,25.00
 2026-01-03,Bear Brand Powdered Milk 320g,DRY-BBM-320,3,Dairy,70.00,90.00
 2026-01-03,Pandesal 10pcs,BKY-PDS-10,16,Bakery,45.00,60.00
-2026-01-03,Fresh Eggs Tray 30s,FRS-EGG-30,5,Fresh,210.00,260.00
+2023-02-29,Fresh Eggs Tray 30s,FRS-EGG-30,5,Fresh,210.00,260.00
 2026-01-03,CDO Hotdog 1kg,FRS-HTD-1K,3,Fresh,180.00,230.00
 2026-01-04,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,6,Pantry,60.00,75.00
 2026-01-04,Lucky Me Pancit Canton,PNT-LMC-55G,14,Pantry,10.00,14.00
@@ -17586,7 +17604,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2026-01-11,Argentina Corned Beef 175g,CAN-ACB-175,4,Canned Goods,45.00,55.00
 2026-01-11,Century Tuna Flakes in Oil,CAN-CTF-155,7,Canned Goods,38.00,48.00
 2026-01-11,Nescafé 3-in-1 Original,BEV-N3N-01,9,Beverages,5.00,7.00
-2026-01-11,San Miguel Pale Pilsen 330ml,BEV-SMB-330,10,Beverages,50.00,65.00
+2026-01-11,San Miguel Pale Pilsen 330ml ,BEV-SMB-330,10,Beverages,50.00,65.00
 2026-01-11,Coca-Cola 1.5L,BEV-CCR-15L,3,Beverages,55.00,70.00
 2026-01-11,Milo Powdered Drink 33g Sachet,BEV-MIL-33,10,Beverages,6.00,9.00
 2026-01-11,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,6,Beverages,6.00,9.00
@@ -17636,7 +17654,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2026-01-13,Safeguard Soap 90g,BDY-SFG-90,6,Body Care,22.00,30.00
 2026-01-13,Colgate Toothpaste 150g,BDY-COL-150,9,Body Care,55.00,72.00
 2026-01-13,Palmolive Shampoo Sachet,BDY-PLM-01,11,Body Care,5.00,8.00
-2026-01-13,Datu Puti Soy Sauce 385ml,CON-DTP-385,3,Condiments,18.00,25.00
+2026-01-13,Datu Puti Soy Sauce 385ml,CON-DTP-385,3,Condiments,₱18.00,25.00
 2026-01-13,Bear Brand Powdered Milk 320g,DRY-BBM-320,6,Dairy,70.00,90.00
 2026-01-13,Pandesal 10pcs,BKY-PDS-10,8,Bakery,45.00,60.00
 2026-01-13,Fresh Eggs Tray 30s,FRS-EGG-30,5,Fresh,210.00,260.00
@@ -17938,7 +17956,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2026-01-28,CDO Hotdog 1kg,FRS-HTD-1K,1,Fresh,180.00,230.00
 2026-01-29,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,4,Pantry,60.00,75.00
 2026-01-29,Lucky Me Pancit Canton,PNT-LMC-55G,22,Pantry,10.00,14.00
-2026-01-29,Argentina Corned Beef 175g,CAN-ACB-175,5,Canned Goods,45.00,55.00
+2026-01-29,Argentina Corned Beef 175g,CAN-ACB-175,1000000,Canned Goods,45.00,55.00
 2026-01-29,Century Tuna Flakes in Oil,CAN-CTF-155,7,Canned Goods,38.00,48.00
 2026-01-29,Nescafé 3-in-1 Original,BEV-N3N-01,10,Beverages,5.00,7.00
 2026-01-29,San Miguel Pale Pilsen 330ml,BEV-SMB-330,11,Beverages,50.00,65.00
@@ -18054,7 +18072,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2026-02-03,Fresh Eggs Tray 30s,FRS-EGG-30,5,Fresh,210.00,260.00
 2026-02-03,CDO Hotdog 1kg,FRS-HTD-1K,9,Fresh,180.00,230.00
 2026-02-04,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,6,Pantry,60.00,75.00
-2026-02-04,Lucky Me Pancit Canton,PNT-LMC-55G,19,Pantry,10.00,14.00
+2026-02-04,Lucky Me Pancit Canton ,PNT-LMC-55G,19,Pantry,10.00,14.00
 2026-02-04,Argentina Corned Beef 175g,CAN-ACB-175,4,Canned Goods,45.00,55.00
 2026-02-04,Century Tuna Flakes in Oil,CAN-CTF-155,10,Canned Goods,38.00,48.00
 2026-02-04,Nescafé 3-in-1 Original,BEV-N3N-01,3,Beverages,5.00,7.00
@@ -18320,7 +18338,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2026-02-17,San Miguel Pale Pilsen 330ml,BEV-SMB-330,6,Beverages,50.00,65.00
 2026-02-17,Coca-Cola 1.5L,BEV-CCR-15L,6,Beverages,55.00,70.00
 2026-02-17,Milo Powdered Drink 33g Sachet,BEV-MIL-33,10,Beverages,6.00,9.00
-2026-02-17,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,14,Beverages,6.00,9.00
+2026-02-17,Kopiko 3-in-1 Coffee Sachet,BEV-KPK-01,14,Beverages,6.00,"1,250.00"
 2026-02-17,Sky Flakes Crackers,SNK-SKF-01,6,Snacks,8.00,12.00
 2026-02-17,Chippy Barbecue 110g,SNK-CHP-110,6,Snacks,12.00,18.00
 2026-02-17,Surf Detergent Powder 65g,HSH-SRF-65,9,Household,6.00,9.00
@@ -18433,7 +18451,7 @@ date,product,sku,quantity,category,cost_price,selling_price
 2026-02-23,Golden Fiesta Cooking Oil 1L,PNT-OIL-1L,5,Pantry,60.00,75.00
 2026-02-23,Lucky Me Pancit Canton,PNT-LMC-55G,18,Pantry,10.00,14.00
 2026-02-23,Argentina Corned Beef 175g,CAN-ACB-175,2,Canned Goods,45.00,55.00
-2026-02-23,Century Tuna Flakes in Oil,CAN-CTF-155,3,Canned Goods,38.00,48.00
+2026-02-23 14:30:00,Century Tuna Flakes in Oil,CAN-CTF-155,3,Canned Goods,38.00,48.00
 2026-02-23,Nescafé 3-in-1 Original,BEV-N3N-01,8,Beverages,5.00,7.00
 2026-02-23,San Miguel Pale Pilsen 330ml,BEV-SMB-330,10,Beverages,50.00,65.00
 2026-02-23,Coca-Cola 1.5L,BEV-CCR-15L,11,Beverages,55.00,70.00

@@ -269,9 +269,9 @@ require_once __DIR__ . '/../includes/header.php';
                     <span class="text-[10px] text-[#261F0E] ml-1" style="opacity:0.38">— unassigned columns are ignored</span>
                 </div>
 
-                <div class="mb-5 flex items-center gap-3 p-3.5 rounded-xl border border-[#D2C8AE]" style="background:rgba(38,31,14,0.03);">
+                <div class="mb-5 flex items-center gap-3 p-3.5 rounded-xl border border-[#D2C8AE] flex-wrap" style="background:rgba(38,31,14,0.03);">
                     <label class="text-[11px] font-bold text-[#261F0E] uppercase tracking-wider" style="opacity:0.8" for="date-format-select">Date Format:</label>
-                    <select id="date-format-select" class="text-sm font-semibold border-2 border-[#D2C8AE] rounded-lg px-3 py-1.5 bg-white focus:border-[#261F0E] hover:border-[#261F0E] outline-none transition-colors cursor-pointer shadow-sm" style="color:#261F0E;" onchange="clearPreflight()">
+                    <select id="date-format-select" class="date-format-select" disabled onchange="clearPreflight()">
                         <option value="auto">Auto-detect</option>
                         <option value="Y-m-d">YYYY-MM-DD (e.g. 2024-01-31)</option>
                         <option value="d/m/Y">DD/MM/YYYY (e.g. 31/01/2024)</option>
@@ -282,6 +282,9 @@ require_once __DIR__ . '/../includes/header.php';
                         <option value="j/n/y">D/M/YY (e.g. 31/1/24)</option>
                         <option value="n/j/y">M/D/YY (e.g. 1/31/24)</option>
                     </select>
+                    <span id="date-format-hint" class="text-[11px] hidden" style="color:#FF5722;">
+                        <!-- filled by JS when the format is ambiguous or undetected -->
+                    </span>
                 </div>
                 
                 <!-- Column assignment table -->
@@ -496,9 +499,37 @@ function populateMappingUI(data) {
     document.getElementById('file-name-display').textContent = colWord + ' · ' + rowWord + ' total';
     document.getElementById('granularity-badge').textContent = colSample.length + ' sample rows shown';
 
-    var detectedFormat = data.date_format && data.date_format.format ? data.date_format.format : '';
-    var autoText = 'Auto-detect' + (detectedFormat ? ' (' + detectedFormat + ')' : '');
-    document.querySelector('#date-format-select option[value="auto"]').textContent = autoText;
+    applyDateFormatLock(data.date_format);
+}
+
+// Locks the Date Format selector by default — the auto-detected format is used
+// as-is. It only unlocks when the sample data can't disambiguate DD/MM vs MM/DD
+// (or nothing could be detected at all), since only then does the user's choice
+// actually matter.
+function applyDateFormatLock(dateFormat) {
+    var sel  = document.getElementById('date-format-select');
+    var hint = document.getElementById('date-format-hint');
+    if (!sel) return;
+
+    var detected   = dateFormat && dateFormat.format ? dateFormat.format : '';
+    var ambiguous  = !!(dateFormat && dateFormat.ambiguous);
+    var needsInput = ambiguous || !detected;
+
+    document.querySelector('#date-format-select option[value="auto"]').textContent =
+        'Auto-detect' + (detected ? ' (' + detected + ')' : '');
+
+    sel.disabled = !needsInput;
+
+    if (needsInput) {
+        hint.textContent = ambiguous
+            ? 'Ambiguous — could not tell DD/MM from MM/DD apart. Please choose the correct format.'
+            : 'Could not auto-detect a date format. Please choose one.';
+        hint.classList.remove('hidden');
+    } else {
+        sel.value = 'auto';
+        hint.textContent = '';
+        hint.classList.add('hidden');
+    }
 }
 
 function buildColumnTable() {
@@ -640,8 +671,7 @@ function clearPreflight() {
 // ── Submit import (Step 3 confirm) ────────────────────────────────────────────
 async function submitImport() {
     if (preflightDone) {
-        var replace = !!(document.getElementById('replace-overlap') || { checked: false }).checked;
-        await doImport(mappingCache, replace);
+        await doImport(mappingCache);
         return;
     }
 
@@ -685,11 +715,13 @@ var previewRows   = [];
 var previewData   = null;
 var previewFilter = 'all';
 var previewPage   = 1;
-var PER_PAGE      = 50;
+var PER_PAGE      = 15;
 var sortColumn    = null;
 var sortDir       = 'asc';
 
 function renderPreviewCard(data) {
+    applyDateFormatLock(data.date_format);
+
     previewData = data;
     previewRows = data.rows.map(function (r) {
         r.originalStatus = r.status;
@@ -703,12 +735,41 @@ function renderPreviewCard(data) {
     html += '<div class="preview-card-title">Preview of changes</div>';
     html += renderSummary();
 
+    var noteIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+
+    html += renderReplaceNotice(data);
+
     if (data.recovered_count > 0) {
         var rc = data.recovered_count;
         html += '<div class="recovery-notice">';
-        html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+        html += noteIcon;
         html += '<span><strong>' + rc.toLocaleString() + ' row' + (rc !== 1 ? 's' : '') + '</strong> ignored the selected date format and were parsed automatically — their structure was unambiguous (e.g. ISO&nbsp;YYYY-MM-DD, or a day value above&nbsp;12). If any dates look wrong in the table, adjust the <strong>Date Format</strong> selector above and re-run.</span>';
         html += '</div>';
+    }
+
+    // Lossless repairs — reported once, since nothing was lost.
+    var autoFixes = [];
+    if (data.encoding_converted) {
+        autoFixes.push('converted from Windows (ANSI) encoding');
+    }
+    if (data.money_reformatted > 0) {
+        autoFixes.push(data.money_reformatted.toLocaleString() + ' money value' +
+                       (data.money_reformatted !== 1 ? 's' : '') +
+                       ' had currency symbols or thousands separators removed');
+    }
+    if (autoFixes.length) {
+        html += '<div class="recovery-notice">' + noteIcon +
+                '<span><strong>Cleaned automatically:</strong> ' + autoFixes.join('; ') +
+                '. Nothing was lost — no action needed.</span></div>';
+    }
+
+    // Lossy repairs — the user should see these before committing.
+    if (data.warnings_count > 0) {
+        var wc = data.warnings_count;
+        html += '<div class="recovery-notice recovery-notice-warn">' + noteIcon +
+                '<span><strong>' + wc.toLocaleString() + ' row' + (wc !== 1 ? 's' : '') +
+                '</strong> had a value shortened or left empty so it would fit — the sales themselves were kept. ' +
+                'Use the <strong>Needs review</strong> filter to see exactly what changed.</span></div>';
     }
 
     html += '<div class="preview-toolbar">';
@@ -718,11 +779,10 @@ function renderPreviewCard(data) {
     html += filterChip('overlap', 'Conflict');
     html += filterChip('invalid', 'Invalid');
     html += filterChip('noop',    'Unchanged');
+    if (data.warnings_count > 0) html += filterChip('review', 'Needs review');
     html += '</div>';
-    html += '<label class="preview-replace-label">';
-    html += '<input type="checkbox" id="replace-overlap" class="preview-replace-check" onchange="refreshSummary()">';
-    html += '<span>Replace existing values for un-edited conflicts</span>';
-    html += '</label>';
+    // The "Replace existing values" toggle lived here. A store holds one dataset
+    // and this upload becomes it, so there are no conflicts left to resolve.
     html += '</div>';
 
     html += '<div class="preview-table-wrap"><table class="preview-table">';
@@ -766,6 +826,57 @@ function summaryRow(cls, label, value) {
     return '<div class="preview-summary-row ' + cls + '">' +
            '<span class="preview-summary-label">' + label + '</span>' +
            '<span class="preview-summary-value">' + value + '</span></div>';
+}
+
+// What this upload does to the store's single dataset. Replacing is the one
+// action here that discards data, so the numbers are stated plainly rather than
+// left for the owner to infer — and a file that would shorten the history gets
+// a louder treatment than one that simply refreshes it.
+function renderReplaceNotice(data) {
+    var r = data.replaces;
+    if (!r) return '';
+    var icon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+    var html = '';
+
+    if (r.rows_now === 0) {
+        html += '<div class="recovery-notice">' + icon +
+                '<span>This becomes your store\'s dataset: <strong>' +
+                r.rows_incoming.toLocaleString() + ' rows</strong> across <strong>' +
+                r.products_incoming + ' products</strong>.</span></div>';
+    } else {
+        var cls = r.narrows_history ? ' recovery-notice-warn' : '';
+        var body = 'Uploading replaces your current dataset — <strong>' +
+                   r.rows_now.toLocaleString() + ' rows</strong> (' + r.first_date_now +
+                   ' to ' + r.last_date_now + ') become <strong>' +
+                   r.rows_incoming.toLocaleString() + ' rows</strong> (' + r.first_date_new +
+                   ' to ' + r.last_date_new + '). The current data is saved to History first, '
+                   + 'so you can view, download or restore it afterwards.';
+
+        if (r.narrows_history) {
+            body = '<strong>This file covers a shorter period than your stored data.</strong> ' + body +
+                   ' If your export only covers recent weeks, re-export the full history before importing.';
+        }
+        if (r.products_leaving && r.products_leaving.length) {
+            var n = r.products_leaving.length;
+            body += ' <strong>' + n + ' product' + (n !== 1 ? 's' : '') + '</strong> (' +
+                    r.products_leaving.slice(0, 3).map(escHtml).join(', ') +
+                    (n > 3 ? ', +' + (n - 3) + ' more' : '') +
+                    ') ' + (n !== 1 ? 'are' : 'is') + ' not in this file and will be marked inactive — ' +
+                    'kept with their settings and history, just excluded from forecasting.';
+        }
+        html += '<div class="recovery-notice' + cls + '">' + icon + '<span>' + body + '</span></div>';
+    }
+
+    if (data.pruned_version) {
+        var p = data.pruned_version;
+        html += '<div class="recovery-notice recovery-notice-warn">' + icon +
+                '<span>You have the maximum of <strong>' + p.max + ' saved versions</strong>. ' +
+                'Importing will permanently delete the oldest — <strong>' + escHtml(p.label) +
+                '</strong> (' + p.total_rows.toLocaleString() + ' rows, saved ' + p.created_at +
+                '). Download it from History first if you want to keep it.</span></div>';
+    }
+
+    return html;
 }
 
 function filterChip(key, label) {
@@ -866,11 +977,14 @@ function renderRows() {
 
     applySort();
 
+    // 'review' is orthogonal to status — a row can be perfectly importable and
+    // still have had a value clamped to fit, which is exactly what needs eyes.
     var filtered = [];
     previewRows.forEach(function (r, idx) {
-        if (previewFilter === 'all' || r.status === previewFilter) {
-            filtered.push({ row: r, idx: idx });
-        }
+        var match = previewFilter === 'all'
+            || (previewFilter === 'review' ? !!(r.warnings && r.warnings.length)
+                                           : r.status === previewFilter);
+        if (match) filtered.push({ row: r, idx: idx });
     });
 
     var totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
@@ -983,6 +1097,13 @@ function statusBadge(r) {
     if (r.status === 'invalid' && r.reason) {
         html += '<div class="preview-row-reason" title="' + escHtml(r.reason) + '">' + escHtml(r.reason) + '</div>';
     }
+    if (r.warnings && r.warnings.length) {
+        var notes = r.warnings.map(function (w) {
+            return w.field + ': ' + w.reason + ' (was "' + w.original + '")';
+        });
+        html += '<div class="preview-row-warning" title="' + escHtml(notes.join('\n')) + '">' +
+                escHtml(notes.join(' · ')) + '</div>';
+    }
     return html;
 }
 
@@ -1048,13 +1169,12 @@ function refreshSummary() {
     // Un-edited "overlap" rows (same product+date, different quantity) only commit
     // when Replace is on — so they mustn't count toward an enabled button, or the
     // owner clicks an import that provably applies nothing.
-    var replaceOn  = !!(document.getElementById('replace-overlap') || { checked: false }).checked;
-    var willCommit = s.new + s.edited + (replaceOn ? s.overlap : 0);
+    // Every valid row commits: this upload becomes the dataset, so there's no
+    // longer a class of rows held back pending a toggle.
+    var willCommit = s.new + s.edited;
 
     if (willCommit === 0) {
-        btn.innerHTML     = (s.overlap > 0 && !replaceOn)
-            ? 'Turn on “Replace existing” to apply'
-            : 'No changes to apply';
+        btn.innerHTML     = 'No valid rows to import';
         btn.disabled      = true;
         btn.style.opacity = '0.55';
     } else {
@@ -1087,7 +1207,6 @@ async function doImport(mapping, replace) {
     var formData = new FormData();
     formData.append('rows',     JSON.stringify(payloadRows));
     formData.append('csv_rows', colRowCount);
-    formData.append('replace',  replace ? '1' : '0');
 
     // Only the request itself is guarded here. Wrapping the code BELOW in the
     // same try meant any rendering slip after a perfectly good import surfaced
