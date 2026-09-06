@@ -335,12 +335,72 @@
 /* ── Print: isolate the restock table as a shopping list ── */
 @media print {
     body { background: #fff; }
-    header, footer, .db-head, .db-summary, .db-banner, .db-lower, .db-breakdown, .db-restock-tools { display: none !important; }
+    header, footer, .db-head, .db-summary, .db-banner, .db-lower, .db-breakdown,
+    .db-restock-tools, .db-table-actions { display: none !important; }
     main { padding: 0 !important; max-width: none !important; }
     .db-card { border: none; box-shadow: none; padding: 0; }
     .db-print-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.75rem; font-size: 0.9rem; }
     .db-row { cursor: default; }
     .db-row:hover { background: none; }
+}
+
+/* Export + Print sit under the restock table rather than above it: they act on
+   the rows you have just read and filtered. */
+.db-table-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.6rem;
+    margin-top: 0.9rem;
+    padding-top: 1rem;
+    border-top: 1px solid #D2C8AE;
+}
+
+/* Names what the two buttons are for, so they read as a deliberate step at the
+   end of the list rather than stray controls. */
+.db-table-actions-label {
+    margin-right: auto;
+    font-size: 0.75rem;
+    color: #261F0E;
+    opacity: 0.45;
+}
+
+/* Deliberately heavier than .db-btn in the toolbar above: these are the actions
+   an owner actually leaves the dashboard with, and the ghost styling buried them. */
+.db-act-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border: 1.5px solid #261F0E;
+    background: #F0E8D0;
+    border-radius: 0.6rem;
+    padding: 0.5rem 1rem;
+    font-family: 'Lora', serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #261F0E;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.14s, box-shadow 0.14s, transform 0.06s;
+}
+.db-act-btn svg { flex-shrink: 0; }
+.db-act-btn:hover {
+    background: #D2C8AE;
+    box-shadow: 0 2px 8px rgba(38,31,14,0.14);
+}
+.db-act-btn:active { transform: translateY(1px); }
+
+/* Export is the one most owners want — give it the solid treatment. */
+.db-act-primary {
+    background: #261F0E;
+    color: #F0E8D0;
+    border-color: #261F0E;
+}
+.db-act-primary:hover {
+    background: #261F0E;
+    opacity: 0.88;
+    box-shadow: 0 3px 12px rgba(38,31,14,0.28);
 }
 
 /* Batch edit is the actionable one in the restock toolbar — the others just export. */

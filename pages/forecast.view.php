@@ -1797,6 +1797,7 @@ const AUTO_BASE_URL = '<?php echo BASE_URL; ?>';
 
 <script>const BP_BASE = '<?php echo BASE_URL; ?>';</script>
 <?php require_once __DIR__ . '/../includes/batch_pricing_modal.php'; ?>
+<?php require_once __DIR__ . '/../includes/reset_stock_modal.php'; ?>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 </body>
 </html>

@@ -258,6 +258,49 @@ input::placeholder {
     padding: 0.7rem 1.35rem;
     border-bottom: 1px solid rgba(210,200,174,0.6);
 }
+/* Product search — first control in the tools bar, since it is how you find one
+   row in a long catalogue. */
+.bp-search-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+.bp-search-icon {
+    position: absolute;
+    left: 0.55rem;
+    color: #261F0E;
+    opacity: 0.35;
+    pointer-events: none;
+}
+.bp-search {
+    width: 15rem;
+    max-width: 40vw;
+    background: #FFFDF7;
+    border: 1px solid #D2C8AE;
+    border-radius: 0.5rem;
+    padding: 0.35rem 1.6rem 0.35rem 1.85rem;
+    font-family: 'Lora', serif;
+    font-size: 0.75rem;
+    color: #261F0E;
+    outline: none;
+    transition: border-color 0.15s;
+}
+.bp-search::placeholder { color: rgba(38,31,14,0.35); }
+.bp-search:focus { border-color: #261F0E; }
+.bp-search-clear {
+    position: absolute;
+    right: 0.35rem;
+    border: none;
+    background: none;
+    font-size: 1rem;
+    line-height: 1;
+    color: #261F0E;
+    opacity: 0.4;
+    cursor: pointer;
+    padding: 0 0.25rem;
+}
+.bp-search-clear:hover { opacity: 0.9; }
+
 .bp-check { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; opacity: 0.75; cursor: pointer; }
 .bp-legend { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.68rem; opacity: 0.55; }
 .bp-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
@@ -366,3 +409,60 @@ input::placeholder {
 }
 .bp-btn-save:hover:not(:disabled) { opacity: 0.86; }
 .bp-btn-save:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ── Reset current stocks (includes/reset_stock_modal.php) ───────────────────
+   Reuses the bp-* modal chrome above; only what is unique to the stock-take
+   screen lives here. */
+
+/* Opened from inside the batch editor (z-index 70), so it has to paint above it
+   rather than relying on which one happens to come later in the DOM. */
+#rs-overlay { z-index: 80; }
+
+/* Pushes the two bulk actions to the right of the tools bar. */
+.rs-tools-spacer { flex: 1; }
+
+/* The figure being replaced, shown for reference only. */
+.rs-prev {
+    font-size: 0.8rem;
+    color: #261F0E;
+    opacity: 0.45;
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* A product that cannot hold a stock count — no price, or no forecast yet. */
+.rs-blocked { opacity: 0.5; }
+.rs-blocked .bp-name { text-decoration: line-through; text-decoration-thickness: 1px; }
+
+.rs-na {
+    display: block;
+    text-align: center;
+    opacity: 0.35;
+    font-size: 0.85rem;
+}
+
+/* The reset trigger. Sits beside "Batch edit" on both pages, styled as a
+   cautionary outline rather than a primary action — it clears data. */
+.reset-stock-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.85rem;
+    border: 1px solid rgba(255,87,34,0.4);
+    border-radius: 0.6rem;
+    background: transparent;
+    font-family: 'Lora', serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #FF5722;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s;
+}
+.reset-stock-btn:hover {
+    background: rgba(255,87,34,0.09);
+    border-color: #FF5722;
+}
+.reset-stock-btn svg { flex-shrink: 0; }
+/* In the batch editor's tools bar it sits beside "Undo all changes". */
+.bp-tools .reset-stock-btn { padding: 0.35rem 0.7rem; font-size: 0.75rem; }

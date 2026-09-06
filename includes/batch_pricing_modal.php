@@ -61,6 +61,16 @@ foreach ($_bpRows as $r) {
         </div>
 
         <div class="bp-tools">
+            <label class="bp-search-wrap">
+                <svg class="bp-search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <input type="text" id="bp-search" class="bp-search" placeholder="Search products…"
+                       autocomplete="off" oninput="bpApplyFilter()" aria-label="Search products">
+                <button type="button" id="bp-search-clear" class="bp-search-clear" onclick="bpClearSearch()"
+                        aria-label="Clear search" style="display:none">&times;</button>
+            </label>
             <label class="bp-check">
                 <input type="checkbox" id="bp-only-missing" onchange="bpApplyFilter()">
                 Only products missing a price
@@ -70,6 +80,18 @@ foreach ($_bpRows as $r) {
                 <span class="bp-dot is-custom"></span> Customized
             </span>
             <button type="button" class="bp-reset-all" onclick="bpResetAll()">Undo all changes</button>
+            <!-- Stock-take lives here rather than on the page toolbar: it is the same
+                 job as this table, just the stock column on its own. Rendered by
+                 includes/reset_stock_modal.php, which the page includes alongside
+                 this file; it layers over this modal rather than replacing it. -->
+            <button type="button" class="reset-stock-btn" onclick="rsConfirm()"
+                    title="Clear the stock count for every product and enter new figures">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 10 9 10"/>
+                </svg>
+                Reset stocks
+            </button>
         </div>
 
         <div class="bp-table-wrap">
@@ -106,6 +128,7 @@ foreach ($_bpRows as $r) {
                     ?>
                     <tr class="bp-row<?php echo $missing ? ' is-missing' : ''; ?>"
                         data-id="<?php echo $pid; ?>"
+                        data-name="<?php echo htmlspecialchars(mb_strtolower($p['name'])); ?>"
                         data-missing="<?php echo $missing ? 1 : 0; ?>"
                         data-orig-cost="<?php echo $oCost !== null ? $oCost : ''; ?>"
                         data-orig-price="<?php echo $oPrice !== null ? $oPrice : ''; ?>"
@@ -192,6 +215,7 @@ foreach ($_bpRows as $r) {
 function bpOpen() {
     document.getElementById('bp-overlay').classList.remove('hidden');
     document.body.style.overflow = 'hidden';
+    document.getElementById('bp-search').value = '';   // don't inherit the last search
     bpRefreshAll();
 }
 
@@ -341,14 +365,32 @@ function bpUpdateCount() {
 }
 
 function bpApplyFilter() {
-    var only = document.getElementById('bp-only-missing').checked;
+    var only  = document.getElementById('bp-only-missing').checked;
+    var query = (document.getElementById('bp-search').value || '').trim().toLowerCase();
     var shown = 0;
+
     document.querySelectorAll('#bp-rows .bp-row').forEach(function (row) {
-        var show = !only || row.dataset.missing === '1';
+        var show = (!only || row.dataset.missing === '1')
+                && (query === '' || row.dataset.name.indexOf(query) !== -1);
         row.style.display = show ? '' : 'none';
         if (show) shown++;
     });
-    document.getElementById('bp-empty').style.display = shown === 0 ? '' : 'none';
+
+    document.getElementById('bp-search-clear').style.display = query === '' ? 'none' : '';
+
+    // Hiding a row never discards its edit — bpSave walks every row, not just the
+    // visible ones — so say what is filtered out rather than implying it is gone.
+    var empty = document.getElementById('bp-empty');
+    empty.textContent = query !== ''
+        ? 'No product matches “' + query + '”.'
+        : 'Every product already has a price.';
+    empty.style.display = shown === 0 ? '' : 'none';
+}
+
+function bpClearSearch() {
+    document.getElementById('bp-search').value = '';
+    bpApplyFilter();
+    document.getElementById('bp-search').focus();
 }
 
 function _bpMsg(text, type) {
@@ -435,7 +477,13 @@ function bpSave() {
 
 // Escape closes; clicking the backdrop closes.
 document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && !document.getElementById('bp-overlay').classList.contains('hidden')) bpClose();
+    if (e.key !== 'Escape') return;
+    if (document.getElementById('bp-overlay').classList.contains('hidden')) return;
+    // The stock-take layers over this modal — let Escape dismiss that first
+    // instead of collapsing both at once.
+    var rs = document.getElementById('rs-overlay');
+    if (rs && !rs.classList.contains('hidden')) return;
+    bpClose();
 });
 document.getElementById('bp-overlay').addEventListener('click', function (e) {
     if (e.target === this) bpClose();

@@ -161,9 +161,8 @@ $units = fn($v) => number_format((int) $v);
                     <option value="name">Sort: Name</option>
                 </select>
                 <label class="db-check"><input type="checkbox" id="db-needs"> Needs restock only</label>
-                <a class="db-btn" href="<?php echo BASE_URL; ?>/api/export_restock.php">Export CSV</a>
-                <button type="button" class="db-btn" onclick="window.print()">Print</button>
-                <!-- Fill in cost / price / stock for every product without leaving the dashboard. -->
+                <!-- Fill in cost / price / stock for every product without leaving the
+                     dashboard. Resetting stock counts lives inside that editor. -->
                 <button type="button" class="db-btn db-btn-primary" onclick="bpOpen()"
                         title="Set cost price, selling price and stock for all products">Batch edit</button>
             </div>
@@ -223,6 +222,29 @@ $units = fn($v) => number_format((int) $v);
                 </tbody>
             </table>
             <div id="db-rows-empty" class="db-rows-empty" style="display:none">No products match this filter.</div>
+        </div>
+
+        <!-- Export actions sit under the table: they act on the rows you have just
+             read and filtered, so they belong at the end of them, not above. -->
+        <div class="db-table-actions">
+            <span class="db-table-actions-label">Take this list with you</span>
+            <a class="db-act-btn db-act-primary" style="padding: 6px 12px; display: inline-flex; align-items: center;" href="<?php echo BASE_URL; ?>/api/export_restock.php">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Export CSV
+            </a>
+            <button type="button" class="db-act-btn" style="padding: 6px 12px; display: inline-flex; align-items: center;" onclick="window.print()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 6 2 18 2 18 9"/>
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                    <rect x="6" y="14" width="12" height="8"/>
+                </svg>
+                Print
+            </button>
         </div>
     </section>
 
@@ -352,6 +374,7 @@ $units = fn($v) => number_format((int) $v);
 
 <script>const BP_BASE = '<?php echo BASE_URL; ?>';</script>
 <?php require_once __DIR__ . '/../includes/batch_pricing_modal.php'; ?>
+<?php require_once __DIR__ . '/../includes/reset_stock_modal.php'; ?>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
 
 <script>
