@@ -33,18 +33,9 @@ if ($hasProphet) {
     $overallArrow = $overallPct > 0 ? '↑' : ($overallPct < 0 ? '↓' : '→');
     $overallSign  = $overallPct > 0 ? '+' : '';
 
-    $maxOcc = max(array_column($prophetCache, 'occurrence_count'));
-    if ($rec === 'monthly') {
-        $confCss   = $maxOcc >= 12 ? 'strong' : ($maxOcc >= 6 ? 'moderate' : 'weak');
-        $confLabel = $maxOcc >= 12 ? 'Strong' : ($maxOcc >= 6 ? 'Moderate' : 'Weak');
-    } elseif ($rec === 'custom') {
-        // Same thresholds as getConfidence() in pages/events.logic.php.
-        $confCss   = $maxOcc >= 6 ? 'strong' : ($maxOcc >= 3 ? 'moderate' : 'weak');
-        $confLabel = $maxOcc >= 6 ? 'Strong' : ($maxOcc >= 3 ? 'Moderate' : 'Weak');
-    } else {
-        $confCss   = $maxOcc >= 4  ? 'strong' : ($maxOcc >= 2 ? 'moderate' : 'weak');
-        $confLabel = $maxOcc >= 4  ? 'Strong' : ($maxOcc >= 2 ? 'Moderate' : 'Weak');
-    }
+    $maxLevel  = confidenceLevel($rec, (int) max(array_column($prophetCache, 'occurrence_count')));
+    $confCss   = $maxLevel['css'];
+    $confLabel = $maxLevel['label'];
 }
 ?>
 
@@ -83,7 +74,7 @@ if ($hasProphet) {
                     ?>
                 </span>
                 <?php endif; ?>
-                <?php $occCount = count($occurrences); if ($occCount > 0): ?>
+                <?php $occCount = $datesInHistory; if ($occCount > 0): ?>
                 <span class="event-header-schedule" style="opacity:0.3">·</span>
                 <span class="event-header-occ-count"><?php echo $occCount; ?>&times; in your data</span>
                 <?php endif; ?>
@@ -93,6 +84,19 @@ if ($hasProphet) {
             <?php endif; ?>
         </div>
     </div>
+
+    <?php if ($eventUnused): ?>
+    <div class="prophet-card" style="margin-bottom:1rem;">
+        <div class="prophet-card-header">
+            <p class="prophet-card-title">Not used in forecasts yet</p>
+            <p class="prophet-card-sub">
+                <?php echo (int) $datesInHistory; ?> of this event's dates <?php echo $datesInHistory === 1 ? 'is' : 'are'; ?> in your sales history.
+                The forecast needs at least <?php echo MIN_CUSTOM_DATES; ?> to learn a real effect, because one date can't be told apart from a one-off.
+                Add more dates from your history, and any upcoming dates, by editing this event.
+            </p>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <?php if ($hasProphet): ?>
 
@@ -115,52 +119,6 @@ if ($hasProphet) {
                 </span>
             </div>
             <p class="prophet-card-sub">What the model has learned about how this event affects your sales, based on your full sales history.</p>
-        </div>
-
-        <!-- ── Methodology explainer ─────────────────────────────────────────
-             Always-visible explanation of how the two key numbers (Confidence
-             and Model Impact) are produced. Surfacing the formula here means
-             panelists can see the math without us having to defend "trust the
-             model" hand-waving — every figure in the table below has a
-             traceable derivation written right above it. -->
-        <div class="prophet-methodology">
-            <div class="methodology-item">
-                <span class="methodology-icon-wrap methodology-icon-conf">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                    </svg>
-                </span>
-                <div>
-                    <div class="methodology-title">Confidence</div>
-                    <div class="methodology-desc">
-                        Based on how many times this event has appeared in your sales history.
-                        More occurrences &rarr; the model has more evidence to learn from.
-                        <?php if ($rec === 'monthly'): ?>
-                        <strong>Monthly:</strong> 12+ &rarr; Strong &middot; 6&ndash;11 &rarr; Moderate &middot; &lt;6 &rarr; Weak.
-                        <?php else: ?>
-                        <strong>Yearly:</strong> 4+ &rarr; Strong &middot; 2&ndash;3 &rarr; Moderate &middot; 1 &rarr; Weak.
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-            <div class="methodology-item">
-                <span class="methodology-icon-wrap methodology-icon-impact">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                    </svg>
-                </span>
-                <div>
-                    <div class="methodology-title">Model Impact</div>
-                    <div class="methodology-desc">
-                        Prophet treats this event as an additive regressor. The model fits a
-                        coefficient (in units of daily sales) for it, isolated from trend and
-                        weekly seasonality. We express it as a percent:
-                        <span class="methodology-formula">impact % = coefficient &divide; mean daily sales &times; 100</span>
-                    </div>
-                </div>
-            </div>
         </div>
 
         <div class="prophet-summary-row">
@@ -192,13 +150,9 @@ if ($hasProphet) {
                 $pArrow = $pPct > 0 ? '↑' : ($pPct < 0 ? '↓' : '→');
                 $pSign  = $pPct > 0 ? '+' : '';
                 $pOcc   = (int) $pc['occurrence_count'];
-                if ($rec === 'monthly') {
-                    $pConfCss   = $pOcc >= 12 ? 'strong' : ($pOcc >= 6  ? 'moderate' : 'weak');
-                    $pConfLabel = $pOcc >= 12 ? 'Strong' : ($pOcc >= 6  ? 'Moderate' : 'Weak');
-                } else {
-                    $pConfCss   = $pOcc >= 4  ? 'strong' : ($pOcc >= 2  ? 'moderate' : 'weak');
-                    $pConfLabel = $pOcc >= 4  ? 'Strong' : ($pOcc >= 2  ? 'Moderate' : 'Weak');
-                }
+                $pLevel     = confidenceLevel($rec, $pOcc);
+                $pConfCss   = $pLevel['css'];
+                $pConfLabel = $pLevel['label'];
                 $pCoef  = (float) $pc['coefficient'];
                 $pMean  = (float) $pc['mean_daily_sales'];
                 $pCoefSign = $pCoef >= 0 ? '+' : '';
@@ -240,7 +194,7 @@ if ($hasProphet) {
 
     </div>
 
-    <?php else: ?>
+    <?php elseif (!$eventUnused): ?>
 
     <!-- ── No forecast data yet ────────────────────────────────────────────── -->
     <div class="no-data-box">

@@ -14,6 +14,7 @@ if (!isset($_SESSION['user_id'])) {
 
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../queries/events.query.php';
+require_once __DIR__ . '/../queries/forecast.query.php';   // invalidateProductAccuracy
 
 // Parses the `occurrences` field sent for custom-date events: a JSON array of
 // { start_date, end_date }. Returns [dates, errorMessage]; dates is sorted and
@@ -60,9 +61,23 @@ function reactToEventChange(PDO $pdo, int $userId, array|false $before, array|fa
     if (($before && eventTouchesSalesHistory($pdo, $userId, $before))
         || ($after && eventTouchesSalesHistory($pdo, $userId, $after))) {
         markEventsChanged($pdo, $userId);
+        // The accuracy tests use events too, so saved scores are now out of date.
+        $ids = $pdo->prepare('SELECT id FROM products WHERE user_id = ?');
+        $ids->execute([$userId]);
+        invalidateProductAccuracy($pdo, $ids->fetchAll(PDO::FETCH_COLUMN));
     } elseif ($after && !empty(getUserSaleDateRange($pdo, $userId)['earliest'])) {
-        $_SESSION['event_no_history_note'] = true;
+        // Some of its dates are in the history, but too few for the forecast to use.
+        $_SESSION[eventDatesInHistory($pdo, $userId, $after) > 0 ? 'event_unused_note' : 'event_no_history_note'] = true;
     }
+}
+
+// An event the forecast no longer uses must not keep showing an old effect.
+function dropEventEffectIfUnused(PDO $pdo, int $userId, int $eventId): void
+{
+    $event = getEventById($pdo, $eventId, $userId);
+    if (!$event) return;
+    if (eventIsUsedByForecast($pdo, $userId, $event)) return;
+    $pdo->prepare('DELETE FROM event_impact_cache WHERE event_id = ?')->execute([$eventId]);
 }
 
 $action = $_POST['action'] ?? '';
@@ -168,6 +183,7 @@ switch ($action) {
 
             // Name, color and note edits can't change the forecast; only dates can.
             $after = getEventById($pdo, $id, $userId);
+            dropEventEffectIfUnused($pdo, $userId, $id);
             $dates = fn($e) => [$e['event_start'], $e['event_end'], $e['recurrence'], (int) $e['is_last_day'], $e['occurrences']];
             if ($dates($before) !== $dates($after)) {
                 reactToEventChange($pdo, $userId, $before, $after);

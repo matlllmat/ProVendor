@@ -35,6 +35,47 @@ require_once __DIR__ . '/../includes/header.php';
         </p>
     </div>
 
+    <!-- ── How Confidence and Model Impact are worked out ─────────────────── -->
+    <div class="prophet-methodology">
+        <div class="methodology-item">
+            <span class="methodology-icon-wrap methodology-icon-conf">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+            </span>
+            <div>
+                <div class="methodology-title">Confidence</div>
+                <div class="methodology-desc">
+                    Based on how many times an event has appeared in your sales history.
+                    More occurrences &rarr; the model has more evidence to learn from.
+                    <span class="methodology-rules">
+                        <span><strong>Yearly:</strong> 4+ &rarr; Strong &middot; 2&ndash;3 &rarr; Moderate &middot; 1 &rarr; Weak</span>
+                        <span><strong>Monthly:</strong> 12+ &rarr; Strong &middot; 6&ndash;11 &rarr; Moderate &middot; &lt;6 &rarr; Weak</span>
+                        <span><strong>Specific dates:</strong> 6+ &rarr; Strong &middot; 3&ndash;5 &rarr; Moderate &middot; 2 &rarr; Weak</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="methodology-item">
+            <span class="methodology-icon-wrap methodology-icon-impact">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
+            </span>
+            <div>
+                <div class="methodology-title">Model Impact</div>
+                <div class="methodology-desc">
+                    Prophet treats each event as an additive regressor. The model fits a
+                    coefficient (in units of daily sales) for it, isolated from the trend and the
+                    weekly and yearly patterns. We express it as a percent:
+                    <span class="methodology-formula">impact % = coefficient &divide; mean daily sales &times; 100</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ── Toolbar: search · sort · analyze · info · add ──────────────────── -->
     <div class="events-toolbar">
 
@@ -229,6 +270,9 @@ require_once __DIR__ . '/../includes/header.php';
 <?php require_once __DIR__ . '/../includes/event_info_modal.php'; ?>
 <?php require_once __DIR__ . '/../includes/confirm_modal.php'; ?>
 <?php require_once __DIR__ . '/../includes/toast.php'; ?>
+<?php if (!empty($_SESSION['event_unused_note'])): unset($_SESSION['event_unused_note']); ?>
+<script>showToast("Saved, but this event isn't used in forecasts yet. It needs at least 2 dates from your sales history.", 'info', { bottom: true, ms: 10000 });</script>
+<?php endif; ?>
 <?php if (!empty($_SESSION['event_no_history_note'])): unset($_SESSION['event_no_history_note']); ?>
 <script>showToast("This event isn't in your sales history yet, so it won't change the forecast until it has happened and those sales are added.", 'info', { bottom: true, ms: 10000 });</script>
 <?php endif; ?>
@@ -238,7 +282,9 @@ require_once __DIR__ . '/../includes/header.php';
 ════════════════════════════════════════════ -->
 <script>
 window.EVENTS_CONFIG = {
-    today:   <?php echo json_encode(date('Y-m-d')); ?>,
+    historyStart: <?php echo json_encode($historyStart); ?>,
+    historyEnd:   <?php echo json_encode($historyEnd); ?>,
+    today:  <?php echo json_encode(date('Y-m-d')); ?>,
     cutoff:  <?php echo json_encode(date('Y-m-d', strtotime('+2 months'))); ?>,
     baseUrl: <?php echo json_encode(BASE_URL); ?>,
 };

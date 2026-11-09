@@ -203,6 +203,38 @@ function groupByYearNorm(historical) {
     return map;
 }
 
+// Draws the bar joining the two dots of a range event when the chart is zoomed out
+// (see buildChartAnnotations). Runs before the datasets and annotations, so the dots
+// end up on top of the bar.
+if (typeof Chart !== 'undefined') {
+    Chart.register({
+        id: 'pvRangeBars',
+        beforeDatasetsDraw: function (chart) {
+            const ann = chart.options.plugins && chart.options.plugins.annotation
+                ? chart.options.plugins.annotation.annotations : null;
+            const xs = chart.scales.x;
+            if (!ann || !xs) return;
+            const ctx = chart.ctx, area = chart.chartArea;
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(area.left, 0, area.width, area.bottom);
+            ctx.clip();
+            Object.keys(ann).forEach(function (k) {
+                const r = ann[k] && ann[k].pvRange;
+                if (!r) return;
+                const x1 = xs.getPixelForValue(new Date(r.start).getTime());
+                const x2 = xs.getPixelForValue(new Date(r.end).getTime());
+                const y  = area.top + r.y;
+                ctx.strokeStyle = r.color;
+                ctx.lineWidth   = 2.5;
+                ctx.lineCap     = 'round';
+                ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x2, y); ctx.stroke();
+            });
+            ctx.restore();
+        },
+    });
+}
+
 // Builds Chart.js annotation objects for CHART_EVENTS visible in [visibleFrom, visibleTo].
 //   normalize  — when true, maps event dates to 2000 base year (for overlay charts).
 //   disabledIds — Set of event IDs to hide; pass new Set() to show all events.
@@ -272,16 +304,32 @@ function buildChartAnnotations(visibleFrom, visibleTo, normalize, disabledIds) {
         const yAdj  = yAdjOf[i];
         const key   = 'evt-' + i;
         if (compact) {
-            annotations[key] = {
-                type: 'line', scaleID: 'x', value: start,
-                borderColor: hexToRgba(color, 0.25), borderWidth: 1, borderDash: [2, 5],
-                label: {
-                    display: true, content: '●', position: 'start',
-                    backgroundColor: color, color: '#fff',
-                    font: { size: 7, weight: '700', family: 'Lora' },
-                    padding: { x: 3, y: 2 }, borderRadius: 99, yAdjust: yAdj,
-                },
+            const dot = function (value) {
+                return {
+                    type: 'line', scaleID: 'x', value: value,
+                    borderColor: hexToRgba(color, 0.25), borderWidth: 1, borderDash: [2, 5],
+                    label: {
+                        display: true, content: '●', position: 'start',
+                        backgroundColor: color, color: '#fff',
+                        font: { size: 7, weight: '700', family: 'Lora' },
+                        padding: { x: 3, y: 2 }, borderRadius: 99, yAdjust: yAdj,
+                    },
+                };
             };
+            if (end && end !== start) {
+                // A range shows a dot at each end with a bar joining them, so it still
+                // reads as one event when zoomed out. The annotation plugin can't draw
+                // a bar at a pixel height, so this hidden entry only carries the details
+                // for the pvRangeBars plugin below, which draws it under the dots.
+                annotations[key + '-range'] = {
+                    type: 'box', display: false,
+                    pvRange: { start: start, end: end, color: color, y: yAdj + 6 },
+                };
+                annotations[key]        = dot(start);
+                annotations[key + '-e'] = dot(end);
+            } else {
+                annotations[key] = dot(start);
+            }
         } else if (end && end !== start) {
             annotations[key] = {
                 type: 'box', xMin: start, xMax: end,

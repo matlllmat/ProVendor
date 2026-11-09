@@ -292,7 +292,7 @@ $units = fn($v) => number_format((int) $v);
         <section class="db-card">
             <h2 class="db-card-title">Needs attention</h2>
             <?php
-            $anyAttention = $attention['no_price'] || $attention['not_forecast'] || $attention['ended'] || $attention['stale'] || $attention['stockout'] || $eventsBehind > 0;
+            $anyAttention = $attention['no_price'] || $attention['not_forecast'] || $attention['short_history'] || $attention['ended'] || $attention['stale'] || $attention['stockout'] || $eventsBehind > 0;
             // Renders one attention block: label, count, product chips, CTA.
             $attnBlock = function (array $rows, string $label, string $tone, string $cta, string $href) {
                 if (!$rows) return;
@@ -314,6 +314,7 @@ $units = fn($v) => number_format((int) $v);
                 <?php
                 $attnBlock($attention['no_price'],     'No price set',       'warn',  'Set prices on the Forecast page', BASE_URL . '/pages/forecast.view.php');
                 $attnBlock($attention['not_forecast'], 'Not forecast yet',   'muted', 'Generate forecasts',              BASE_URL . '/pages/forecast.view.php');
+                $attnBlock($attention['short_history'], 'Not enough sales history', 'muted', 'Needs ' . MIN_FORECAST_DAYS . ' days of sales. Add more data', BASE_URL . '/pages/import.view.php');
                 $attnBlock($attention['ended'],        'Forecast ended',     'muted', 'Generate new forecasts',          BASE_URL . '/pages/forecast.view.php');
                 $attnBlock($attention['stockout'],     'Stock below demand', 'danger','Review these products',           BASE_URL . '/pages/forecast.view.php');
                 $attnBlock($attention['stale'],        'Forecasts are stale','muted', 'Re-check on the Forecast page',    BASE_URL . '/pages/forecast.view.php');
@@ -367,9 +368,11 @@ $units = fn($v) => number_format((int) $v);
     <section class="db-card db-breakdown">
         <div class="db-bd-col">
             <h2 class="db-card-title">By category</h2>
+            <p class="db-bd-sub">Where your restock money goes: the cost of the suggested orders in each category, biggest first.</p>
             <?php
             $maxCatCost = 0.0;
-            foreach ($byCategory as $c) $maxCatCost = max($maxCatCost, $c['order_cost']);
+            $totalCatCost = 0.0;
+            foreach ($byCategory as $c) { $maxCatCost = max($maxCatCost, $c['order_cost']); $totalCatCost += $c['order_cost']; }
             ?>
             <?php if ($maxCatCost <= 0): ?>
             <p class="db-muted-msg">No suggested orders to break down yet.</p>
@@ -379,7 +382,7 @@ $units = fn($v) => number_format((int) $v);
                 <div class="db-catrow">
                     <span class="db-catrow-label" title="<?php echo htmlspecialchars($cat); ?>"><?php echo htmlspecialchars($cat); ?></span>
                     <div class="db-catrow-bar"><span style="width:<?php echo $maxCatCost > 0 ? round($c['order_cost'] / $maxCatCost * 100) : 0; ?>%"></span></div>
-                    <span class="db-catrow-val"><?php echo $peso($c['order_cost'], 0); ?></span>
+                    <span class="db-catrow-val"><?php echo $peso($c['order_cost'], 0); ?><small><?php echo $totalCatCost > 0 ? round($c['order_cost'] / $totalCatCost * 100) : 0; ?>%</small></span>
                 </div>
                 <?php endforeach; ?>
                 </div>
@@ -393,17 +396,19 @@ $units = fn($v) => number_format((int) $v);
             <div class="db-movers-head">
                 <h2 class="db-card-title">Top products</h2>
                 <div class="db-movers-toggle">
-                    <button type="button" class="db-mt active" data-mv="order">Order value</button>
-                    <button type="button" class="db-mt" data-mv="demand">Demand</button>
-                    <button type="button" class="db-mt" data-mv="profit">Profit</button>
+                    <button type="button" class="db-mt active" data-mv="order" data-desc="The products that cost the most to restock: suggested order times unit cost.">Order value</button>
+                    <button type="button" class="db-mt" data-mv="demand" data-desc="The products expected to sell the most units over the forecast period.">Demand</button>
+                    <button type="button" class="db-mt" data-mv="profit" data-desc="The products expected to earn the most profit if you order the suggested amount.">Profit</button>
                 </div>
             </div>
+            <p class="db-bd-sub" id="db-mv-desc">The products that cost the most to restock: suggested order times unit cost.</p>
             <?php
             // Renders a Top-5 list. $valFn formats the metric per row.
             $moverList = function (array $rows, string $key, callable $valFn) {
                 echo '<ol class="db-movers db-movers-' . $key . '"' . ($key !== 'order' ? ' style="display:none"' : '') . '>';
-                foreach ($rows as $r) {
-                    echo '<li class="db-mover" onclick="goToProduct(' . (int) $r['id'] . ')" tabindex="0">';
+                foreach ($rows as $i => $r) {
+                    echo '<li class="db-mover" onclick="goToProduct(' . (int) $r['id'] . ')" tabindex="0" title="Open this product\'s forecast">';
+                    echo '<span class="db-mover-rank">' . ($i + 1) . '</span>';
                     echo '<span class="db-mover-name">' . htmlspecialchars($r['name']) . '</span>';
                     echo '<span class="db-mover-val">' . $valFn($r) . '</span>';
                     echo '</li>';
@@ -973,6 +978,7 @@ function goToProduct(id) {
         btn.addEventListener('click', function () {
             var mv = btn.dataset.mv;
             document.querySelectorAll('.db-mt').forEach(function (b) { b.classList.toggle('active', b === btn); });
+            document.getElementById('db-mv-desc').textContent = btn.dataset.desc;
             document.querySelectorAll('.db-movers').forEach(function (ol) {
                 ol.style.display = ol.classList.contains('db-movers-' + mv) ? '' : 'none';
             });

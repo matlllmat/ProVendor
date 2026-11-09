@@ -212,6 +212,7 @@ foreach ($stmt->fetchAll() as $r) {
 // ── Run each matched product's backtest against the (filtered) uploaded actuals ──
 $evaluated = [];
 $skipped   = [];
+$fileDays  = array_unique(array_column($aggregated, 'date'));
 
 foreach ($byProductId as $pid => $info) {
     $alreadyKnown = 0;
@@ -227,6 +228,16 @@ foreach ($byProductId as $pid => $info) {
     if (empty($actuals)) {
         $skipped[] = ['name' => $info['name'], 'reason' => 'Every uploaded date for this product is already in your sales history.'];
         continue;
+    }
+
+    // A later day in the file with no row for this product was a day it sold
+    // nothing, the same way the forecast treats its history.
+    $lastKnown = max(array_keys($existingDates[$pid] ?? ['' => true]));
+    $soldDays  = array_flip(array_column($actuals, 'date'));
+    foreach ($fileDays as $day) {
+        if ($day > $lastKnown && !isset($soldDays[$day])) {
+            $actuals[] = ['date' => $day, 'qty' => 0];
+        }
     }
 
     [$result, , $flaskError] = flaskRequest('/forecast/product/evaluate_upload', json_encode([

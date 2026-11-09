@@ -7,6 +7,30 @@
 
 require_once __DIR__ . '/forecast.query.php';
 
+// A product needs this many days of history to be forecast. Keep in step with
+// MIN_FORECAST_DAYS in python/app.py.
+const MIN_FORECAST_DAYS = 30;
+
+// Days of history each product has, as [product_id => days]: the days the store
+// sold anything since the product's first sale, which is what the forecast trains
+// on (see add_no_sale_days in python/app.py).
+function getHistoryDayCounts(PDO $pdo, int $userId): array
+{
+    $stmt = $pdo->prepare(
+        'SELECT firsts.product_id, COUNT(*)
+         FROM (SELECT s.product_id, MIN(s.sale_date) AS first_sale
+               FROM sales s JOIN products p ON p.id = s.product_id
+               WHERE p.user_id = ?
+               GROUP BY s.product_id) firsts
+         JOIN (SELECT DISTINCT s.sale_date
+               FROM sales s JOIN products p ON p.id = s.product_id
+               WHERE p.user_id = ?) days ON days.sale_date >= firsts.first_sale
+         GROUP BY firsts.product_id'
+    );
+    $stmt->execute([$userId, $userId]);
+    return $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+}
+
 // One row per product: price info joined with its latest forecast summary
 // (demand / suggested order / current stock / est. profit) plus derived fields
 // (order_cost, has_price, forecasted). Sorted by suggested-order VALUE desc so the
@@ -17,12 +41,15 @@ function getRestockOverview(PDO $pdo, int $userId): array
     $products        = getProducts($pdo, $userId, '', '');
     $latestForecasts = getLatestForecasts($pdo, $userId);
     $series          = getForecastSeries($pdo, $userId);
+    $historyDays     = getHistoryDayCounts($pdo, $userId);
     $today           = date('Y-m-d');
 
     $rows = [];
     foreach ($products as $p) {
         $pid   = (int) $p['id'];
-        $fc    = $latestForecasts[$pid] ?? null;
+        $shortHistory = (int) ($historyDays[$pid] ?? 0) < MIN_FORECAST_DAYS;
+        // A saved forecast from before the data shrank is no longer trustworthy.
+        $fc    = $shortHistory ? null : ($latestForecasts[$pid] ?? null);
 
         $cost  = $p['cost_price']    !== null ? (float) $p['cost_price']    : null;
         $price = $p['selling_price'] !== null ? (float) $p['selling_price'] : null;
@@ -70,6 +97,7 @@ function getRestockOverview(PDO $pdo, int $userId): array
             'has_price'     => $cost !== null && $price !== null,
             'forecasted'    => $fc !== null && !$ended,
             'forecast_ended'=> $ended,
+            'short_history' => $shortHistory,
             'generated_at'  => $fc['generated_at'] ?? null,
         ];
     }

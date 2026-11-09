@@ -28,23 +28,9 @@ if (!$event) {
     exit;
 }
 
-// Occurrence count — use the real sales date range so the count matches actual history.
-$dateRange    = getUserSaleDateRange($pdo, $_SESSION['user_id']);
-$historyStart = $dateRange['earliest'] ?? date('Y-m-d', strtotime('-2 years'));
-$historyEnd   = $dateRange['latest']   ?? date('Y-m-d');
-$occurrences  = expandEvents([$event], $historyStart, $historyEnd);
+// An event the forecast doesn't use yet has no real effect to show.
+$datesInHistory = eventDatesInHistory($pdo, $_SESSION['user_id'], $event);
+$eventUnused    = !eventIsUsedByForecast($pdo, $_SESSION['user_id'], $event);
 
 // Load Prophet regressor cache for this event (populated during forecast runs).
-$prophetCache = getEventImpactCache($pdo, $eventId, $_SESSION['user_id']);
-
-// Fallback: populate avg_impact_pct from window method when no Prophet cache exists yet.
-// Once Prophet has run at least once, refreshEventAvgImpact() owns avg_impact_pct.
-if (empty($prophetCache)) {
-    $windows   = buildEventWindows($occurrences, 7);
-    if (!empty($windows)) {
-        $avgImpact = computeAvgImpactPct($pdo, $_SESSION['user_id'], $windows);
-        if ($avgImpact !== null) {
-            updateEventImpactCache($pdo, $eventId, $avgImpact);
-        }
-    }
-}
+$prophetCache = $eventUnused ? [] : getEventImpactCache($pdo, $eventId, $_SESSION['user_id']);

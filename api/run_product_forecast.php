@@ -48,12 +48,6 @@ if (is_array($decoded) && !empty($decoded['event_coefficients'])) {
 
     upsertEventImpactCache($pdo, $productId, $decoded['event_coefficients']);
 
-    // Refresh the weighted-average impact badge for each affected event.
-    $affectedIds = array_unique(array_column($decoded['event_coefficients'], 'event_id'));
-    foreach ($affectedIds as $eid) {
-        refreshEventAvgImpact($pdo, (int) $eid);
-    }
-
     unset($decoded['event_coefficients']);
     $result = json_encode($decoded);
 }

@@ -39,37 +39,52 @@
             </div>
 
             <div class="info-section">
-                <p class="info-section-title">Impact badge &nbsp; &uarr; +32% &nbsp; &darr; &minus;18%</p>
+                <p class="info-section-title">Model Impact</p>
                 <p class="info-section-body">
-                    Shows the overall % effect this event has on daily sales, derived from the
+                    The % effect an event has on daily sales, derived from the
                     <strong>forecast model</strong> (Prophet regressor analysis). The model isolates
-                    the event's contribution from trend and weekly seasonality — making it more
-                    reliable than a simple before/after comparison. The badge appears after you run
-                    your first forecast that includes this event. Click any event row to see the
-                    full product-by-product breakdown with confidence levels.
+                    the event's contribution from the trend and the weekly and yearly patterns — making
+                    it more reliable than a simple before/after comparison. It appears on an event's
+                    page after you run your first forecast that includes the event. Click any event
+                    row to see the full product-by-product breakdown.
                 </p>
             </div>
 
             <div class="info-section">
-                <p class="info-section-title">Confidence levels</p>
+                <p class="info-section-title">Confidence column &nbsp; Strong &middot; Moderate &middot; Weak</p>
                 <p class="info-section-body">
-                    Tells you how trustworthy the model's impact figure is, based on how many times
-                    the event has appeared in your sales history.
+                    This shows <strong>how many times the event has happened in your sales history</strong>.
+                    The forecast learns an event's effect from those past times, so more times means
+                    it can trust what it learned. It does <strong>not</strong> show how big the effect is:
+                    a Strong event can have a small effect, and a Weak one a large effect.
                 </p>
                 <div class="info-conf-table">
                     <div class="info-conf-row">
                         <span class="event-conf-badge conf-strong">Strong</span>
-                        <span>Yearly: 4+ occurrences &nbsp;&middot;&nbsp; Monthly: 12+</span>
+                        <span>Plenty of past examples, so the learned effect is reliable.<br>
+                            Every year: 4+ times &middot; Every month: 12+ &middot; Specific dates: 6+</span>
                     </div>
                     <div class="info-conf-row">
                         <span class="event-conf-badge conf-moderate">Moderate</span>
-                        <span>Yearly: 2&ndash;3 &nbsp;&middot;&nbsp; Monthly: 6&ndash;11</span>
+                        <span>A few examples. The effect is a fair estimate.<br>
+                            Every year: 2&ndash;3 times &middot; Every month: 6&ndash;11 &middot; Specific dates: 3&ndash;5</span>
                     </div>
                     <div class="info-conf-row">
                         <span class="event-conf-badge conf-weak">Weak</span>
-                        <span>Only 1 occurrence &mdash; treat with caution</span>
+                        <span>Very few examples, so the effect could be a coincidence.<br>
+                            Every year: 1 time &middot; Every month: 1&ndash;5 &middot; Specific dates: 2</span>
+                    </div>
+                    <div class="info-conf-row">
+                        <span class="event-conf-badge conf-unused">Not used yet</span>
+                        <span>The forecast doesn't use this event for now.<br>
+                            Specific dates need at least 2 dates inside your sales history.</span>
                     </div>
                 </div>
+                <p class="info-section-body" style="margin-top:0.5rem">
+                    <strong>How it is counted:</strong> each time the event falls on days that have sales
+                    counts once, and a date range counts as one time. Hover a badge to see the exact number. No badge means the event hasn't
+                    happened in your sales history yet.
+                </p>
             </div>
 
             <div class="info-section">

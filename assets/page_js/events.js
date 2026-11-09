@@ -85,6 +85,8 @@
             return;
         }
 
+        list.appendChild(makeColumnHeader());
+
         if (upcoming.length > 0) {
             list.appendChild(makeSectionHeader('Upcoming'));
             upcoming.forEach(function (row) { list.appendChild(row); });
@@ -93,6 +95,27 @@
             if (upcoming.length > 0) list.appendChild(makeSectionHeader('All Events'));
             rest.forEach(function (row) { list.appendChild(row); });
         }
+    }
+
+    // Column titles for the list. Same grid as .event-row so they line up.
+    function makeColumnHeader() {
+        var cols = [
+            ['', ''],
+            ['Event', 'The name of the event. Click a row to see its effect on each product.'],
+            ['When it happens', 'The dates or repeat pattern of the event.'],
+            ['Confidence', 'How many times this event appears in your sales history. More times means the forecast can trust what it learned. The exact rules are at the top of this page.'],
+            ['Next date', 'When the event happens next.'],
+            ['', '']
+        ];
+        var div = document.createElement('div');
+        div.className = 'events-col-head';
+        cols.forEach(function (c) {
+            var s = document.createElement('span');
+            s.textContent = c[0];
+            if (c[1]) s.title = c[1];
+            div.appendChild(s);
+        });
+        return div;
     }
 
     function makeSectionHeader(title) {
@@ -368,21 +391,39 @@
         return out;
     }
 
-    // Live feedback on how much evidence the list carries, using the same
-    // thresholds as the confidence badge on the events list.
-    function updateCustomDateHint() {
-        var hint = document.getElementById('custom-date-hint');
-        var n    = readCustomDates().length;
+    // Live feedback on how many dates the forecast can actually learn from. Only
+    // dates inside the sales history count; later dates are what the event is for.
+    // Keep MIN_USED in step with MIN_CUSTOM_DATES in queries/events.query.php.
+    var MIN_USED = 2;
 
-        if (n === 0) {
-            hint.textContent = 'Add at least one date.';
+    // True when at least one day of this date row is in the history.
+    function countsAsEvidence(d) {
+        var conf = window.EVENTS_CONFIG || {};
+        var from = conf.historyStart, to = conf.historyEnd;
+        if (!from || !to) return false;
+        var last = d.end_date && d.end_date > d.start_date ? d.end_date : d.start_date;
+        return d.start_date <= to && last >= from;
+    }
+
+    function updateCustomDateHint() {
+        var hint  = document.getElementById('custom-date-hint');
+        var dates = readCustomDates();
+        var n     = dates.filter(countsAsEvidence).length;
+        var other = dates.length - n;
+        var extra = other ? ' ' + other + ' other date' + (other === 1 ? ' is' : 's are') + ' outside your sales history, so ' +
+                            (other === 1 ? 'it adds' : 'they add') + ' no evidence. Upcoming dates are still applied.' : '';
+
+        if (dates.length === 0) {
+            hint.textContent = 'Add at least ' + MIN_USED + ' dates that fall in your sales history.';
+        } else if (n < MIN_USED) {
+            hint.textContent = n + ' of your dates ' + (n === 1 ? 'is' : 'are') + ' in your sales history. Add at least ' + MIN_USED +
+                ', or the forecast won\'t use this event yet.' + extra;
         } else if (n < 3) {
-            hint.textContent = n + ' date' + (n === 1 ? '' : 's') +
-                ' — add more so the system can tell a real effect from a one-off.';
+            hint.textContent = n + ' dates in your history — enough to use it, but a rough estimate. 3 or more is better.' + extra;
         } else if (n < 6) {
-            hint.textContent = n + ' dates — enough for a moderate estimate. 6 or more is stronger.';
+            hint.textContent = n + ' dates in your history — a moderate estimate. 6 or more is stronger.' + extra;
         } else {
-            hint.textContent = n + ' dates — enough for a strong estimate.';
+            hint.textContent = n + ' dates in your history — a strong estimate.' + extra;
         }
     }
 
@@ -416,9 +457,8 @@
             };
         }
 
-
         var duration = parseInt(document.getElementById('modal-duration').value, 10);
-        if (!duration || duration < 1) return { error: 'Length must be at least 1 day.' };
+        if (!duration || duration < 1 || duration > 365) return { error: 'Length must be between 1 and 365 days.' };
 
         var startDate, isLastDay = 0;
 

@@ -83,9 +83,6 @@ foreach ($productIds as $rawId) {
     // Persist event regressor coefficients — same side-effect as the single-product flow.
     if (!empty($fcData['event_coefficients'])) {
         upsertEventImpactCache($pdo, $productId, $fcData['event_coefficients']);
-        foreach (array_unique(array_column($fcData['event_coefficients'], 'event_id')) as $eid) {
-            refreshEventAvgImpact($pdo, (int) $eid);
-        }
     }
 
     $results[] = [

@@ -33,7 +33,7 @@ function getRawEventsForUser(PDO $pdo, int $userId): array
 }
 
 // Returns all raw event rows visible to this user (global + own), for the events list page.
-// Excludes events the user has hidden. Includes avg_impact_pct for impact badges.
+// Excludes events the user has hidden.
 function getAllEventsForUser(PDO $pdo, int $userId): array
 {
     $stmt = $pdo->prepare(
@@ -124,7 +124,74 @@ function eventTouchesSalesHistory(PDO $pdo, int $userId, array $event): bool
 {
     $range = getUserSaleDateRange($pdo, $userId);
     if (empty($range['earliest'])) return false;
-    return expandEvents([$event], $range['earliest'], $range['latest']) !== [];
+    return expandEvents([$event], $range['earliest'], $range['latest']) !== []
+        && eventIsUsedByForecast($pdo, $userId, $event);
+}
+
+// A specific-dates event is only used once at least this many of its dates fall in
+// the sales history; one date would just make the model memorise that day. Other
+// event types are always used. Keep in step with MIN_CUSTOM_DATES in python/app.py.
+const MIN_CUSTOM_DATES = 2;
+
+// Occurrences needed for [Strong, Moderate]; anything fewer is Weak.
+const CONFIDENCE_RULES = [
+    'yearly'  => [4, 2],
+    'monthly' => [12, 6],
+    'custom'  => [6, 3],
+];
+
+// The confidence level for an event type seen $count times.
+function confidenceLevel(string $recurrence, int $count): array
+{
+    [$strong, $moderate] = CONFIDENCE_RULES[$recurrence] ?? CONFIDENCE_RULES['yearly'];
+    [$label, $css] = $count >= $strong ? ['Strong', 'strong']
+        : ($count >= $moderate ? ['Moderate', 'moderate'] : ['Weak', 'weak']);
+    return ['label' => $label, 'css' => $css, 'strong' => $strong, 'moderate' => $moderate];
+}
+
+// How many of an event's dates the forecast can really learn from.
+function eventDatesInHistory(PDO $pdo, int $userId, array $event): int
+{
+    $range = getUserSaleDateRange($pdo, $userId);
+    if (empty($range['earliest'])) return 0;
+    $instances = expandEvents([$event], $range['earliest'], $range['latest']);
+    return countInstancesWithSales($instances, getSaleDates($pdo, $userId));
+}
+
+// This owner's sale days, as a ['Y-m-d' => index] set.
+function getSaleDates(PDO $pdo, int $userId): array
+{
+    $stmt = $pdo->prepare(
+        "SELECT DISTINCT s.sale_date
+         FROM sales s
+         JOIN products p ON p.id = s.product_id
+         WHERE p.user_id = ?"
+    );
+    $stmt->execute([$userId]);
+    return array_flip($stmt->fetchAll(PDO::FETCH_COLUMN));
+}
+
+// How many of these expanded instances have at least one day in $saleDates.
+function countInstancesWithSales(array $instances, array $saleDates): int
+{
+    $count = 0;
+    foreach ($instances as $instance) {
+        $day = new DateTime($instance['instance_start']);
+        $end = new DateTime($instance['instance_end'] ?? $instance['instance_start']);
+        for (; $day <= $end; $day->modify('+1 day')) {
+            if (isset($saleDates[$day->format('Y-m-d')])) {
+                $count++;
+                break;
+            }
+        }
+    }
+    return $count;
+}
+
+function eventIsUsedByForecast(PDO $pdo, int $userId, array $event): bool
+{
+    if (($event['recurrence'] ?? '') !== 'custom') return true;
+    return eventDatesInHistory($pdo, $userId, $event) >= MIN_CUSTOM_DATES;
 }
 
 function markEventsChanged(PDO $pdo, int $userId): void
@@ -243,7 +310,13 @@ function updateEvent(
          WHERE id=? AND user_id=? AND is_seeded=0'
     );
     $stmt->execute([$name, $eventStart, $eventEnd, $recurrence, $isLastDay, $color, $impactNote, $eventId, $userId]);
-    return $stmt->rowCount() > 0;
+    if ($stmt->rowCount() > 0) return true;
+
+    // MySQL counts only rows whose values changed. A save that changes just the date
+    // list (kept in another table) leaves this row identical, so check it exists.
+    $exists = $pdo->prepare('SELECT 1 FROM seasonal_events WHERE id=? AND user_id=? AND is_seeded=0');
+    $exists->execute([$eventId, $userId]);
+    return (bool) $exists->fetchColumn();
 }
 
 function deleteEvent(PDO $pdo, int $eventId, int $userId): bool
@@ -253,97 +326,6 @@ function deleteEvent(PDO $pdo, int $eventId, int $userId): bool
     );
     $stmt->execute([$eventId, $userId]);
     return $stmt->rowCount() > 0;
-}
-
-// Returns per-product impact data for a set of event windows.
-// Each window: ['window_start' => 'Y-m-d', 'window_end' => 'Y-m-d'].
-// Impact % = ((event_avg - overall_avg) / overall_avg) * 100.
-// Sorted by |impact_pct| DESC, paginated.
-function getProductImpactForEvent(
-    PDO $pdo, int $userId,
-    array $windows,
-    int $page, int $perPage
-): array {
-    if (empty($windows)) {
-        return ['products' => [], 'total' => 0];
-    }
-
-    [$windowSql, $windowParams] = buildWindowSql($windows);
-
-    // $windowSql is used twice in the SELECT (event_qty + event_days), so bind params twice.
-    $sql = "
-        SELECT
-            p.id,
-            p.name,
-            " . PRODUCT_CATEGORIES_SQL . " AS category,
-            SUM(s.quantity_sold)                                                      AS total_qty,
-            COUNT(DISTINCT s.sale_date)                                                 AS total_days,
-            SUM(CASE WHEN $windowSql THEN s.quantity_sold ELSE 0 END)                  AS event_qty,
-            COUNT(DISTINCT CASE WHEN $windowSql THEN s.sale_date ELSE NULL END)        AS event_days
-        FROM products p
-        JOIN sales s ON s.product_id = p.id
-        WHERE p.user_id = ?
-        GROUP BY p.id, p.name
-        HAVING total_days > 0 AND event_days > 0
-    ";
-
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([...$windowParams, ...$windowParams, $userId]);
-    $rows = $stmt->fetchAll();
-
-    // Calculate impact in PHP and sort by absolute impact
-    foreach ($rows as &$row) {
-        $overallAvg       = $row['total_qty'] / $row['total_days'];
-        $eventAvg         = $row['event_qty'] / $row['event_days'];
-        $row['overall_avg'] = round($overallAvg, 2);
-        $row['event_avg']   = round($eventAvg, 2);
-        $row['impact_pct']  = $overallAvg > 0
-            ? round(($eventAvg - $overallAvg) / $overallAvg * 100, 1)
-            : 0;
-    }
-    unset($row);
-
-    usort($rows, fn($a, $b) => abs($b['impact_pct']) <=> abs($a['impact_pct']));
-
-    $total  = count($rows);
-    $offset = ($page - 1) * $perPage;
-
-    return [
-        'products' => array_slice($rows, $offset, $perPage),
-        'total'    => $total,
-    ];
-}
-
-// Builds a single SQL fragment and params array for matching sale_date against
-// a list of [window_start, window_end] pairs.
-function buildWindowSql(array $windows): array
-{
-    $conditions = [];
-    $params     = [];
-    foreach ($windows as $w) {
-        $conditions[] = '(s.sale_date BETWEEN ? AND ?)';
-        $params[]     = $w['window_start'];
-        $params[]     = $w['window_end'];
-    }
-    return [implode(' OR ', $conditions), $params];
-}
-
-// Writes the cached average impact % back to the event row.
-// Called after computing product impact on the detail page.
-function updateEventImpactCache(PDO $pdo, int $eventId, float $avgImpactPct): void
-{
-    $stmt = $pdo->prepare('UPDATE seasonal_events SET avg_impact_pct = ? WHERE id = ?');
-    $stmt->execute([round($avgImpactPct, 1), $eventId]);
-}
-
-// Returns the average impact % across all products for a set of event windows,
-// without pagination. Used to populate the cached avg_impact_pct column.
-function computeAvgImpactPct(PDO $pdo, int $userId, array $windows): ?float
-{
-    $result = getProductImpactForEvent($pdo, $userId, $windows, 1, PHP_INT_MAX);
-    if (empty($result['products'])) return null;
-    $total = array_sum(array_column($result['products'], 'impact_pct'));
-    return round($total / count($result['products']), 1);
 }
 
 // ── Recurrence expansion ──────────────────────────────────────────────────────
@@ -519,22 +501,6 @@ function upsertEventImpactCache(PDO $pdo, int $productId, array $coefficients): 
     }
 }
 
-// Refreshes seasonal_events.avg_impact_pct for one event using the cached Prophet coefficients.
-// Weighted average: overall_pct = SUM(coefficient) / SUM(mean_daily_sales) * 100.
-// High-volume products contribute more weight, matching their share of total store revenue.
-function refreshEventAvgImpact(PDO $pdo, int $eventId): void
-{
-    $pdo->prepare(
-        'UPDATE seasonal_events
-         SET avg_impact_pct = (
-             SELECT ROUND(SUM(eic.coefficient) / NULLIF(SUM(eic.mean_daily_sales), 0) * 100, 1)
-             FROM event_impact_cache eic
-             WHERE eic.event_id = ?
-         )
-         WHERE id = ?'
-    )->execute([$eventId, $eventId]);
-}
-
 // Returns cached Prophet impact rows for an event, joined with product names.
 // Sorted by |impact_pct| DESC so the most-impacted products appear first.
 //
@@ -565,18 +531,4 @@ function getEventImpactCache(PDO $pdo, int $eventId, int $userId): array
     );
     $stmt->execute([$eventId, $userId]);
     return $stmt->fetchAll();
-}
-
-// Generates ±$windowDays windows around each event occurrence for impact analysis.
-function buildEventWindows(array $occurrences, int $windowDays = 7): array
-{
-    $windows = [];
-    foreach ($occurrences as $occ) {
-        $end = $occ['instance_end'] ?? $occ['instance_start'];
-        $windows[] = [
-            'window_start' => date('Y-m-d', strtotime($occ['instance_start'] . " -{$windowDays} days")),
-            'window_end'   => date('Y-m-d', strtotime($end . " +{$windowDays} days")),
-        ];
-    }
-    return $windows;
 }

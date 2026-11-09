@@ -24,12 +24,14 @@ $dateRange    = getUserSaleDateRange($pdo, $_SESSION['user_id']);
 $historyStart = $dateRange['earliest'] ?? null;
 $historyEnd   = $dateRange['latest']   ?? null;
 
+// Only days the forecast can learn from count as evidence for an event.
+$saleDates = ($historyStart && $historyEnd) ? getSaleDates($pdo, $_SESSION['user_id']) : [];
+
 $today = date('Y-m-d');
 foreach ($events as &$ev) {
+    $instances = ($historyStart && $historyEnd) ? expandEvents([$ev], $historyStart, $historyEnd) : [];
     $ev['next_occurrence'] = getNextOccurrenceDate($ev, $today);
-    $ev['occurrence_count'] = ($historyStart && $historyEnd)
-        ? count(expandEvents([$ev], $historyStart, $historyEnd))
-        : 0;
+    $ev['occurrence_count'] = countInstancesWithSales($instances, $saleDates);
 }
 unset($ev);
 
@@ -73,31 +75,31 @@ function formatEventSchedule(array $event): string
 function getConfidence(array $event): ?array
 {
     $count = $event['occurrence_count'] ?? 0;
+    $rec   = $event['recurrence'];
+
+    // Specific dates need a few in the history before the forecast will use them.
+    if ($rec === 'custom' && $count < MIN_CUSTOM_DATES) {
+        return ['label' => 'Not used yet', 'css' => 'unused',
+                'title' => $count . ' of its dates ' . ($count === 1 ? 'is' : 'are') . ' in your sales history. '
+                         . 'Add at least ' . MIN_CUSTOM_DATES . ' dates from your history before the forecast uses this event.'];
+    }
     if ($count === 0) return null;
 
-    $rec = $event['recurrence'];
+    // Custom dates carry no calendar rule, so evidence comes only from how many
+    // listed dates fall inside real sales history.
+    $detail = $rec === 'custom'
+        ? $count . ' of its dates fall in your sales history.'
+        : 'Seen ' . $count . ' time' . ($count !== 1 ? 's' : '') . ' in your sales history.';
 
-    if ($rec === 'monthly') {
-        $detail = $count . ' monthly occurrence' . ($count !== 1 ? 's' : '');
-        if ($count >= 12) return ['label' => 'Strong',   'css' => 'strong',   'title' => $detail];
-        if ($count >= 6)  return ['label' => 'Moderate', 'css' => 'moderate', 'title' => $detail];
-        return                   ['label' => 'Weak',     'css' => 'weak',     'title' => $detail];
-    }
-
-    if ($rec === 'custom') {
-        // Custom dates carry no calendar rule, so evidence comes only from how
-        // many listed dates fall inside real sales history.
-        $detail = $count . ' of the listed dates fall in your sales history';
-        if ($count >= 6) return ['label' => 'Strong',   'css' => 'strong',   'title' => $detail];
-        if ($count >= 3) return ['label' => 'Moderate', 'css' => 'moderate', 'title' => $detail];
-        return                  ['label' => 'Weak',     'css' => 'weak',     'title' => $detail];
-    }
-
-    // yearly (or legacy none)
-    $detail = $count . ' yearly occurrence' . ($count !== 1 ? 's' : '');
-    if ($count >= 4) return ['label' => 'Strong',   'css' => 'strong',   'title' => $detail];
-    if ($count >= 2) return ['label' => 'Moderate', 'css' => 'moderate', 'title' => $detail];
-    return                  ['label' => 'Weak',     'css' => 'weak',     'title' => $detail];
+    $level = confidenceLevel($rec, $count);
+    $s = $level['strong'];
+    $m = $level['moderate'];
+    $rule = match ($level['css']) {
+        'strong'   => "$s or more is Strong.",
+        'moderate' => "$m to " . ($s - 1) . " is Moderate; $s or more is Strong.",
+        default    => "Under $m is Weak; $m to " . ($s - 1) . ' is Moderate.',
+    };
+    return ['label' => $level['label'], 'css' => $level['css'], 'title' => "$detail $rule"];
 }
 
 // Converts an integer to its ordinal string: 1 → "1st", 15 → "15th".

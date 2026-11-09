@@ -9,6 +9,82 @@
     margin-top: 0.25rem;
 }
 
+/* ── Methodology explainer ──
+   Two side-by-side panels at the top of the page documenting how Confidence and
+   Model Impact are worked out, so they are read before the list. */
+.prophet-methodology {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.25rem;
+    background: #F0E8D0;
+    border: 1px solid #D2C8AE;
+    border-radius: 1rem;
+}
+
+.methodology-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+}
+
+.methodology-icon-wrap {
+    flex-shrink: 0;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.methodology-icon-wrap svg {
+    width: 0.95rem;
+    height: 0.95rem;
+}
+.methodology-icon-conf   { background: rgba(180,83,9,0.10);  color: #B45309; }
+.methodology-icon-impact { background: rgba(26,105,51,0.10); color: #1A6933; }
+
+.methodology-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #261F0E;
+    margin-bottom: 0.3rem;
+}
+
+.methodology-desc {
+    font-size: 0.74rem;
+    color: #261F0E;
+    opacity: 0.75;
+    line-height: 1.5;
+}
+
+.methodology-rules {
+    display: flex;
+    flex-direction: column;
+    margin-top: 0.4rem;
+}
+
+.methodology-formula {
+    display: block;
+    margin-top: 0.4rem;
+    padding: 0.35rem 0.55rem;
+    background: rgba(38,31,14,0.06);
+    border-radius: 0.35rem;
+    font-family: 'Lora', serif;
+    font-style: italic;
+    font-size: 0.72rem;
+    color: #261F0E;
+    opacity: 0.85;
+}
+
+/* On narrow viewports the two panels stack instead of squeezing. */
+@media (max-width: 720px) {
+    .prophet-methodology { grid-template-columns: 1fr; }
+}
+
 /* PHP renders all event rows into this pool; JS moves them into the visible
    list on render. Hidden via class instead of inline style. */
 .event-rows-pool {
@@ -138,6 +214,7 @@
 .conf-strong   { background: rgba(26,105,51,0.1);  color: #1A6933; border-color: rgba(26,105,51,0.28); }
 .conf-moderate { background: rgba(180,83,9,0.09);  color: #B45309; border-color: rgba(180,83,9,0.25);  }
 .conf-weak     { background: rgba(220,38,38,0.07); color: #DC2626; border-color: rgba(220,38,38,0.2);  }
+.conf-unused   { background: rgba(38,31,14,0.06);  color: rgba(38,31,14,0.6); border-color: rgba(38,31,14,0.18); }
 
 /* ── Suggestions panel ── */
 .suggestions-panel {
@@ -399,9 +476,10 @@
     margin-top: 0.375rem;
 }
 
+.info-conf-row .event-conf-badge { min-width: 5.8rem; }
 .info-conf-row {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 0.625rem;
     font-size: 0.78rem;
     color: #261F0E;
@@ -799,6 +877,22 @@
     cursor: pointer;
     flex-shrink: 0;
 }
+
+/* ── Column titles above the list (same grid as .event-row) ── */
+.events-col-head {
+    display: grid;
+    grid-template-columns: 0.5rem 1fr 210px 95px 110px 100px;
+    column-gap: 1rem;
+    padding: 0.55rem 1.25rem;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #261F0E;
+    background: rgba(38,31,14,0.05);
+    border-bottom: 1px solid #D2C8AE;
+}
+.events-col-head span { opacity: 0.55; white-space: nowrap; cursor: help; }
 
 /* ── Section headers (Upcoming / All Events) ── */
 .events-section-header {

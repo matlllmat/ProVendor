@@ -201,9 +201,6 @@ function runProphet(PDO $pdo, int $userId, int $productId, string $fromDate, str
 
     if (!empty($data['event_coefficients'])) {
         upsertEventImpactCache($pdo, $productId, $data['event_coefficients']);
-        foreach (array_unique(array_column($data['event_coefficients'], 'event_id')) as $eventId) {
-            refreshEventAvgImpact($pdo, (int) $eventId);
-        }
     }
 
     return $forecastRows;

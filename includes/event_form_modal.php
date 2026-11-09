@@ -107,7 +107,7 @@ $swatches = ['#FF5722','#EF4444','#F59E0B','#EAB308','#22C55E','#3B82F6','#8B5CF
             <div class="form-field hidden" id="when-custom">
                 <label class="form-label">Which dates?
                     <span class="info-tip" tabindex="0" role="note"
-                          aria-label="How specific dates are used">i<span class="info-tip-bubble">Use this for things that repeat but follow no calendar rule &mdash; storms, or holidays that move each year like Holy Week or Chinese New Year. List every date it happened. The system learns one combined effect from all of them, so more dates means a more reliable figure. Group only dates of similar severity.</span></span>
+                          aria-label="How specific dates are used">i<span class="info-tip-bubble">Use this for things that repeat but follow no calendar rule &mdash; storms, or holidays that move each year like Holy Week or Chinese New Year. List every date it happened. The system learns one combined effect from all of them, so more dates means a more reliable figure. At least 2 of the dates must fall in your sales history before the forecast uses the event. Add an upcoming date too, and the forecast will raise or lower demand on it. Group only dates of similar severity.</span></span>
                 </label>
 
                 <div id="custom-date-list" class="custom-date-list"></div>
@@ -118,7 +118,6 @@ $swatches = ['#FF5722','#EF4444','#F59E0B','#EAB308','#22C55E','#3B82F6','#8B5CF
 
                 <p class="form-hint" id="custom-date-hint"></p>
             </div>
-
 
             <!-- Duration for recurring events. Stored as event_end = start + (n-1) days. -->
             <div class="form-field" id="duration-row">

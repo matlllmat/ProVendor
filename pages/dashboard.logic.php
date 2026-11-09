@@ -75,7 +75,7 @@ $kpi = [
     'product_count'    => count($restock),
 ];
 
-$attention  = ['no_price' => [], 'not_forecast' => [], 'ended' => [], 'stale' => [], 'stockout' => []];
+$attention  = ['no_price' => [], 'not_forecast' => [], 'short_history' => [], 'ended' => [], 'stale' => [], 'stockout' => []];
 $byCategory = [];   // category => ['order_qty', 'order_cost', 'demand']
 $anyMultiCategory = false;   // a product in several categories counts in each of them
 
@@ -96,6 +96,8 @@ foreach ($restock as $r) {
     if (!$r['has_price'])  { $kpi['no_price']++;     $attention['no_price'][]     = $r; }
     if ($r['forecast_ended']) {
         $attention['ended'][] = $r;
+    } elseif ($r['short_history']) {
+        $attention['short_history'][] = $r;
     } elseif (!$r['forecasted']) {
         $kpi['not_forecast']++;
         $attention['not_forecast'][] = $r;
@@ -182,13 +184,17 @@ foreach ($rawEvents as $e) {
     $next = getNextOccurrenceDate($e, $today);
     if ($next === null || $next > $windowEnd) continue;
 
+    $used    = eventIsUsedByForecast($pdo, $uid, $e);
+    $effects = $used ? getEventImpactCache($pdo, (int) $e['id'], $uid) : [];
+    // Weighted by this account's products, so busier products count for more.
+    $sumMean = array_sum(array_column($effects, 'mean_daily_sales'));
     $upcoming[] = [
         'name'         => $e['name'],
         'date'         => $next,
         'days_until'   => (int) floor((strtotime($next) - strtotime($today)) / 86400),
-        'avg_impact'   => $e['avg_impact_pct'] !== null ? (float) $e['avg_impact_pct'] : null,
+        'avg_impact'   => $sumMean > 0 ? round(array_sum(array_column($effects, 'coefficient')) / $sumMean * 100, 1) : null,
         'color'        => $e['color'] ?? '#FF5722',
-        'top_products' => array_slice(getEventImpactCache($pdo, (int) $e['id'], $uid), 0, 3),
+        'top_products' => array_slice($effects, 0, 3),
     ];
 }
 usort($upcoming, fn($a, $b) => strcmp($a['date'], $b['date']));

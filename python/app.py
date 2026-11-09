@@ -227,27 +227,88 @@ def get_event_active_series(event, date_index):
     return pd.Series(values, index=date_index, dtype=float)
 
 
-def count_event_instances(event, train_start, train_end):
-    """Count how many discrete instances of the event fall within [train_start, train_end]."""
+# A specific-dates event is only trusted once at least this many of its dates fall
+# inside the data the model trains on. With one date the model would just memorise
+# that one day. Keep in step with MIN_CUSTOM_DATES in queries/events.query.php.
+MIN_CUSTOM_DATES = 2
+
+# Too few days of sales to forecast from: in backtests 30 days did as well as 45,
+# while 20 came out about 25% too low. Keep in step with MIN_FORECAST_DAYS in
+# queries/dashboard.query.php.
+MIN_FORECAST_DAYS = 30
+
+
+def add_no_sale_days(cur, user_id, rows):
+    """Add 0-sale rows to a product's history (rows sorted by date).
+
+    Sales are only stored for days a product sold, so without this a slow seller
+    looks like it sells every day and is heavily over-forecast. A day counts as 0
+    when the store sold something else that day, from the product's first sale to
+    the store's latest. Days the store sold nothing are left out: it was likely closed.
+    """
+    if not rows:
+        return rows
+    cur.execute("""
+        SELECT DISTINCT s.sale_date AS ds
+        FROM sales s
+        JOIN products p ON p.id = s.product_id
+        WHERE p.user_id = %s AND s.sale_date >= %s
+        ORDER BY s.sale_date
+    """, (user_id, rows[0]['ds']))
+    sold = {r['ds']: r['y'] for r in rows}
+    return [{'ds': d['ds'], 'y': sold.get(d['ds'], 0)} for d in cur.fetchall()]
+
+
+# Days the sales must span before the yearly pattern is fitted. With much less it
+# has too little to learn from and sends the forecast wildly off, even down to 0;
+# in backtests slow sellers were still 17-40% too high at 370 days and fine by 500.
+MIN_YEARLY_DAYS = 500
+
+
+def can_fit_yearly(dates):
+    return (dates.max() - dates.min()).days >= MIN_YEARLY_DAYS
+
+
+def drop_unproven_events(events, train_dates):
+    """Leave out specific-dates events with too few dates in the training data."""
+    return [ev for ev in events
+            if ev['recurrence'] != 'custom'
+            or count_event_instances(ev, train_dates) >= MIN_CUSTOM_DATES]
+
+
+def count_event_instances(event, train_dates):
+    """Count the event's occurrences that have at least one day the model trains on.
+
+    train_dates has gaps wherever there were no sales, so an occurrence the model
+    never sees is not counted as evidence.
+    """
     base_start = pd.to_datetime(event['event_start'])
+    base_end   = pd.to_datetime(event['event_end'] or event['event_start'])
+    duration   = max(0, (base_end - base_start).days)
     rec        = event['recurrence']
     count      = 0
+    date_set   = set(pd.DatetimeIndex(train_dates))
+    train_start = min(date_set)
+    train_end   = max(date_set)
+
+    def trained(start, days):
+        return any(start + pd.Timedelta(days=o) in date_set for o in range(days + 1))
 
     if rec == 'custom':
         for occ in event.get('occurrences') or []:
             o_start = pd.to_datetime(occ['start_date'])
-            if train_start <= o_start <= train_end:
+            o_end   = pd.to_datetime(occ['end_date'] or occ['start_date'])
+            if trained(o_start, max(0, (o_end - o_start).days)):
                 count += 1
 
     elif rec == 'none':
-        if train_start <= base_start <= train_end:
+        if trained(base_start, duration):
             count = 1
 
     elif rec == 'yearly':
         for yr in range(train_start.year, train_end.year + 1):
             try:
-                y_date = base_start.replace(year=yr)
-                if train_start <= y_date <= train_end:
+                if trained(base_start.replace(year=yr), duration):
                     count += 1
             except ValueError:
                 pass
@@ -265,7 +326,7 @@ def count_event_instances(event, train_start, train_end):
                     cursor += pd.offsets.MonthBegin(1)
                     continue
                 m_date = pd.Timestamp(cursor.year, cursor.month, day)
-            if train_start <= m_date <= train_end:
+            if trained(m_date, duration):
                 count += 1
             cursor += pd.offsets.MonthBegin(1)
 
@@ -294,7 +355,7 @@ def forecast_product():
                 WHERE s.product_id = %s AND p.user_id = %s
                 ORDER BY s.sale_date
             """, (product_id, user_id))
-            rows = cur.fetchall()
+            rows = add_no_sale_days(cur, user_id, cur.fetchall())
 
             # Events visible to this user (global presets + own, excluding hidden)
             cur.execute("""
@@ -313,6 +374,12 @@ def forecast_product():
     if not rows:
         return jsonify({'error': 'No sales data found for this product.'}), 404
 
+    if len(rows) < MIN_FORECAST_DAYS:
+        return jsonify({
+            'error': f'Only {len(rows)} days of sales history for this product. The forecast needs at least {MIN_FORECAST_DAYS}.',
+            'available_days': len(rows),
+        }), 400
+
     df       = pd.DataFrame(rows)
     df['ds'] = pd.to_datetime(df['ds'])
     df['y']  = df['y'].astype(float)
@@ -329,9 +396,11 @@ def forecast_product():
     else:
         days = int(body.get('days', 30))
 
+    events = drop_unproven_events(events, df['ds'])
+
     # ── Build Prophet model with event regressors ─────────────────────────────
     model = Prophet(
-        yearly_seasonality = True,
+        yearly_seasonality = can_fit_yearly(df['ds']),
         weekly_seasonality = True,
         daily_seasonality  = False,
     )
@@ -375,7 +444,7 @@ def forecast_product():
                 if row.empty:
                     continue
                 coef      = float(row['coef'].iloc[0])
-                occ_count = count_event_instances(ev, df['ds'].min(), df['ds'].max())
+                occ_count = count_event_instances(ev, df['ds'])
                 if occ_count == 0:
                     continue   # event never appeared in training data — skip
                 impact_pct = round(coef / mean_daily_sales * 100, 1) if mean_daily_sales > 0 else 0.0
@@ -619,7 +688,7 @@ def evaluate_product_forecast():
                 WHERE s.product_id = %s AND p.user_id = %s
                 ORDER BY s.sale_date
             """, (product_id, user_id))
-            rows = cur.fetchall()
+            rows = add_no_sale_days(cur, user_id, cur.fetchall())
 
             cur.execute("""
                 SELECT id, name, event_start, event_end, recurrence, is_last_day
@@ -665,10 +734,12 @@ def evaluate_product_forecast():
     # Mirror the production model: same event regressors so the evaluation
     # number reflects what the user actually sees in /forecast/product.
     model = Prophet(
-        yearly_seasonality = True,
+        yearly_seasonality = can_fit_yearly(train['ds']),
         weekly_seasonality = True,
         daily_seasonality  = False,
     )
+
+    events = drop_unproven_events(events, train['ds'])
 
     event_col_map  = {}
     train_date_idx = pd.DatetimeIndex(train['ds'])
@@ -759,7 +830,7 @@ def evaluate_product_forecast_upload():
                 WHERE s.product_id = %s AND p.user_id = %s
                 ORDER BY s.sale_date
             """, (product_id, user_id))
-            rows = cur.fetchall()
+            rows = add_no_sale_days(cur, user_id, cur.fetchall())
 
             cur.execute("""
                 SELECT id, name, event_start, event_end, recurrence, is_last_day
@@ -791,10 +862,12 @@ def evaluate_product_forecast_upload():
     test       = test.sort_values('ds').reset_index(drop=True)
 
     model = Prophet(
-        yearly_seasonality = True,
+        yearly_seasonality = can_fit_yearly(train['ds']),
         weekly_seasonality = True,
         daily_seasonality  = False,
     )
+
+    events = drop_unproven_events(events, train['ds'])
 
     event_col_map  = {}
     train_date_idx = pd.DatetimeIndex(train['ds'])
@@ -870,6 +943,7 @@ def detect_patterns():
     df           = pd.DataFrame(rows)
     df['ds']     = pd.to_datetime(df['ds'])
     df['y']      = df['y'].astype(float)
+
     overall_mean = df['y'].mean()
     years_count  = df['ds'].dt.year.nunique()
     total_days   = len(df)
