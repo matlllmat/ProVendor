@@ -4,8 +4,10 @@
 // Kept in one place so preflight and import always agree on what a "valid date" is —
 // otherwise preflight could green-light rows that import then silently drops.
 
-// The most rows one upload can hold. Larger files run the server out of memory
-// during the review step.
+// Checked in the browser before upload and again by detect.php.
+const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
+const IMPORT_FILE_TOO_LARGE_MESSAGE = 'File exceeds the 10 MB limit. Please upload a smaller file with no more than 200,000 data rows.';
+// Larger files run the server out of memory during the review step.
 const MAX_IMPORT_ROWS = 200000;
 const TOO_MANY_ROWS_MESSAGE = 'This file has more than 200,000 rows, which is more than ProVendor can check at once. Please upload a shorter period.';
 

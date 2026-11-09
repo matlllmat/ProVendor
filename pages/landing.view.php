@@ -4,6 +4,7 @@
 // All logic is handled by landing.logic.php.
 
 require_once __DIR__ . '/landing.logic.php';
+require_once __DIR__ . '/../api/import_helpers.php';
 
 $pageTitle = 'ProVendor — Set Up Your Store';
 $pageCss   = 'import.css';
@@ -117,7 +118,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <p id="drop-text" class="text-[#261F0E] font-semibold text-sm mb-1">
                         Drop your CSV or Excel file here, or click to browse
                     </p>
-                    <p class="text-[#261F0E] text-xs" style="opacity:0.4">Supports .csv and .xlsx files</p>
+                    <p class="text-[#261F0E] text-xs" style="opacity:0.4">Supports .csv and .xlsx files · Max 10 MB · Max 200,000 data rows</p>
 
                     <input type="file" id="csv-file" accept=".csv,.xlsx" class="hidden" onchange="handleFileSelect(event)">
                 </div>
@@ -427,6 +428,11 @@ function setFileSelected(name) {
 async function detectColumns() {
     const file = droppedFile || document.getElementById('csv-file').files[0];
     if (!file) return;
+    // Reject before PHP's POST limit can turn the response into an error page.
+    if (file.size > <?php echo MAX_IMPORT_BYTES; ?>) {
+        alert(<?php echo json_encode(IMPORT_FILE_TOO_LARGE_MESSAGE); ?>);
+        return;
+    }
 
     const btn = document.getElementById('upload-btn');
     btn.textContent = 'Detecting…';
@@ -437,6 +443,10 @@ async function detectColumns() {
 
     try {
         const res  = await fetch('<?php echo BASE_URL; ?>/api/detect.php', { method: 'POST', body: formData });
+        if (res.status === 413) {
+            alert(<?php echo json_encode(IMPORT_FILE_TOO_LARGE_MESSAGE); ?>);
+            return;
+        }
         const data = await res.json();
 
         if (data.error) {

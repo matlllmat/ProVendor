@@ -118,6 +118,8 @@ require_once __DIR__ . '/../includes/header.php';
                     </div>
                     <?php endif; ?>
 
+                    <div id="signup-feedback" class="hidden" role="status" aria-live="polite" tabindex="-1"></div>
+
                     <div class="auth-tabs" id="auth-tabs">
                         <button id="tab-login"  onclick="switchTab('login')"  class="auth-tab active">Login</button>
                         <button id="tab-signup" onclick="switchTab('signup')" class="auth-tab">Sign Up</button>
@@ -172,7 +174,23 @@ require_once __DIR__ . '/../includes/header.php';
                             <?php $_passwordField('signup-confirm', 'confirm_password'); ?>
                         </div>
 
-                        <button type="submit" class="btn-submit">Create Account</button>
+                        <button type="submit" class="btn-submit">Send verification code</button>
+                    </form>
+
+
+                    <form id="form-signup-verify" action="<?php echo BASE_URL; ?>/pages/login.view.php" method="POST" class="auth-form hidden" onsubmit="return verifySignup(event)">
+                        <input type="hidden" name="action" value="verify_signup">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>">
+                        <p class="signup-code-note">Enter the code sent to <strong id="signup-code-email"><?php echo htmlspecialchars($signupVerification['email'] ?? ''); ?></strong>. It expires in 10 minutes. Check your spam folder if it has not arrived.</p>
+                        <div class="form-group">
+                            <label for="signup-code" class="form-label">6-digit verification code</label>
+                            <input type="text" id="signup-code" name="code" class="form-input signup-code-input" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required placeholder="000000" aria-describedby="signup-feedback">
+                        </div>
+                        <button type="submit" class="btn-submit">Verify &amp; Create Account</button>
+                        <div class="signup-code-actions">
+                            <button type="submit" name="action" value="resend_signup" formnovalidate id="signup-resend" class="form-link">Resend code</button>
+                            <button type="button" onclick="changeSignupEmail()" class="form-link">Change email or details</button>
+                        </div>
                     </form>
 
                     <form id="form-forgot" action="<?php echo BASE_URL; ?>/pages/login.view.php" method="POST" class="auth-form hidden">
@@ -588,7 +606,7 @@ require_once __DIR__ . '/../includes/header.php';
         });
 
         function switchTab(tab) {
-            const allForms = ['login', 'signup', 'forgot', 'verify', 'reset'];
+            const allForms = ['login', 'signup', 'signup-verify', 'forgot', 'verify', 'reset'];
             allForms.forEach(f => {
                 const el = document.getElementById('form-' + f);
                 if(el) el.classList.add('hidden');
@@ -619,6 +637,10 @@ require_once __DIR__ . '/../includes/header.php';
                     heading.textContent = 'Create your account';
                     subheading.textContent = 'Start making smarter restocking decisions';
                     break;
+                case 'signup-verify':
+                    heading.textContent = 'Verify your email';
+                    subheading.textContent = 'One last step before your account is created';
+                    break;
                 case 'forgot':
                     heading.textContent = 'Forgot Password';
                     subheading.textContent = 'Enter your email to receive a reset code';
@@ -634,22 +656,6 @@ require_once __DIR__ . '/../includes/header.php';
             }
         }
 
-        function interceptSignup(e) {
-            e.preventDefault();
-            // Assuming showConfirm is loaded via confirm_modal.php
-            if (typeof showConfirm === 'function') {
-                showConfirm({
-                    title: 'Create your account?',
-                    message: 'Please make sure your details are correct.',
-                    confirmText: 'Yes, create account',
-                    confirmStyle: 'primary',
-                    onConfirm: function () { document.getElementById('form-signup').submit(); }
-                });
-            } else {
-                document.getElementById('form-signup').submit();
-            }
-            return false;
-        }
 
         // Show/hide the password sitting next to the clicked toggle.
         function togglePassword(btn) {
@@ -735,6 +741,11 @@ require_once __DIR__ . '/../includes/header.php';
 
         document.querySelectorAll('.counter').forEach(el => counterObserver.observe(el));
     </script>
+
+    <script>
+        window.signupVerification = <?php echo json_encode($signupVerification ?: new stdClass(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    </script>
+    <script src="<?php echo BASE_URL; ?>/assets/page_js/signup.js?v=<?php echo filemtime(__DIR__ . '/../assets/page_js/signup.js'); ?>"></script>
 
 <?php require_once __DIR__ . '/../includes/confirm_modal.php'; ?>
 </body>

@@ -9,3 +9,6 @@ creds/service-account.json
 # Background forecast worker log (runtime artifact)
 cli/worker.log
 
+
+# Local mail credentials
+config/mail.local.php

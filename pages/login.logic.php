@@ -1,12 +1,12 @@
 <?php
 // pages/login.logic.php
 // Handles login, signup, and password reset POST actions.
-use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
 // Global autoloader paths
 require_once dirname(__DIR__) . '/vendor/autoload.php'; 
 require_once __DIR__ . '/../config/bootstrap.php';
+require_once __DIR__ . '/../includes/signup_verification.php';
 
 if (isset($_SESSION['user_id'])) {
     header('Location: ' . BASE_URL . '/index.php');
@@ -15,7 +15,7 @@ if (isset($_SESSION['user_id'])) {
 
 $error     = null;
 $success   = null;
-$activeTab = 'login'; // States: 'login', 'signup', 'forgot', 'verify', 'reset'
+$activeTab = 'login'; // States: 'login', 'signup', 'signup-verify', 'forgot', 'verify', 'reset'
 
 // Submitted text-field values, preserved across a failed submit so the user
 // doesn't have to retype everything. Password fields are intentionally NOT
@@ -45,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // ── Login ──────────────────────────────────────────────────────────────
     if ($action === 'login') {
         $email    = trim($_POST['email']    ?? '');
-        $password = trim($_POST['password'] ?? '');
+        $password = (string) ($_POST['password'] ?? '');
         $loginEmail = $email; // keep the typed email if the login fails
 
         if ($email === '' || $password === '') {
@@ -69,43 +69,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
     // ── Signup ─────────────────────────────────────────────────────────────
-    } elseif ($action === 'signup') {
-        $activeTab       = 'signup';
-        $name            = trim($_POST['name']             ?? '');
-        $storeName       = trim($_POST['store_name']       ?? '');
-        $email           = trim($_POST['email']            ?? '');
-        $password        = trim($_POST['password']         ?? '');
-        $confirmPassword = trim($_POST['confirm_password'] ?? '');
-
-        // Keep the typed details if signup fails — only the passwords clear.
-        $signupName      = $name;
-        $signupStoreName = $storeName;
-        $signupEmail     = $email;
-
-        if ($name === '' || $storeName === '' || $email === '' || $password === '' || $confirmPassword === '') {
-            $error = 'Please fill in all fields.';
-        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $error = 'Please enter a valid email address.';
-        } elseif ($password !== $confirmPassword) {
-            $error = 'Passwords do not match.';
-        } elseif (!isValidPassword($password)) {
-            $error = 'Password must be at least 8 characters, include 1 uppercase, 1 lowercase, 1 number, and 1 special character.';
-        } else {
-            $existing = getUserByEmail($pdo, $email);
-
-            if ($existing) {
-                $error = 'An account with that email already exists.';
-            } else {
-                $hash  = password_hash($password, PASSWORD_DEFAULT);
-                $newId = createUser($pdo, $name, $storeName, $email, $hash);
-                session_regenerate_id(true);
-                $_SESSION['user_id'] = $newId;
-                header('Location: ' . BASE_URL . '/pages/landing.view.php');
+    } elseif (in_array($action, ['signup', 'verify_signup', 'resend_signup'], true)) {
+        $activeTab = 'signup';
+        $signupName = trim($_POST['name'] ?? '');
+        $signupStoreName = trim($_POST['store_name'] ?? '');
+        $signupEmail = trim($_POST['email'] ?? '');
+        try {
+            $result = handleSignupVerification($pdo, $_POST);
+            $error = $result['error'] ?? null;
+            $success = $result['message'] ?? null;
+            if (!empty($result['requires_verification'])) $activeTab = 'signup-verify';
+            if (!empty($result['success'])) {
+                header('Location: ' . $result['redirect']);
                 exit;
             }
+        } catch (\Throwable $e) {
+            $error = 'Signup is temporarily unavailable. Please try again.';
         }
-    
-    // ── Forgot Password (Send Code) ─────────────────────────────────────────
+
+    // Forgot Password (Send Code)
     } elseif ($action === 'send_code') {
         $activeTab = 'forgot';
         $email     = trim($_POST['email'] ?? '');
@@ -118,17 +100,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['reset_email'] = $email;
 
             // Send email using PHPMailer
-            $mail = new PHPMailer(true);
             try {
-                $mail->isSMTP();
-                $mail->Host       = 'smtp.gmail.com';
-                $mail->SMTPAuth   = true;
-                $mail->Username   = 'Windoges7@gmail.com';
-                $mail->Password   = 'bblqyhtketrtoyuy';
-                $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-                $mail->Port       = 587;
-
-                $mail->setFrom('Windoges7@gmail.com', 'ProVendor Security');
+                $mail = createMailer();
                 $mail->addAddress($email);
                 $mail->isHTML(true);
                 $mail->Subject = 'Your ProVendor Password Reset Code';
@@ -139,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $activeTab = 'verify';
                 $success   = "Reset code sent to your email.";
             } catch (Exception $e) {
-                $error = "Message could not be sent. Mailer Error: {$mail->ErrorInfo}";
+                $error = 'We could not send the reset email. Please try again.';
             }
         } else {
             $error = "No account found with that email address.";
@@ -181,4 +154,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $activeTab = 'forgot';
         }
     }
+}
+
+$signupVerification = signupVerificationState();
+if ($signupVerification) {
+    $pending = $_SESSION['pending_signup'];
+    $signupName = $pending['name'];
+    $signupStoreName = $pending['store_name'];
+    $signupEmail = $pending['email'];
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') $activeTab = 'signup-verify';
 }

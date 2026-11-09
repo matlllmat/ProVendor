@@ -404,3 +404,12 @@ CREATE TABLE IF NOT EXISTS `backtest_runs` (
     UNIQUE KEY `backtest_runs_user_unique` (`user_id`),
     CONSTRAINT `fk_br_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Persistent send limits survive browser refreshes and new sessions.
+CREATE TABLE IF NOT EXISTS signup_otp_limits (
+    bucket CHAR(64) NOT NULL,
+    window_started INT UNSIGNED NOT NULL,
+    sent_count INT UNSIGNED NOT NULL DEFAULT 0,
+    last_sent_at INT UNSIGNED NOT NULL DEFAULT 0,
+    PRIMARY KEY (bucket)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
