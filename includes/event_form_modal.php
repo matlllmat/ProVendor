@@ -45,7 +45,6 @@ $swatches = ['#FF5722','#EF4444','#F59E0B','#EAB308','#22C55E','#3B82F6','#8B5CF
                     <option value="yearly">Every year</option>
                     <option value="monthly">Every month</option>
                     <option value="custom">Specific dates (irregular)</option>
-                    <option value="none">One-time (does not repeat)</option>
                 </select>
             </div>
 
@@ -120,19 +119,6 @@ $swatches = ['#FF5722','#EF4444','#F59E0B','#EAB308','#22C55E','#3B82F6','#8B5CF
                 <p class="form-hint" id="custom-date-hint"></p>
             </div>
 
-            <!-- One-time: real calendar dates, stored exactly as typed. -->
-            <div class="form-grid-2 hidden" id="when-once">
-                <div class="form-field">
-                    <label class="form-label" for="modal-start">Start Date *</label>
-                    <input type="date" id="modal-start" class="form-input">
-                </div>
-                <div class="form-field">
-                    <label class="form-label" for="modal-end">End Date
-                        <span class="form-label-optional">(optional)</span>
-                    </label>
-                    <input type="date" id="modal-end" class="form-input">
-                </div>
-            </div>
 
             <!-- Duration for recurring events. Stored as event_end = start + (n-1) days. -->
             <div class="form-field" id="duration-row">

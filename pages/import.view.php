@@ -64,7 +64,7 @@ require_once __DIR__ . '/../includes/header.php';
                         if ($rows > 0)     $parts[] = number_format($rows)     . ' new record' . ($rows !== 1 ? 's' : '') . ' imported';
                         if ($replaced > 0) $parts[] = number_format($replaced) . ' record' . ($replaced !== 1 ? 's' : '') . ' updated';
                         if ($skipped > 0)  $parts[] = number_format($skipped)  . ' row' . ($skipped !== 1 ? 's' : '') . ' skipped (already in database)';
-                        if ($dropped > 0)  $parts[] = number_format($dropped)  . ' row' . ($dropped !== 1 ? 's' : '') . ' dropped (invalid data)';
+                        if ($dropped > 0)  $parts[] = number_format($dropped)  . ' row' . ($dropped !== 1 ? 's' : '') . ' left out';
                         echo implode(', ', $parts) . '.';
                     ?>
                 </span>
@@ -84,7 +84,7 @@ require_once __DIR__ . '/../includes/header.php';
             <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 10 9 10"/>
             </svg>
-            <span>Version restored. The previous state was auto-saved at the top of your history if you need to undo.</span>
+            <span>Version restored and marked Active<?php echo ($_GET['restored'] ?? '') === 'noprices' ? '. This older version has no saved prices, so your current prices were kept' : ', with its prices'; ?>. Your forecast is being re-run from it. The previous state was auto-saved in your history if you need to undo.</span>
         </div>
         <?php endif; ?>
 
@@ -187,7 +187,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <p class="pipeline-step-desc">Prophet sums the signals to project future demand.</p>
                     <ul class="pipeline-step-list">
                         <li>Daily <strong>predicted units</strong></li>
-                        <li>+ <strong>95%</strong> confidence band</li>
+                        <li>+ <strong>80%</strong> confidence band</li>
                         <li>Feeds the <strong>Newsvendor</strong> restock model</li>
                     </ul>
                 </div>
@@ -313,8 +313,13 @@ require_once __DIR__ . '/../includes/header.php';
 
             <div class="wizard-header">
                 <div class="wizard-header-text">
+                    <?php if ((int) $summary['total_sales'] > 0): ?>
+                    <h2>Replace Sales Data</h2>
+                    <p>Upload your full, updated sales file. It replaces your current data, which stays in Version History.</p>
+                    <?php else: ?>
                     <h2>Upload Sales Data</h2>
-                    <p>Upload a CSV and map its columns to proceed.</p>
+                    <p>Upload a CSV or Excel file and map its columns to proceed.</p>
+                    <?php endif; ?>
                 </div>
                 <button class="wizard-close-btn" onclick="closeWizard()" title="Cancel">
                     <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -330,7 +335,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <div class="wizard-steps">
                     <div id="wdot-1" class="wizard-step-dot">
                         <span class="num" style="background:#261F0E; color:#F0E8D0">1</span>
-                        <span class="lbl">Upload CSV</span>
+                        <span class="lbl">Upload File</span>
                     </div>
                     <div class="wizard-connector"></div>
                     <div id="wdot-2" class="wizard-step-dot" style="opacity:0.35">
@@ -358,16 +363,16 @@ require_once __DIR__ . '/../includes/header.php';
                         </div>
 
                         <p id="w-drop-text" class="text-[#261F0E] font-semibold text-sm mb-1">
-                            Drop your CSV here, or click to browse
+                            Drop your CSV or Excel file here, or click to browse
                         </p>
-                        <p class="text-[#261F0E] text-xs" style="opacity:0.4">Supports .csv files only · Max 10 MB</p>
+                        <p class="text-[#261F0E] text-xs" style="opacity:0.4">Supports .csv and .xlsx files · Max 10 MB</p>
                         <button type="button" onclick="downloadSampleCsv(event)"
                                 class="mt-3 text-xs text-[#261F0E] underline underline-offset-2 transition-opacity hover:opacity-60"
                                 style="opacity:0.38; background:none; border:none; cursor:pointer;">
                             Download sample CSV
                         </button>
 
-                        <input type="file" id="w-csv-file" accept=".csv" class="hidden" onchange="wHandleFileSelect(event)">
+                        <input type="file" id="w-csv-file" accept=".csv,.xlsx" class="hidden" onchange="wHandleFileSelect(event)">
                     </div>
 
                     <!-- Column requirements -->
@@ -441,12 +446,12 @@ require_once __DIR__ . '/../includes/header.php';
                         <span class="text-xs px-2.5 py-0.5 rounded-full font-semibold" style="background:rgba(38,31,14,0.08); color:#261F0E; border:1px solid rgba(38,31,14,0.18)">Date</span>
                         <span class="text-xs px-2.5 py-0.5 rounded-full font-semibold" style="background:rgba(38,31,14,0.08); color:#261F0E; border:1px solid rgba(38,31,14,0.18)">Product (Primary)</span>
                         <span class="text-xs px-2.5 py-0.5 rounded-full font-semibold" style="background:rgba(38,31,14,0.08); color:#261F0E; border:1px solid rgba(38,31,14,0.18)">Quantity</span>
-                        <span class="text-[10px] text-[#261F0E] ml-1" style="opacity:0.38">— unassigned columns are ignored</span>
+                        <span class="text-[10px] text-[#261F0E] ml-1" style="opacity:0.38">— unassigned columns are ignored. Category can be set on more than one column.</span>
                     </div>
-                    
+
                     <div class="mb-5 flex items-center gap-3 p-3.5 rounded-xl border border-[#D2C8AE]" style="background:rgba(38,31,14,0.03);">
                         <label class="text-[11px] font-bold text-[#261F0E] uppercase tracking-wider" style="opacity:0.8" for="w-date-format-select">Date Format:</label>
-                        <select id="w-date-format-select" class="text-sm font-semibold border-2 border-[#D2C8AE] rounded-lg px-3 py-1.5 bg-white focus:border-[#261F0E] hover:border-[#261F0E] outline-none transition-colors cursor-pointer shadow-sm" style="color:#261F0E;" onchange="wClearPreflight(); wSaveState();">
+                        <select id="w-date-format-select" class="text-sm font-semibold border-2 border-[#D2C8AE] rounded-lg px-3 py-1.5 bg-white focus:border-[#261F0E] hover:border-[#261F0E] outline-none transition-colors cursor-pointer shadow-sm" style="color:#261F0E;" onchange="wClearPreflight(); wApplyDateLock(); wSaveState();">
                             <option value="auto">Auto-detect</option>
                             <option value="Y-m-d">YYYY-MM-DD (e.g. 2024-01-31)</option>
                             <option value="d/m/Y">DD/MM/YYYY (e.g. 31/01/2024)</option>
@@ -457,6 +462,7 @@ require_once __DIR__ . '/../includes/header.php';
                             <option value="j/n/y">D/M/YY (e.g. 31/1/24)</option>
                             <option value="n/j/y">M/D/YY (e.g. 1/31/24)</option>
                         </select>
+                        <span id="w-date-format-hint" class="date-format-hint" hidden></span>
                     </div>
 
                     <div class="col-table-wrap">
@@ -467,6 +473,7 @@ require_once __DIR__ . '/../includes/header.php';
                          style="color:#b91c1c; background:rgba(185,28,28,0.07); border:1px solid rgba(185,28,28,0.2); border-radius:0.75rem; padding:0.875rem 1.25rem;"></div>
 
                     <div id="w-preflight-container"></div>
+                    <script src="<?php echo BASE_URL; ?>/assets/global_js/import_preview.js?v=<?php echo filemtime(__DIR__ . '/../assets/global_js/import_preview.js'); ?>"></script>
 
                     <div class="flex items-center justify-between pt-4 border-t border-[#D2C8AE]">
                         <button onclick="wGoToStep(1)"
@@ -508,43 +515,89 @@ require_once __DIR__ . '/../includes/header.php';
                 <?php endif; ?>
 
                 <?php if ($sheetLink): ?>
-                <!-- Sheet linked: the sheet is the way data gets in, so the CSV
-                     upload button is gone rather than sitting there failing. -->
-                <span class="sheet-csv-off">
-                    CSV import is off while your Google Sheet is connected.
-                </span>
-                <?php else: ?>
-                <button onclick="openSheetsDialog()" class="sheets-btn">
-                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                        <polyline points="14 2 14 8 20 8"/>
-                        <line x1="8" y1="13" x2="16" y2="13"/>
-                        <line x1="8" y1="17" x2="16" y2="17"/>
-                    </svg>
-                    Google Sheets
-                </button>
-                <button onclick="openWizard()" class="upload-btn-primary">
+                <!-- Sheet linked: the button stays, and tells the owner to disconnect first. -->
+                <button type="button" class="upload-btn-primary" onclick="notifySheetConnected()">
                     <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                     </svg>
-                    Update Sales Data
+                    Replace Sales Data
                 </button>
+                <?php else: ?>
+                <div class="data-source">
+                    <button type="button" id="data-source-toggle" class="upload-btn-primary" aria-haspopup="true" aria-expanded="false">
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        <?php echo (int) $summary['total_sales'] > 0 ? 'Replace Sales Data' : 'Upload Sales Data'; ?>
+                        <span aria-hidden="true">▾</span>
+                    </button>
+                    <div class="data-source-menu" id="data-source-menu" hidden>
+                        <button type="button" class="data-source-item" id="data-source-upload">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                            </svg>
+                            <span>
+                                <span class="data-source-title">Manual upload</span>
+                                <span class="data-source-desc">Choose a CSV or Excel file from your computer.</span>
+                            </span>
+                        </button>
+                        <button type="button" class="data-source-item" id="data-source-sheets">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                                <line x1="8" y1="13" x2="16" y2="13"/>
+                                <line x1="8" y1="17" x2="16" y2="17"/>
+                            </svg>
+                            <span>
+                                <span class="data-source-title">Connect Google Sheets</span>
+                                <span class="data-source-desc">Link a sheet so your sales stay up to date.</span>
+                            </span>
+                        </button>
+                    </div>
+                </div>
                 <?php endif; ?>
             </div>
         </div>
 
         <p class="versions-help">
-            Each import saves a snapshot. Restore any version to roll your sales data back —
+            The row marked <strong>Active</strong> is the data your forecast uses. Each import saves a snapshot. Restore any version to roll your sales data back —
             the current state is auto-saved first so the restore itself is reversible.
             Only the most recent <?php echo MAX_VERSIONS_PER_USER; ?> versions are kept.
         </p>
 
         <div class="versions-list" id="versions-list">
-            <?php if (empty($versions)): ?>
+            <?php if ($sheetLink): ?>
+            <div class="version-entry version-sheet" id="version-sheet-link">
+                <div class="version-row">
+                    <div class="version-icon">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="8" y1="13" x2="16" y2="13"/>
+                            <line x1="8" y1="17" x2="16" y2="17"/>
+                        </svg>
+                    </div>
+                    <a class="version-label" target="_blank" rel="noopener"
+                       href="<?php echo htmlspecialchars($sheetLink['sheet_url']); ?>"
+                       title="Open this Google Sheet">
+                        Google Sheet: <?php echo htmlspecialchars($sheetLink['sheet_title'] ?? 'Untitled sheet'); ?>
+                    </a>
+                    <div class="version-meta">
+                        <span class="version-badge version-badge-active">Active</span>
+                        <span class="version-badge version-badge-added">Connected</span>
+                    </div>
+                    <button type="button" class="version-disconnect-btn" onclick="confirmSheetUnlink()">Disconnect</button>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <?php if (empty($versions) && !$sheetLink): ?>
             <div class="versions-empty">No saved versions yet. Upload your first CSV to get started.</div>
             <?php else: ?>
                 <?php foreach ($versions as $v): ?>
-                <div class="version-entry<?php echo $v['is_pre_restore_snapshot'] ? ' version-pre-restore' : ''; ?>"
+                <?php $isActiveVersion = $v['is_current'] && !$sheetLink; ?>
+                <div class="version-entry<?php echo $v['is_pre_restore_snapshot'] ? ' version-pre-restore' : ''; ?><?php echo $isActiveVersion ? ' version-active' : ''; ?>"
                      id="version-<?php echo $v['id']; ?>">
 
                     <div class="version-row">
@@ -569,6 +622,9 @@ require_once __DIR__ . '/../includes/header.php';
                         </span>
 
                         <div class="version-meta">
+                            <?php if ($isActiveVersion): ?>
+                            <span class="version-badge version-badge-active">Active</span>
+                            <?php endif; ?>
                             <?php if ($v['rows_added'] > 0): ?>
                             <span class="version-badge version-badge-added">+<?php echo number_format($v['rows_added']); ?> added</span>
                             <?php endif; ?>
@@ -762,8 +818,9 @@ require_once __DIR__ . '/../includes/header.php';
     <div id="tab-content-forecast" class="hidden">
 
         <?php
-        $curHorizon = (int) ($profile['forecast_horizon_days'] ?? 30);
-        $jobRunning = $lastJob && in_array($lastJob['status'], ['queued', 'running'], true);
+        $curHorizon  = (int) ($profile['forecast_horizon_days'] ?? 30);
+        $curReminder = min((int) ($profile['forecast_reminder_days'] ?? 10), $curHorizon);
+        $jobRunning =$lastJob && in_array($lastJob['status'], ['queued', 'running'], true);
         ?>
 
         <!-- ── Forecast range ──────────────────────────────────────────────── -->
@@ -804,79 +861,34 @@ require_once __DIR__ . '/../includes/header.php';
                                value="<?php echo $curHorizon; ?>" oninput="syncHorizonPresets()">
                         <span class="settings-input-affix">days</span>
                     </div>
-                    <button type="button" id="settings-save-btn" class="settings-save-btn" onclick="saveHorizon()">
+                    <!-- Disabled until the range differs from the saved one (syncHorizonPresets). -->
+                    <button type="button" id="settings-save-btn" class="settings-save-btn" onclick="saveHorizon()" disabled>
                         Save &amp; re-forecast
                     </button>
                 </div>
                 <p class="settings-hint">Any value from 1 to 60 days. Default is 30.</p>
                 <div id="settings-msg" class="settings-msg" style="display:none"></div>
             </div>
-        </div>
 
-        <!-- ── Keeping the window current ──────────────────────────────────── -->
-        <?php
-        $cov      = $forecastCoverage;
-        $isAuto   = ($forecastMode === 'auto');
-        $upToDate = $cov['up_to_date'];
-        ?>
-        <div class="settings-card settings-card-secondary">
-            <div class="settings-card-head">
-                <p class="settings-eyebrow">Keeping up to date</p>
-                <h2 class="settings-title">Forecast Updates</h2>
-                <p class="settings-sub">
-                    A forecast covers a fixed set of dates, so its reach shrinks by a day every day.
-                    Choose whether ProVendor tops it back up on its own, or waits for you.
-                </p>
-            </div>
-
-            <div class="settings-modes" role="radiogroup" aria-label="Forecast update mode">
-                <button type="button" class="settings-mode<?php echo $isAuto ? '' : ' is-on'; ?>"
-                        data-mode="manual" role="radio" aria-checked="<?php echo $isAuto ? 'false' : 'true'; ?>"
-                        onclick="setForecastMode('manual')">
-                    <span class="settings-mode-name">Manual</span>
-                    <span class="settings-mode-desc">You decide when to re-forecast.</span>
-                </button>
-                <button type="button" class="settings-mode<?php echo $isAuto ? ' is-on' : ''; ?>"
-                        data-mode="auto" role="radio" aria-checked="<?php echo $isAuto ? 'true' : 'false'; ?>"
-                        onclick="setForecastMode('auto')">
-                    <span class="settings-mode-name">Automatic</span>
-                    <span class="settings-mode-desc">Kept at <?php echo (int) $curHorizon; ?> days for you.</span>
-                </button>
-            </div>
-
-            <!-- AUTO: status indicator -->
-            <div id="mode-auto-panel" class="settings-status<?php echo $upToDate ? ' is-ok' : ' is-behind'; ?>"
-                 style="<?php echo $isAuto ? '' : 'display:none'; ?>">
-                <span class="settings-status-dot"></span>
-                <div class="settings-status-text">
-                    <span class="settings-status-title" id="cov-title">
-                        <?php echo $upToDate ? 'Everything is up to date' : 'Catching up…'; ?>
-                    </span>
-                    <span class="settings-status-sub" id="cov-sub">
-                        <?php
-                        if ($upToDate) {
-                            echo (int) $cov['covered'] . ' of ' . (int) $cov['total']
-                               . ' products forecast through ' . date('M j, Y', strtotime($cov['required_end'])) . '.';
-                        } else {
-                            echo (int) $cov['behind'] . ' product' . ($cov['behind'] === 1 ? '' : 's')
-                               . ' need topping up to ' . date('M j, Y', strtotime($cov['required_end']))
-                               . ' — this runs in the background.';
-                        }
-                        ?>
-                    </span>
+            <div class="settings-field settings-reminder-field">
+                <label class="settings-label" for="reminder-input">Remind me to re-forecast after</label>
+                <div class="settings-input-row">
+                    <div class="settings-input-wrap">
+                        <input type="number" id="reminder-input" class="settings-input" min="1" max="<?php echo $curHorizon; ?>"
+                               value="<?php echo $curReminder; ?>" oninput="syncReminderSave()">
+                        <span class="settings-input-affix">days</span>
+                    </div>
+                    <button type="button" id="reminder-save-btn" class="settings-save-btn" onclick="saveReminder()" disabled>
+                        Save reminder
+                    </button>
                 </div>
-                <button type="button" class="settings-status-refresh" onclick="checkCoverage(true)" title="Check now">↻</button>
+                <p class="settings-hint">Counted from the first day of your forecast. It can't be longer than your forecast range. Default is 10.</p>
+                <div id="reminder-msg" class="settings-msg" style="display:none"></div>
             </div>
-
-            <p class="settings-run-note" id="mode-auto-note" style="<?php echo $isAuto ? '' : 'display:none'; ?>">
-                Only the missing days are forecast — days already predicted are reused, so this
-                stays cheap and never re-runs the whole catalogue without reason.
-            </p>
         </div>
 
         <!-- ── Re-forecast the catalogue (manual action) ────────────────────── -->
-        <div class="settings-card settings-card-secondary" id="mode-manual-panel"
-             style="<?php echo $isAuto ? 'display:none' : ''; ?>">
+        <div class="settings-card settings-card-secondary">
             <div class="settings-card-head">
                 <p class="settings-eyebrow">Maintenance</p>
                 <h2 class="settings-title">Re-forecast All Products</h2>
@@ -973,26 +985,18 @@ require_once __DIR__ . '/../includes/header.php';
             <div class="catalogue-accuracy-grid" id="ca-grid" style="<?php echo $_hasData ? '' : 'display:none'; ?>">
                 <div class="catalogue-accuracy-card">
                     <p class="catalogue-accuracy-label">
-                        MAPE
-                        <span class="info-tip" tabindex="0" role="note" aria-label="What MAPE means">i<span class="info-tip-bubble">Mean Absolute Percentage Error — the average miss size as a percentage of actual sales. A friendly headline number, but it can look worse than it is on low-volume products.</span></span>
+                        WAPE
+                        <span class="info-tip" tabindex="0" role="note" aria-label="What WAPE means">i<span class="info-tip-bubble">Weighted Absolute Percentage Error: all the missed units added together, divided by all the units actually sold. Busy products count more and slow sellers do not distort it, so it is the fairest single figure for restocking. Lower is better.</span></span>
                     </p>
-                    <p class="catalogue-accuracy-value" id="ca-mape"><?php echo $_hasData ? number_format($_ca['weighted_mape'], 1) . '%' : ''; ?></p>
-                    <p class="catalogue-accuracy-unit">avg % error</p>
+                    <p class="catalogue-accuracy-value" id="ca-wape"><?php echo $_hasData && $_ca['weighted_wape'] !== null ? number_format($_ca['weighted_wape'], 1) . '%' : ($_hasData ? '—' : ''); ?></p>
+                    <p class="catalogue-accuracy-unit">total error &divide; total sales</p>
                 </div>
                 <div class="catalogue-accuracy-card">
                     <p class="catalogue-accuracy-label">
                         MAE
-                        <span class="info-tip" tabindex="0" role="note" aria-label="What MAE means">i<span class="info-tip-bubble">Mean Absolute Error — average units off per day, in the same units as your sales. Easier to judge on a specific product than MAPE.</span></span>
+                        <span class="info-tip" tabindex="0" role="note" aria-label="What MAE means">i<span class="info-tip-bubble">Mean Absolute Error — average units off per day, in the same units as your sales. Easier to judge on a specific product than a percentage.</span></span>
                     </p>
-                    <p class="catalogue-accuracy-value" id="ca-mae"><?php echo $_hasData ? number_format($_ca['weighted_mae'], 1) : ''; ?></p>
-                    <p class="catalogue-accuracy-unit">units/day off</p>
-                </div>
-                <div class="catalogue-accuracy-card">
-                    <p class="catalogue-accuracy-label">
-                        RMSE
-                        <span class="info-tip" tabindex="0" role="note" aria-label="What RMSE means">i<span class="info-tip-bubble">Root Mean Square Error — like MAE, but squares each miss first, so a few big blow-outs raise it much more than many small ones. RMSE noticeably higher than MAE means occasional large misses.</span></span>
-                    </p>
-                    <p class="catalogue-accuracy-value" id="ca-rmse"><?php echo $_hasData ? number_format($_ca['weighted_rmse'], 1) : ''; ?></p>
+                    <p class="catalogue-accuracy-value" id="ca-mae"><?php echo $_hasData && $_ca['weighted_mae'] !== null ? number_format($_ca['weighted_mae'], 1) : ''; ?></p>
                     <p class="catalogue-accuracy-unit">units/day off</p>
                 </div>
             </div>
@@ -1017,16 +1021,12 @@ require_once __DIR__ . '/../includes/header.php';
                             <th class="bk-col-product">Product</th>
                             <th class="bk-col-num">Avg/day</th>
                             <th class="bk-col-num">
-                                MAPE
-                                <span class="info-tip" tabindex="0" role="note" aria-label="What MAPE means">i<span class="info-tip-bubble">Mean Absolute Percentage Error — the average miss size as a percentage of actual sales. A friendly headline number, but it can look worse than it is on low-volume products.</span></span>
+                                WAPE
+                                <span class="info-tip" tabindex="0" role="note" aria-label="What WAPE means">i<span class="info-tip-bubble">Weighted Absolute Percentage Error: all the missed units added together, divided by all the units actually sold. Busy products count more and slow sellers do not distort it, so it is the fairest single figure for restocking. Lower is better.</span></span>
                             </th>
                             <th class="bk-col-num">
                                 MAE
-                                <span class="info-tip" tabindex="0" role="note" aria-label="What MAE means">i<span class="info-tip-bubble">Mean Absolute Error — average units off per day, in the same units as your sales. Easier to judge on a specific product than MAPE.</span></span>
-                            </th>
-                            <th class="bk-col-num">
-                                RMSE
-                                <span class="info-tip" tabindex="0" role="note" aria-label="What RMSE means">i<span class="info-tip-bubble">Root Mean Square Error — like MAE, but squares each miss first, so a few big blow-outs raise it much more than many small ones. RMSE noticeably higher than MAE means occasional large misses.</span></span>
+                                <span class="info-tip" tabindex="0" role="note" aria-label="What MAE means">i<span class="info-tip-bubble">Mean Absolute Error — average units off per day, in the same units as your sales. Easier to judge on a specific product than a percentage.</span></span>
                             </th>
                             <th class="bk-col-status">Status</th>
                         </tr>
@@ -1058,9 +1058,8 @@ require_once __DIR__ . '/../includes/header.php';
                                 <?php endif; ?>
                             </td>
                             <td class="bk-col-num"><?php echo $avgDaily !== null ? number_format($avgDaily, 1) : '—'; ?></td>
-                            <td class="bk-col-num"><?php echo $p['accuracy_mape'] !== null ? number_format((float) $p['accuracy_mape'], 1) . '%' : '—'; ?></td>
+                            <td class="bk-col-num"><?php echo $p['accuracy_wape'] !== null ? number_format((float) $p['accuracy_wape'], 1) . '%' : '—'; ?></td>
                             <td class="bk-col-num"><?php echo $p['accuracy_mae']  !== null ? number_format((float) $p['accuracy_mae'],  1) : '—'; ?></td>
-                            <td class="bk-col-num"><?php echo $p['accuracy_rmse'] !== null ? number_format((float) $p['accuracy_rmse'], 1) : '—'; ?></td>
                             <td class="bk-col-status"><span class="bk-status bk-status-<?php echo $tone; ?>"><?php echo $toneLabel; ?></span></td>
                         </tr>
                         <?php endforeach; ?>
@@ -1125,26 +1124,18 @@ require_once __DIR__ . '/../includes/header.php';
                 <div class="catalogue-accuracy-grid" style="margin-top:0.85rem; margin-bottom:0;">
                     <div class="catalogue-accuracy-card">
                         <p class="catalogue-accuracy-label">
-                            MAPE
-                            <span class="info-tip" tabindex="0" role="note" aria-label="What MAPE means">i<span class="info-tip-bubble">Mean Absolute Percentage Error — the average miss size as a percentage of actual sales. A friendly headline number, but it can look worse than it is on low-volume products.</span></span>
+                            WAPE
+                            <span class="info-tip" tabindex="0" role="note" aria-label="What WAPE means">i<span class="info-tip-bubble">Weighted Absolute Percentage Error: all the missed units added together, divided by all the units actually sold. Busy products count more and slow sellers do not distort it, so it is the fairest single figure for restocking. Lower is better.</span></span>
                         </p>
-                        <p class="catalogue-accuracy-value" id="ub-mape"></p>
-                        <p class="catalogue-accuracy-unit">avg % error</p>
+                        <p class="catalogue-accuracy-value" id="ub-wape"></p>
+                        <p class="catalogue-accuracy-unit">total error &divide; total sales</p>
                     </div>
                     <div class="catalogue-accuracy-card">
                         <p class="catalogue-accuracy-label">
                             MAE
-                            <span class="info-tip" tabindex="0" role="note" aria-label="What MAE means">i<span class="info-tip-bubble">Mean Absolute Error — average units off per day, in the same units as your sales. Easier to judge on a specific product than MAPE.</span></span>
+                            <span class="info-tip" tabindex="0" role="note" aria-label="What MAE means">i<span class="info-tip-bubble">Mean Absolute Error — average units off per day, in the same units as your sales. Easier to judge on a specific product than a percentage.</span></span>
                         </p>
                         <p class="catalogue-accuracy-value" id="ub-mae"></p>
-                        <p class="catalogue-accuracy-unit">units/day off</p>
-                    </div>
-                    <div class="catalogue-accuracy-card">
-                        <p class="catalogue-accuracy-label">
-                            RMSE
-                            <span class="info-tip" tabindex="0" role="note" aria-label="What RMSE means">i<span class="info-tip-bubble">Root Mean Square Error — like MAE, but squares each miss first, so a few big blow-outs raise it much more than many small ones. RMSE noticeably higher than MAE means occasional large misses.</span></span>
-                        </p>
-                        <p class="catalogue-accuracy-value" id="ub-rmse"></p>
                         <p class="catalogue-accuracy-unit">units/day off</p>
                     </div>
                 </div>
@@ -1199,9 +1190,8 @@ document.addEventListener('DOMContentLoaded', function() {
         catalogue: {
             evaluated_count:       <?php echo (int) $backtestRun['evaluated_count']; ?>,
             total_count:           <?php echo (int) $backtestRun['total_count']; ?>,
-            weighted_mape:         <?php echo $backtestRun['weighted_mape']         !== null ? (float) $backtestRun['weighted_mape']         : 'null'; ?>,
+            weighted_wape:         <?php echo $backtestRun['weighted_wape']         !== null ? (float) $backtestRun['weighted_wape']         : 'null'; ?>,
             weighted_mae:          <?php echo $backtestRun['weighted_mae']          !== null ? (float) $backtestRun['weighted_mae']          : 'null'; ?>,
-            weighted_rmse:         <?php echo $backtestRun['weighted_rmse']         !== null ? (float) $backtestRun['weighted_rmse']         : 'null'; ?>,
             weighted_accuracy_pct: <?php echo $backtestRun['weighted_accuracy_pct'] !== null ? (float) $backtestRun['weighted_accuracy_pct'] : 'null'; ?>
         }
     });
@@ -1395,6 +1385,26 @@ async function submitDeleteData() {
 // IMPORT WIZARD (unchanged)
 // ══════════════════════════════════════════════════════════════════════════════
 
+// "Replace Sales Data" menu: manual upload or Google Sheets.
+(function () {
+    var toggle = document.getElementById('data-source-toggle');
+    var menu   = document.getElementById('data-source-menu');
+    if (!toggle) return;   // no menu while a Google Sheet is connected
+
+    function setOpen(open) {
+        menu.hidden = !open;
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    toggle.addEventListener('click', function (e) {
+        e.stopPropagation();
+        setOpen(menu.hidden);
+    });
+    document.getElementById('data-source-upload').addEventListener('click', function () { openWizard(); });
+    document.getElementById('data-source-sheets').addEventListener('click', function () { openSheetsDialog(); });
+    document.addEventListener('click', function () { setOpen(false); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setOpen(false); });
+}());
+
 function openWizard() {
     var panel = document.getElementById('wizard-panel');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1419,11 +1429,11 @@ function closeWizard() {
 
 function wForceClose() {
     document.getElementById('wizard-panel').classList.add('hidden');
-    document.getElementById('w-drop-text').textContent = 'Drop your CSV here, or click to browse';
+    document.getElementById('w-drop-text').textContent = 'Drop your CSV or Excel file here, or click to browse';
     document.getElementById('w-csv-file').value = '';
     
     var dfSel = document.getElementById('w-date-format-select');
-    if (dfSel) dfSel.value = 'auto';
+    if (dfSel) { dfSel.value = 'auto'; dfSel.disabled = false; }
 
     var btn = document.getElementById('w-upload-btn');
     btn.disabled      = true;
@@ -1476,8 +1486,8 @@ function wHandleDrop(e) {
     wHandleDragLeave();
     var file = e.dataTransfer.files[0];
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-        document.getElementById('w-drop-text').textContent = 'Only .csv files are accepted';
+    if (!/\.(csv|xlsx)$/i.test(file.name)) {
+        document.getElementById('w-drop-text').textContent = 'Only .csv and .xlsx files are accepted';
         return;
     }
     wDroppedFile = file;
@@ -1531,9 +1541,8 @@ var W_FIELDS = [
     { key: 'product',     label: 'Product (Primary)',    required: true  },
     { key: 'quantity',    label: 'Quantity',             required: true  },
     { key: 'sku',         label: 'Product (Secondary)',  required: false },
-    { key: 'category',    label: 'Category',             required: false },
-    { key: 'subcategory', label: 'Sub-Category',         required: false },
-    { key: 'cost',        label: 'Cost Price',           required: false },
+    { key: 'category',    label: 'Category',             required: false, multiple: true },
+    { key: 'cost',       label: 'Cost Price',           required: false },
     { key: 'price',       label: 'Selling Price',        required: false },
 ];
 
@@ -1541,11 +1550,12 @@ var wHeaders     = [];
 var wSample      = [];
 var wRowCount    = 0;
 var wAssignments = {};
+var wDateFormats = {};   // column name → what the server worked out about its dates
 var wPending     = null;
 var wCurrentStep = 1;
 var wDroppedFile = null; // holds File from drag-and-drop (file input can't receive dragged files)
 
-var WZ_KEY = 'pv_import_wizard';
+var WZ_KEY = 'pv_import_wizard_v2';
 
 function wSaveState() {
     if (!wHeaders.length) return;
@@ -1555,6 +1565,7 @@ function wSaveState() {
             sample:      wSample,
             rowCount:    wRowCount,
             assignments: wAssignments,
+            dateFormats: wDateFormats,
             fileName:    document.getElementById('w-file-name').textContent,
             dateFormat:  document.getElementById('w-date-format-select').value,
         }));
@@ -1577,6 +1588,7 @@ function wRestoreState() {
         wSample      = state.sample      || [];
         wRowCount    = state.rowCount    || 0;
         wAssignments = state.assignments || {};
+        wDateFormats = state.dateFormats || {};
 
         if (state.dateFormat) {
             var dfSel = document.getElementById('w-date-format-select');
@@ -1599,13 +1611,15 @@ function wPopulateMappingUI(data) {
     wSample      = data.sample  || [];
     wRowCount    = data.row_count;
     wAssignments = {};
+    wDateFormats = data.date_formats || {};
 
     W_FIELDS.forEach(function(f) {
-        var suggested = data.suggestions[f.key];
-        if (suggested) {
+        [].concat(data.suggestions[f.key] || []).forEach(function(suggested) {
             var idx = wHeaders.indexOf(suggested);
-            if (idx !== -1) wAssignments[f.key] = idx;
-        }
+            if (idx === -1) return;
+            if (f.multiple) wAssignments[f.key] = (wAssignments[f.key] || []).concat(idx);
+            else            wAssignments[f.key] = idx;
+        });
     });
 
     buildColumnTable();
@@ -1614,12 +1628,44 @@ function wPopulateMappingUI(data) {
     var rowWord = wRowCount.toLocaleString() + ' row' + (wRowCount !== 1 ? 's' : '');
     document.getElementById('w-file-name').textContent         = colWord + ' · ' + rowWord + ' total';
     document.getElementById('w-granularity-badge').textContent = wSample.length + ' sample rows shown';
-    
-    var detectedFormat = data.date_format && data.date_format.format ? data.date_format.format : '';
-    var autoText = 'Auto-detect' + (detectedFormat ? ' (' + detectedFormat + ')' : '');
-    document.querySelector('#w-date-format-select option[value="auto"]').textContent = autoText;
 
     wSaveState();
+}
+
+// Locks the Date Format selector when every date in the assigned column proves
+// the format. Otherwise the owner has to choose it.
+function wApplyDateLock() {
+    var sel   = document.getElementById('w-date-format-select');
+    var hint  = document.getElementById('w-date-format-hint');
+    var auto  = sel.querySelector('option[value="auto"]');
+    var info  = wDateFormats[wHeaders[wAssignments.date]] || {};
+    var sure  = !!info.format && !info.ambiguous;
+    var unassigned = wAssignments.date === undefined;
+
+    if (sure) {
+        var option = sel.querySelector('option[value="' + info.format + '"]');
+        auto.textContent = 'Auto-detected: ' + (option ? option.textContent.split(' (')[0] : 'written-out dates');
+        sel.value = 'auto';
+    } else {
+        auto.textContent = unassigned ? 'Auto-detect' : 'Choose a format…';
+    }
+    sel.disabled = sure;
+
+    var mustChoose = !sure && !unassigned && sel.value === 'auto';
+    hint.hidden = !mustChoose;
+    hint.textContent = mustChoose ? 'We can\'t tell from your dates. Please choose the format.' : '';
+}
+
+// The server refused the date format: clear it so the owner has to choose again.
+function wRejectDateFormat(message) {
+    var sel  = document.getElementById('w-date-format-select');
+    var hint = document.getElementById('w-date-format-hint');
+    sel.value = 'auto';
+    wApplyDateLock();
+    hint.textContent = message;
+    hint.hidden = false;
+    sel.focus();
+    showMappingError(message);
 }
 
 function buildColumnTable() {
@@ -1668,19 +1714,29 @@ function buildColumnTable() {
     html += '</tr></tfoot></table>';
 
     document.getElementById('w-col-table-inner').innerHTML = html;
+    wApplyDateLock();
 }
 
 function isColAssigned(colIdx) {
-    var vals = Object.keys(wAssignments).map(function(k) { return wAssignments[k]; });
-    return vals.indexOf(colIdx) !== -1;
+    return getAssignedField(colIdx) !== null;
 }
 
 function getAssignedField(colIdx) {
     var keys = Object.keys(wAssignments);
     for (var k = 0; k < keys.length; k++) {
-        if (wAssignments[keys[k]] === colIdx) return keys[k];
+        if ([].concat(wAssignments[keys[k]]).indexOf(colIdx) !== -1) return keys[k];
     }
     return null;
+}
+
+function wUnassignColumn(colIdx) {
+    var field = getAssignedField(colIdx);
+    if (!field) return;
+    if (Array.isArray(wAssignments[field])) {
+        wAssignments[field] = wAssignments[field].filter(function(i) { return i !== colIdx; });
+        if (wAssignments[field].length) return;
+    }
+    delete wAssignments[field];
 }
 
 function escHtml(str) {
@@ -1693,8 +1749,17 @@ function escHtml(str) {
 
 function wHandleAssignment(colIdx, fieldKey) {
     if (!fieldKey) {
-        var prev = getAssignedField(colIdx);
-        if (prev) delete wAssignments[prev];
+        wUnassignColumn(colIdx);
+        buildColumnTable();
+        wSaveState();
+        wClearPreflight();
+        return;
+    }
+
+    // Category can be set on any number of columns, kept in column order.
+    if (fieldKey === 'category') {
+        wUnassignColumn(colIdx);
+        wAssignments.category = (wAssignments.category || []).concat(colIdx).sort(function(a, b) { return a - b; });
         buildColumnTable();
         wSaveState();
         wClearPreflight();
@@ -1715,6 +1780,7 @@ function wHandleAssignment(colIdx, fieldKey) {
             confirmText:  'Reassign',
             confirmStyle: 'warning',
             onConfirm: function() {
+                wUnassignColumn(wPending.colIdx);
                 wAssignments[wPending.fieldKey] = wPending.colIdx;
                 wPending = null;
                 buildColumnTable();
@@ -1724,8 +1790,7 @@ function wHandleAssignment(colIdx, fieldKey) {
         return;
     }
 
-    var prevField = getAssignedField(colIdx);
-    if (prevField) delete wAssignments[prevField];
+    wUnassignColumn(colIdx);
 
     wAssignments[fieldKey] = colIdx;
     buildColumnTable();
@@ -1741,7 +1806,8 @@ var IMPORT_BTN_HTML = 'Confirm &amp; Import <svg class="w-4 h-4" viewBox="0 0 24
 function wBuildMapping() {
     var mapping = {};
     Object.keys(wAssignments).forEach(function(fieldKey) {
-        mapping[fieldKey] = wHeaders[wAssignments[fieldKey]];
+        var col = wAssignments[fieldKey];
+        mapping[fieldKey] = Array.isArray(col) ? col.map(function(i) { return wHeaders[i]; }) : wHeaders[col];
     });
     if (!mapping.date || !mapping.product || !mapping.quantity) {
         showMappingError('Please assign the Date, Product (Primary), and Quantity columns before importing.');
@@ -1761,7 +1827,7 @@ function wClearPreflight() {
 
 async function wSubmitImport() {
     if (wPreflightDone) {
-        await wDoImport(wMappingCache);
+        ImportPreview.confirmUnresolved(function () { wDoImport(wMappingCache); });
         return;
     }
 
@@ -1782,7 +1848,8 @@ async function wSubmitImport() {
         var data = await res.json();
 
         if (data.error) {
-            showMappingError('Check failed: ' + data.error);
+            if (data.code === 'date_format') wRejectDateFormat(data.error);
+            else showMappingError('Check failed: ' + data.error);
             btn.innerHTML = IMPORT_BTN_HTML;
             btn.disabled  = false;
             return;
@@ -1792,7 +1859,6 @@ async function wSubmitImport() {
         // row before anything commits.
         wRenderPreviewCard(data);
         wPreflightDone = true;
-        wRefreshSummary();  // sets the Apply button label/enabled state too
     } catch(e) {
         showMappingError('Network error during check. Please try again.');
         btn.innerHTML = IMPORT_BTN_HTML;
@@ -1800,495 +1866,14 @@ async function wSubmitImport() {
     }
 }
 
-// ── Editable preview state ────────────────────────────────────────────────────
-// wPreviewRows holds the full row list returned by preflight, mutated in place
-// as the user edits qty/date. Each row carries its original values so we can
-// tell what's been touched (the yellow "edited" indicator).
-var wPreviewRows   = [];
-var wPreviewData   = null;
-var wPreviewFilter = 'all'; // all | new | overlap | invalid | noop
-var wPreviewPage   = 1;
-var W_PER_PAGE     = 15;
-var wSortColumn    = null;  // null = preflight's default order (invalid → overlap → new → noop)
-var wSortDir       = 'asc';
-
+// The review step itself lives in assets/global_js/import_preview.js.
 function wRenderPreviewCard(data) {
-    wPreviewData = data;
-    wPreviewRows = data.rows.map(function (r) {
-        r.originalStatus = r.status;
-        r.originalQty    = r.qty;
-        r.originalDate   = r.date;
-        r.edited         = false;
-        return r;
-    });
-
-    var html = '<div class="preview-card">';
-    html += '<div class="preview-card-title">Preview of changes</div>';
-    html += wRenderSummary();
-
-    var noteIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
-
-    html += wRenderReplaceNotice(data);
-
-    if (data.recovered_count > 0) {
-        var rc = data.recovered_count;
-        html += '<div class="recovery-notice">';
-        html += noteIcon;
-        html += '<span><strong>' + rc.toLocaleString() + ' row' + (rc !== 1 ? 's' : '') + '</strong> ignored the selected date format and were parsed automatically — their structure was unambiguous (e.g. ISO&nbsp;YYYY-MM-DD, or a day value above&nbsp;12). If any dates look wrong in the table, adjust the <strong>Date Format</strong> selector above and re-run.</span>';
-        html += '</div>';
-    }
-
-    // Lossless repairs — reported once, since nothing was lost.
-    var autoFixes = [];
-    if (data.encoding_converted) {
-        autoFixes.push('converted from Windows (ANSI) encoding');
-    }
-    if (data.money_reformatted > 0) {
-        autoFixes.push(data.money_reformatted.toLocaleString() + ' money value' +
-                       (data.money_reformatted !== 1 ? 's' : '') +
-                       ' had currency symbols or thousands separators removed');
-    }
-    if (autoFixes.length) {
-        html += '<div class="recovery-notice">' + noteIcon +
-                '<span><strong>Cleaned automatically:</strong> ' + autoFixes.join('; ') +
-                '. Nothing was lost — no action needed.</span></div>';
-    }
-
-    // Lossy repairs — the user should see these before committing.
-    if (data.warnings_count > 0) {
-        var wc = data.warnings_count;
-        html += '<div class="recovery-notice recovery-notice-warn">' + noteIcon +
-                '<span><strong>' + wc.toLocaleString() + ' row' + (wc !== 1 ? 's' : '') +
-                '</strong> had a value shortened or left empty so it would fit — the sales themselves were kept. ' +
-                'Use the <strong>Needs review</strong> filter to see exactly what changed.</span></div>';
-    }
-
-    html += '<div class="preview-toolbar">';
-    html += '<div class="preview-filter-chips" id="w-filter-chips">';
-    html += wFilterChip('all',     'All');
-    html += wFilterChip('new',     'New');
-    html += wFilterChip('overlap', 'Conflict');
-    html += wFilterChip('invalid', 'Invalid');
-    html += wFilterChip('noop',    'Unchanged');
-    if (data.warnings_count > 0) html += wFilterChip('review', 'Needs review');
-    html += '</div>';
-    // The "Replace existing values for un-edited conflicts" toggle lived here.
-    // A store holds one dataset and this upload becomes it, so there are no
-    // conflicts left to resolve — the choice it offered no longer exists.
-    html += '</div>';
-
-    html += '<div class="preview-table-wrap"><table class="preview-table">';
-    html += '<thead><tr>';
-    html += wSortableTh('row',      'Row');
-    html += wSortableTh('product',  'Product');
-    html += wSortableTh('date',     'Date');
-    html += wSortableTh('qty',      'Qty');
-    html += wSortableTh('existing', 'Existing');
-    html += wSortableTh('status',   'Status');
-    html += '<th>Actions</th>';
-    html += '</tr></thead>';
-    html += '<tbody id="w-preview-tbody"></tbody>';
-    html += '</table></div>';
-
-    html += '<div class="preview-pagination" id="w-preview-pagination"></div>';
-
-    html += '<p class="preview-edit-help">Click <strong>Edit</strong> on any row to change its Qty or Date, then <strong>Save</strong>. Edited rows show a yellow indicator and are always applied on commit; un-edited conflicts respect the toggle above.</p>';
-
-    html += '</div>';
-
-    document.getElementById('w-preflight-container').innerHTML = html;
-    wRenderRows();
+    ImportPreview.render('w-preflight-container', data, wRefreshImportButton);
 }
 
-function wRenderSummary() {
-    var s   = computePreviewCounts(wPreviewRows);
-    var tot = (wPreviewData.csv_rows || 0).toLocaleString();
-
-    var html = '<div class="preview-summary">';
-    html += wSummaryRow('preview-summary-total',   'Total rows in file', tot);
-    html += wSummaryRow('preview-summary-new',     'Will be added',      s.new.toLocaleString());
-    if (s.overlap > 0) html += wSummaryRow('preview-summary-overlap', 'Conflicts with existing data', s.overlap.toLocaleString());
-    if (s.invalid > 0) html += wSummaryRow('preview-summary-invalid', 'Can’t be accepted',       s.invalid.toLocaleString());
-    if (s.noop > 0)    html += wSummaryRow('preview-summary-noop',    'Already match (no change)', s.noop.toLocaleString());
-    if (s.edited > 0)  html += wSummaryRow('preview-summary-edited',  'Manually edited', s.edited.toLocaleString());
-    html += '</div>';
-    return html;
-}
-
-function wSummaryRow(cls, label, value) {
-    return '<div class="preview-summary-row ' + cls + '">' +
-           '<span class="preview-summary-label">' + label + '</span>' +
-           '<span class="preview-summary-value">' + value + '</span></div>';
-}
-
-// What this upload does to the store's single dataset. Replacing is the one
-// action here that discards data, so the numbers are stated plainly rather than
-// left for the owner to infer — and a file that would shorten the history gets
-// a louder treatment than one that simply refreshes it.
-function wRenderReplaceNotice(data) {
-    var r = data.replaces;
-    if (!r) return '';
-    var icon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
-    var html = '';
-
-    if (r.rows_now === 0) {
-        html += '<div class="recovery-notice">' + icon +
-                '<span>This becomes your store\'s dataset: <strong>' +
-                r.rows_incoming.toLocaleString() + ' rows</strong> across <strong>' +
-                r.products_incoming + ' products</strong>.</span></div>';
-    } else {
-        var cls = r.narrows_history ? ' recovery-notice-warn' : '';
-        var body = 'Uploading replaces your current dataset — <strong>' +
-                   r.rows_now.toLocaleString() + ' rows</strong> (' + r.first_date_now +
-                   ' to ' + r.last_date_now + ') become <strong>' +
-                   r.rows_incoming.toLocaleString() + ' rows</strong> (' + r.first_date_new +
-                   ' to ' + r.last_date_new + '). The current data is saved to History first, '
-                   + 'so you can view, download or restore it afterwards.';
-
-        if (r.narrows_history) {
-            body = '<strong>This file covers a shorter period than your stored data.</strong> ' + body +
-                   ' If your export only covers recent weeks, re-export the full history before importing.';
-        }
-        if (r.products_leaving && r.products_leaving.length) {
-            var n = r.products_leaving.length;
-            body += ' <strong>' + n + ' product' + (n !== 1 ? 's' : '') + '</strong> (' +
-                    r.products_leaving.slice(0, 3).map(escHtml).join(', ') +
-                    (n > 3 ? ', +' + (n - 3) + ' more' : '') +
-                    ') ' + (n !== 1 ? 'are' : 'is') + ' not in this file and will be marked inactive — ' +
-                    'kept with their settings and history, just excluded from forecasting.';
-        }
-        html += '<div class="recovery-notice' + cls + '">' + icon + '<span>' + body + '</span></div>';
-    }
-
-    // History is capped, so name the version this upload pushes out while it can
-    // still be downloaded.
-    if (data.pruned_version) {
-        var p = data.pruned_version;
-        html += '<div class="recovery-notice recovery-notice-warn">' + icon +
-                '<span>You have the maximum of <strong>' + p.max + ' saved versions</strong>. ' +
-                'Importing will permanently delete the oldest — <strong>' + escHtml(p.label) +
-                '</strong> (' + p.total_rows.toLocaleString() + ' rows, saved ' + p.created_at +
-                '). Download it from History first if you want to keep it.</span></div>';
-    }
-
-    return html;
-}
-
-function wFilterChip(key, label) {
-    var active = wPreviewFilter === key ? ' preview-filter-chip-active' : '';
-    return '<button type="button" class="preview-filter-chip' + active + '" ' +
-           'data-filter="' + key + '" onclick="wSetFilter(\'' + key + '\')">' + label + '</button>';
-}
-
-function wSetFilter(key) {
-    wPreviewFilter = key;
-    wPreviewPage   = 1; // changing filter resets to page 1 since the row set shrinks/grows
-    document.querySelectorAll('#w-filter-chips .preview-filter-chip').forEach(function (el) {
-        el.classList.toggle('preview-filter-chip-active', el.dataset.filter === key);
-    });
-    wRenderRows();
-}
-
-function wGoToPage(p) {
-    wPreviewPage = p;
-    wRenderRows();
-}
-
-function wSortableTh(col, label) {
-    var active = wSortColumn === col;
-    var arrow  = active ? (wSortDir === 'asc' ? ' ▲' : ' ▼') : '';
-    var cls    = 'preview-th-sortable' + (active ? ' preview-th-sorted' : '');
-    return '<th class="' + cls + '" data-col="' + col + '" onclick="wSetSort(\'' + col + '\')">' + label +
-           '<span class="preview-sort-arrow">' + arrow + '</span></th>';
-}
-
-function wSetSort(col) {
-    if (wSortColumn === col) {
-        // Same column → toggle direction. Third click clears the sort entirely
-        // (back to preflight's default invalid-first ordering).
-        if (wSortDir === 'asc') {
-            wSortDir = 'desc';
-        } else {
-            wSortColumn = null;
-            wSortDir    = 'asc';
-        }
-    } else {
-        wSortColumn = col;
-        wSortDir    = 'asc';
-    }
-    wPreviewPage = 1;
-    wUpdateSortHeaders();
-    wRenderRows();
-}
-
-// Updates the arrow indicators on the existing thead instead of re-rendering
-// the whole card — that would wipe out any rows the user is currently editing.
-function wUpdateSortHeaders() {
-    document.querySelectorAll('#w-preflight-container .preview-th-sortable').forEach(function (th) {
-        var col   = th.dataset.col;
-        var arrow = th.querySelector('.preview-sort-arrow');
-        if (wSortColumn === col) {
-            th.classList.add('preview-th-sorted');
-            if (arrow) arrow.textContent = wSortDir === 'asc' ? ' ▲' : ' ▼';
-        } else {
-            th.classList.remove('preview-th-sorted');
-            if (arrow) arrow.textContent = '';
-        }
-    });
-}
-
-// Re-applies the active sort to wPreviewRows in place. Returns nothing.
-function wApplySort() {
-    if (!wSortColumn) {
-        // Restore preflight's default order: invalid → overlap → new → noop, then rowNum.
-        var defaultOrder = { invalid: 0, overlap: 1, new: 2, noop: 3 };
-        wPreviewRows.sort(function (a, b) {
-            var sa = defaultOrder[a.status] !== undefined ? defaultOrder[a.status] : 9;
-            var sb = defaultOrder[b.status] !== undefined ? defaultOrder[b.status] : 9;
-            if (sa !== sb) return sa - sb;
-            return a.rowNum - b.rowNum;
-        });
-        return;
-    }
-    var dir = wSortDir === 'asc' ? 1 : -1;
-    wPreviewRows.sort(function (a, b) { return wCompareRows(a, b, wSortColumn) * dir; });
-}
-
-function wCompareRows(a, b, col) {
-    if (col === 'row')      return a.rowNum - b.rowNum;
-    if (col === 'product')  return String(a.product || '').localeCompare(String(b.product || ''));
-    if (col === 'date')     return String(a.date || '').localeCompare(String(b.date || '')); // YYYY-MM-DD sorts lexicographically
-    if (col === 'qty') {
-        var aq = (a.qty === null || a.qty === undefined) ? -Infinity : a.qty;
-        var bq = (b.qty === null || b.qty === undefined) ? -Infinity : b.qty;
-        return aq - bq;
-    }
-    if (col === 'existing') {
-        var ae = a.existing_qty === undefined ? -Infinity : a.existing_qty;
-        var be = b.existing_qty === undefined ? -Infinity : b.existing_qty;
-        return ae - be;
-    }
-    if (col === 'status') {
-        var order = { invalid: 0, overlap: 1, new: 2, noop: 3 };
-        return (order[a.status] !== undefined ? order[a.status] : 9) -
-               (order[b.status] !== undefined ? order[b.status] : 9);
-    }
-    return 0;
-}
-
-function wRenderRows() {
-    var tbody = document.getElementById('w-preview-tbody');
-    if (!tbody) return;
-
-    wApplySort();
-
-    // Filtered set first, then paginate so the page indicator reflects what
-    // the user is actually navigating.
-    // 'review' is orthogonal to status — a row can be perfectly importable and
-    // still have had a value clamped to fit, which is exactly what needs eyes.
-    var filtered = [];
-    wPreviewRows.forEach(function (r, idx) {
-        var match = wPreviewFilter === 'all'
-            || (wPreviewFilter === 'review' ? !!(r.warnings && r.warnings.length)
-                                            : r.status === wPreviewFilter);
-        if (match) filtered.push({ row: r, idx: idx });
-    });
-
-    var totalPages = Math.max(1, Math.ceil(filtered.length / W_PER_PAGE));
-    if (wPreviewPage > totalPages) wPreviewPage = totalPages;
-    if (wPreviewPage < 1)          wPreviewPage = 1;
-
-    var start = (wPreviewPage - 1) * W_PER_PAGE;
-    var slice = filtered.slice(start, start + W_PER_PAGE);
-
-    var html = '';
-    slice.forEach(function (entry) { html += wRenderRow(entry.row, entry.idx); });
-    if (!html) html = '<tr><td colspan="7" class="preview-empty">No rows match this filter.</td></tr>';
-    tbody.innerHTML = html;
-
-    wRenderPagination(filtered.length, totalPages, start, slice.length);
-}
-
-function wRenderPagination(totalFiltered, totalPages, start, shown) {
-    var el = document.getElementById('w-preview-pagination');
-    if (!el) return;
-    if (totalFiltered === 0) { el.innerHTML = ''; return; }
-
-    var from = (start + 1).toLocaleString();
-    var to   = (start + shown).toLocaleString();
-    var tot  = totalFiltered.toLocaleString();
-
-    var html = '<div class="preview-pagination-info">Showing ' + from + '–' + to + ' of <strong>' + tot + '</strong></div>';
-    html += '<div class="preview-pagination-controls">';
-    html += '<button type="button" class="preview-page-btn" onclick="wGoToPage(1)"'                          + (wPreviewPage === 1          ? ' disabled' : '') + '>« First</button>';
-    html += '<button type="button" class="preview-page-btn" onclick="wGoToPage(' + (wPreviewPage - 1) + ')"' + (wPreviewPage === 1          ? ' disabled' : '') + '>← Prev</button>';
-    html += '<span class="preview-pagination-page">Page ' + wPreviewPage + ' of ' + totalPages + '</span>';
-    html += '<button type="button" class="preview-page-btn" onclick="wGoToPage(' + (wPreviewPage + 1) + ')"' + (wPreviewPage === totalPages ? ' disabled' : '') + '>Next →</button>';
-    html += '<button type="button" class="preview-page-btn" onclick="wGoToPage(' + totalPages       + ')"'  + (wPreviewPage === totalPages ? ' disabled' : '') + '>Last »</button>';
-    html += '</div>';
-    el.innerHTML = html;
-}
-
-function wRenderRow(r, idx) {
-    var rowClass = 'preview-row preview-row-' + r.status + (r.edited ? ' preview-row-edited' : '');
-    var qtyVal   = r.qty === null || r.qty === undefined ? (r.raw_qty || '') : r.qty;
-    var dateVal  = r.date || r.raw_date || '';
-    var qtyDisp  = typeof qtyVal === 'number' ? qtyVal.toLocaleString() : escHtml(String(qtyVal));
-
-    var html = '<tr class="' + rowClass + '" data-idx="' + idx + '">';
-    html += '<td class="preview-row-num">' + r.rowNum + (r.agg_count > 1 ? ' <span class="preview-agg">+' + (r.agg_count - 1) + '</span>' : '') + '</td>';
-    html += '<td class="preview-product" title="' + escHtml(r.product) + '">' + escHtml(r.product || '(empty)') + '</td>';
-
-    // Date + Qty cells render as plain text by default. Click Edit to swap in
-    // editable inputs — the gate stops accidental keystrokes from changing data.
-    if (r.editing) {
-        html += '<td><input type="text" class="preview-input preview-input-date" value="' + escHtml(String(dateVal)) + '" ' +
-                'placeholder="YYYY-MM-DD" onchange="wOnRowEdit(' + idx + ', \'date\', this.value)"></td>';
-        html += '<td><input type="number" min="1" step="1" class="preview-input preview-input-qty" value="' + escHtml(String(qtyVal)) + '" ' +
-                'onchange="wOnRowEdit(' + idx + ', \'qty\', this.value)"></td>';
-    } else {
-        html += '<td class="preview-cell-display">' + escHtml(String(dateVal)) + '</td>';
-        html += '<td class="preview-cell-display preview-cell-qty-display">' + qtyDisp + '</td>';
-    }
-
-    html += '<td class="preview-existing">' + (r.existing_qty !== undefined ? r.existing_qty.toLocaleString() : '<span class="preview-dash">—</span>') + '</td>';
-    html += '<td>' + wStatusBadge(r) + '</td>';
-    html += '<td class="preview-actions">' + wRenderActions(r, idx) + '</td>';
-    html += '</tr>';
-    return html;
-}
-
-function wRenderActions(r, idx) {
-    if (r.editing) {
-        return '<button type="button" class="preview-row-btn preview-row-btn-save"   onclick="wSaveEdit(' + idx + ')">Save</button>' +
-               '<button type="button" class="preview-row-btn preview-row-btn-cancel" onclick="wCancelEdit(' + idx + ')">Cancel</button>';
-    }
-    return '<button type="button" class="preview-row-btn preview-row-btn-edit" onclick="wStartEdit(' + idx + ')">Edit</button>';
-}
-
-function wStartEdit(idx) {
-    var r = wPreviewRows[idx];
-    if (!r) return;
-    // Snapshot the current state so Cancel can revert in-flight changes.
-    r._snapshotQty  = r.qty;
-    r._snapshotDate = r.date;
-    r.editing       = true;
-    wRenderRows();
-}
-
-function wSaveEdit(idx) {
-    var r = wPreviewRows[idx];
-    if (!r) return;
-    r.editing = false;
-    delete r._snapshotQty;
-    delete r._snapshotDate;
-    wRenderRows();
-    wRefreshSummary();
-}
-
-function wCancelEdit(idx) {
-    var r = wPreviewRows[idx];
-    if (!r) return;
-    if (r._snapshotQty !== undefined)  r.qty  = r._snapshotQty;
-    if (r._snapshotDate !== undefined) r.date = r._snapshotDate;
-    r.edited = (r.qty !== r.originalQty || r.date !== r.originalDate);
-    wReclassifyRow(r);
-    r.editing = false;
-    delete r._snapshotQty;
-    delete r._snapshotDate;
-    wRenderRows();
-    wRefreshSummary();
-}
-
-function wStatusBadge(r) {
-    var label = { new: 'New', overlap: 'Conflict', invalid: 'Invalid', noop: 'Unchanged' }[r.status] || r.status;
-    var html = '<span class="preview-badge preview-badge-' + r.status + '">' + label + '</span>';
-    if (r.status === 'invalid' && r.reason) {
-        html += '<div class="preview-row-reason" title="' + escHtml(r.reason) + '">' + escHtml(r.reason) + '</div>';
-    }
-    if (r.warnings && r.warnings.length) {
-        var notes = r.warnings.map(function (w) {
-            return w.field + ': ' + w.reason + ' (was "' + w.original + '")';
-        });
-        html += '<div class="preview-row-warning" title="' + escHtml(notes.join('\n')) + '">' +
-                escHtml(notes.join(' · ')) + '</div>';
-    }
-    return html;
-}
-
-function wOnRowEdit(idx, field, value) {
-    var r = wPreviewRows[idx];
-    if (!r) return;
-
-    if (field === 'qty')  r.qty  = value === '' ? null : Number(value);
-    if (field === 'date') r.date = value;
-
-    r.edited = (r.qty !== r.originalQty || r.date !== r.originalDate);
-    wReclassifyRow(r);
-
-    // Update the visible cells in place rather than re-rendering the tbody —
-    // a full re-render mid-edit destroys the inputs and steals user focus.
-    var tr = document.querySelector('#w-preview-tbody tr[data-idx="' + idx + '"]');
-    if (tr) {
-        tr.className = 'preview-row preview-row-' + r.status + (r.edited ? ' preview-row-edited' : '');
-        var statusTd = tr.children[5];
-        if (statusTd) statusTd.innerHTML = wStatusBadge(r);
-    }
-
-    wRefreshSummary();
-}
-
-// Client-side reclassification — only does what we can without a DB roundtrip.
-// (Cross-row overlap detection against the existing DB is left to the server.)
-function wReclassifyRow(r) {
-    var qtyOk  = r.qty !== null && Number.isInteger(r.qty) && r.qty > 0;
-    var dateOk = /^\d{4}-\d{2}-\d{2}$/.test(String(r.date).trim()) && !isNaN(new Date(r.date).getTime());
-
-    if (!qtyOk || !dateOk) {
-        r.status = 'invalid';
-        r.reason = !qtyOk ? 'Quantity must be a positive whole number' : 'Date must be in YYYY-MM-DD format';
-        return;
-    }
-    delete r.reason;
-
-    // Fixed an originally-invalid row → optimistically "new" (server confirms on apply).
-    if (r.originalStatus === 'invalid') { r.status = 'new'; return; }
-
-    // Overlap & noop hinge on whether qty matches the existing DB value
-    // (only valid when date hasn't changed — otherwise we can't tell).
-    if (r.date === r.originalDate && r.existing_qty !== undefined) {
-        r.status = (r.qty === r.existing_qty) ? 'noop' : 'overlap';
-        return;
-    }
-
-    // Date changed for a previously-overlap/noop row — unknown overlap with the new
-    // date, so treat as "new" client-side; server will reclassify.
-    if (r.originalStatus === 'overlap' || r.originalStatus === 'noop') {
-        r.status = 'new';
-        return;
-    }
-
-    r.status = r.originalStatus;
-}
-
-function wRefreshSummary() {
-    var card = document.querySelector('#w-preflight-container .preview-card');
-    if (!card) return;
-    var oldSummary = card.querySelector('.preview-summary');
-    if (!oldSummary) return;
-    var tmp = document.createElement('div');
-    tmp.innerHTML = wRenderSummary();
-    oldSummary.replaceWith(tmp.firstElementChild);
-
-    // Apply button gets toggled too based on whether anything would actually commit.
-    var s   = computePreviewCounts(wPreviewRows);
+function wRefreshImportButton(counts) {
     var btn = document.getElementById('w-import-btn');
-
-    // Every valid row commits: this upload becomes the dataset, so there's no
-    // longer a class of rows held back pending a toggle.
-    var willCommit = s.new + s.edited;
-
-    if (willCommit === 0) {
+    if (counts.importable === 0) {
         btn.innerHTML     = 'No valid rows to import';
         btn.disabled      = true;
         btn.style.opacity = '0.55';
@@ -2299,31 +1884,16 @@ function wRefreshSummary() {
     }
 }
 
-function computePreviewCounts(rows) {
-    var s = { new: 0, overlap: 0, invalid: 0, noop: 0, edited: 0 };
-    rows.forEach(function (r) {
-        if (s[r.status] !== undefined) s[r.status]++;
-        if (r.edited) s.edited++;
-    });
-    return s;
-}
-
 async function wDoImport(mapping, replace) {
     var btn = document.getElementById('w-import-btn');
     btn.textContent = 'Importing…';
     btn.disabled    = true;
 
-    // Build the rows payload from the editor state. Skip rows that would be
-    // server-side no-ops (saves payload bytes) and rows still marked invalid
-    // and unedited (nothing we can do with them).
-    var payloadRows = wPreviewRows.filter(function (r) {
-        if (r.status === 'noop'    && !r.edited) return false;
-        if (r.status === 'invalid' && !r.edited) return false;
-        return true;
-    });
+    var counts  = ImportPreview.counts();
+    var leftOut = counts.invalid + counts.dropped;
 
     var formData = new FormData();
-    formData.append('rows',     JSON.stringify(payloadRows));
+    formData.append('rows',     JSON.stringify(ImportPreview.payload()));
     formData.append('csv_rows', wRowCount);
 
     try {
@@ -2334,7 +1904,7 @@ async function wDoImport(mapping, replace) {
             wClearState();
             // A re-import is a dataset update — re-forecast the catalogue at the
             // saved horizon before returning to My Store.
-            var redirect = '<?php echo BASE_URL; ?>/pages/import.view.php?imported=1&rows=' + data.rows + '&replaced=' + (data.replaced || 0) + '&skipped=' + (data.skipped || 0) + '&dropped=' + (data.dropped || 0) + '&csv_rows=' + (data.csv_rows || 0);
+            var redirect = '<?php echo BASE_URL; ?>/pages/import.view.php?imported=1&rows=' + data.rows + '&replaced=' + (data.replaced || 0) + '&skipped=' + (data.skipped || 0) + '&dropped=' + ((data.dropped || 0) + leftOut) + '&csv_rows=' + (data.csv_rows || 0);
             reforecastAfterImport(redirect);
         } else {
             showMappingError('Import failed: ' + (data.error || 'Unknown error.'));
@@ -2372,10 +1942,10 @@ async function reforecastAfterImport(redirectUrl) {
 function downloadSampleCsv(e) {
     e.stopPropagation();
     var rows = [
-        ['date',       'product_name',  'quantity_sold', 'category',  'cost_price', 'selling_price', 'sku',      'subcategory'],
-        ['2024-01-15', 'Pepsi 500ml',   '24',            'Beverages', '12.50',      '18.00',         'PEP-500',  'Carbonated'],
-        ['2024-01-15', 'Lays Original', '15',            'Snacks',    '8.00',       '12.50',         'LAYS-ORG', 'Chips'],
-        ['2024-01-16', 'Pepsi 500ml',   '18',            'Beverages', '12.50',      '18.00',         'PEP-500',  'Carbonated'],
+        ['date',       'product_name',  'quantity_sold', 'category',  'cost_price', 'selling_price', 'sku'],
+        ['2024-01-15', 'Pepsi 500ml',   '24',            'Beverages', '12.50',      '18.00',         'PEP-500'],
+        ['2024-01-15', 'Lays Original', '15',            'Snacks',    '8.00',       '12.50',         'LAYS-ORG'],
+        ['2024-01-16', 'Pepsi 500ml',   '18',            'Beverages', '12.50',      '18.00',         'PEP-500'],
     ];
     var csv  = rows.map(function(r) {
         return r.map(function(v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
@@ -2393,8 +1963,8 @@ function downloadSampleCsv(e) {
 function confirmRestoreVersion(versionId, label) {
     showConfirm({
         title:        'Restore this version?',
-        message:      'Your sales data will be replaced with the snapshot from "' + label + '". ' +
-                      'The current state is auto-saved first, so you can undo this restore from the history.',
+        message:      'Your sales data and prices will be replaced with the snapshot from "' + label + '". ' +
+                      'The current state is auto-saved first, so you can undo this restore from the history. Your forecast will be re-run from this version.',
         confirmText:  'Restore',
         confirmStyle: 'warning',
         onConfirm:    function() { restoreVersion(versionId); },
@@ -2410,7 +1980,7 @@ async function restoreVersion(versionId) {
         var data = await res.json();
 
         if (data.success) {
-            window.location = '<?php echo BASE_URL; ?>/pages/import.view.php?restored=1';
+            reforecastAfterImport('<?php echo BASE_URL; ?>/pages/import.view.php?restored=' + (data.prices_restored ? '1' : 'noprices') + '#import');
         } else {
             alert('Restore failed: ' + (data.error || 'Unknown error.'));
         }
@@ -2471,6 +2041,10 @@ function _settingsMsg(type, text) {
     msg.style.display = '';
 }
 
+// What's saved right now — the Save buttons stay off until the inputs differ.
+var _savedHorizon  = <?php echo (int) $curHorizon; ?>;
+var _savedReminder = <?php echo (int) $curReminder; ?>;
+
 // Quick-pick preset → fills the number input.
 function pickHorizon(days) {
     var inp = document.getElementById('horizon-input');
@@ -2484,6 +2058,12 @@ function syncHorizonPresets() {
     document.querySelectorAll('.settings-preset').forEach(function (b) {
         b.classList.toggle('is-active', parseInt(b.dataset.days, 10) === val);
     });
+    document.getElementById('settings-save-btn').disabled = (val === _savedHorizon);
+}
+
+function syncReminderSave() {
+    var val = parseInt(document.getElementById('reminder-input').value, 10);
+    document.getElementById('reminder-save-btn').disabled = (val === _savedReminder);
 }
 
 // Save the range, then hand the catalogue re-forecast to the background worker.
@@ -2493,6 +2073,7 @@ function saveHorizon() {
         _settingsMsg('error', 'Enter a number of days between 1 and 60.');
         return;
     }
+    if (days === _savedHorizon) return;
 
     var btn = document.getElementById('settings-save-btn');
     btn.disabled = true;
@@ -2511,6 +2092,16 @@ function saveHorizon() {
             var cur = document.getElementById('settings-current-days');
             if (cur) cur.textContent = days + ' days ahead';
 
+            _savedHorizon = days;
+            syncHorizonPresets();
+
+            // A reminder can't outlast the range it belongs to.
+            var rem = document.getElementById('reminder-input');
+            rem.max = days;
+            if (parseInt(rem.value, 10) > days) rem.value = days;
+            _savedReminder = Math.min(_savedReminder, days);
+            syncReminderSave();
+
             _settingsMsg('success', data.already
                 ? 'Range saved. A forecast run is already in progress.'
                 : 'Range saved. Re-forecasting ' + (data.total || '') + ' products in the background — you can keep working.');
@@ -2523,64 +2114,42 @@ function saveHorizon() {
         });
 }
 
-// ── Manual vs automatic window upkeep ───────────────────────────────────────
-function setForecastMode(mode) {
-    var body = new FormData();
-    body.append('mode', mode);
+// ── Re-forecast reminder ────────────────────────────────────────────────────
+function saveReminder() {
+    var input = document.getElementById('reminder-input');
+    var days  = parseInt(input.value, 10);
+    var max   = parseInt(input.max, 10);
+    if (isNaN(days) || days < 1 || days > max) {
+        _msg('reminder-msg', 'error', 'Enter a number of days between 1 and ' + max + '.');
+        return;
+    }
+    if (days === _savedReminder) return;
 
-    fetch('<?php echo BASE_URL; ?>/api/update_forecast_mode.php', { method: 'POST', body: body })
+    var btn = document.getElementById('reminder-save-btn');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    var body = new FormData();
+    body.append('reminder_days', days);
+
+    fetch('<?php echo BASE_URL; ?>/api/update_forecast_reminder.php', { method: 'POST', body: body })
         .then(function (r) { return r.json(); })
         .then(function (data) {
-            if (data.error) { _settingsMsg('error', data.error); return; }
-
-            document.querySelectorAll('.settings-mode').forEach(function (b) {
-                var on = (b.dataset.mode === mode);
-                b.classList.toggle('is-on', on);
-                b.setAttribute('aria-checked', on ? 'true' : 'false');
-            });
-            var auto = (mode === 'auto');
-            document.getElementById('mode-auto-panel').style.display   = auto ? '' : 'none';
-            document.getElementById('mode-auto-note').style.display    = auto ? '' : 'none';
-            document.getElementById('mode-manual-panel').style.display = auto ? 'none' : '';
-
-            // Switching to automatic should act immediately, not next page load.
-            if (auto) checkCoverage(true);
-        })
-        .catch(function () { _settingsMsg('error', 'Network error. Please try again.'); });
-}
-
-// Reads coverage and, in auto mode, lets the server top the window up if it has
-// fallen behind. Safe to call repeatedly — nothing starts unless something is short.
-function checkCoverage(showBusy) {
-    var title = document.getElementById('cov-title');
-    var sub   = document.getElementById('cov-sub');
-    var panel = document.getElementById('mode-auto-panel');
-    if (!panel) return;
-    if (showBusy && title) title.textContent = 'Checking…';
-
-    fetch('<?php echo BASE_URL; ?>/api/forecast_coverage.php', { method: 'POST' })
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
-            if (d.error) return;
-            var endTxt = d.required_end || '';
-            panel.classList.toggle('is-ok',     !!d.up_to_date);
-            panel.classList.toggle('is-behind', !d.up_to_date);
-
-            if (d.up_to_date) {
-                title.textContent = 'Everything is up to date';
-                sub.textContent   = d.covered + ' of ' + d.total + ' products forecast through ' + endTxt + '.';
-            } else if (d.started) {
-                title.textContent = 'Catching up…';
-                sub.textContent   = 'Topping up ' + d.behind + ' product' + (d.behind === 1 ? '' : 's')
-                                  + ' to ' + endTxt + ' in the background.';
-                if (window.pvWatchForecastJob) window.pvWatchForecastJob();
-            } else {
-                title.textContent = 'Catching up…';
-                sub.textContent   = d.behind + ' product' + (d.behind === 1 ? '' : 's')
-                                  + ' still short of ' + endTxt + '.';
+            btn.textContent = 'Save reminder';
+            if (data.error) {
+                btn.disabled = false;
+                _msg('reminder-msg', 'error', data.error);
+                return;
             }
+            _savedReminder = days;
+            syncReminderSave();
+            _msg('reminder-msg', 'success', 'Reminder saved.');
         })
-        .catch(function () { /* transient — the next check retries */ });
+        .catch(function () {
+            btn.disabled = false;
+            btn.textContent = 'Save reminder';
+            _msg('reminder-msg', 'error', 'Network error. Please try again.');
+        });
 }
 
 // ── Re-forecast all products ────────────────────────────────────────────────
@@ -2749,6 +2318,18 @@ function toggleSheetAutoSync() {
 }
 
 // ── Disconnect ───────────────────────────────────────────────────────────────
+function notifySheetConnected() {
+    showConfirm({
+        title:        'Disconnect your Google Sheet first',
+        message:      'Your sales data is coming from a connected Google Sheet. Disconnect it before '
+                    + 'uploading a file or connecting another sheet. '
+                    + 'Sales already brought in from the sheet stay exactly as they are.',
+        confirmText:  'Disconnect',
+        confirmStyle: 'danger',
+        onConfirm:    doSheetUnlink,
+    });
+}
+
 function confirmSheetUnlink() {
     showConfirm({
         title:        'Disconnect this sheet?',
@@ -2790,7 +2371,7 @@ function runCatalogueAccuracy(forceRefresh) {
     fetch('<?php echo BASE_URL; ?>/api/run_catalogue_accuracy.php', { method: 'POST', body: body })
         .then(function (r) { return r.json(); })
         .then(function (data) {
-            if (data.error) return;
+            if (data.error) { showAccuracyError(data.error); return; }
 
             var ca      = data.catalogue;
             var card    = document.getElementById('catalogue-accuracy-card');
@@ -2810,16 +2391,23 @@ function runCatalogueAccuracy(forceRefresh) {
 
             document.getElementById('ca-grid').style.display = hasData ? '' : 'none';
             if (hasData) {
-                document.getElementById('ca-mape').textContent = ca.weighted_mape.toFixed(1) + '%';
-                document.getElementById('ca-mae').textContent  = ca.weighted_mae.toFixed(1);
-                document.getElementById('ca-rmse').textContent = ca.weighted_rmse.toFixed(1);
+                document.getElementById('ca-wape').textContent = ca.weighted_wape != null ? ca.weighted_wape.toFixed(1) + '%' : '—';
+                document.getElementById('ca-mae').textContent  = ca.weighted_mae != null ? ca.weighted_mae.toFixed(1) : '—';
             }
 
         })
+        .catch(function () { showAccuracyError('The accuracy test could not finish. Please try again.'); })
         .finally(function () {
             btn.disabled = false;
             btn.classList.remove('spinning');
         });
+}
+
+function showAccuracyError(message) {
+    document.getElementById('catalogue-accuracy-card').className = 'catalogue-accuracy catalogue-accuracy-low';
+    document.getElementById('ca-title').innerHTML = '<span class="catalogue-accuracy-title-sub">Accuracy test failed</span>';
+    document.getElementById('ca-sub').textContent = message;
+    document.getElementById('ca-grid').style.display = 'none';
 }
 
 // ── Optional: backtest against data the user uploads for dates ProVendor doesn't have ──
@@ -2920,9 +2508,8 @@ function renderUploadResult(data, timestampText) {
         ca.evaluated_count + ' of ' + ca.total_count + ' matched product' + (ca.total_count !== 1 ? 's' : '') + '.';
 
     grid.style.display = '';
-    document.getElementById('ub-mape').textContent = ca.weighted_mape.toFixed(1) + '%';
-    document.getElementById('ub-mae').textContent  = ca.weighted_mae.toFixed(1);
-    document.getElementById('ub-rmse').textContent = ca.weighted_rmse.toFixed(1);
+    document.getElementById('ub-wape').textContent = ca.weighted_wape != null ? ca.weighted_wape.toFixed(1) + '%' : '—';
+    document.getElementById('ub-mae').textContent  = ca.weighted_mae != null ? ca.weighted_mae.toFixed(1) : '—';
 }
 
 // ── Clear the saved run (both the DB row and the CSV kept for re-download) ──

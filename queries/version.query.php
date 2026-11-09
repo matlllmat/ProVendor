@@ -43,6 +43,14 @@ function saveDatasetVersion(
          WHERE p.user_id = ?'
     )->execute([$versionId, $userId]);
 
+    // Prices live on the product, so they're copied too for a restore to bring back.
+    $pdo->prepare(
+        'INSERT INTO version_product_snapshots
+            (version_id, product_id, cost_price, selling_price, orig_cost_price, orig_selling_price)
+         SELECT ?, id, cost_price, selling_price, orig_cost_price, orig_selling_price
+         FROM products WHERE user_id = ?'
+    )->execute([$versionId, $userId]);
+
     pruneOldVersions($pdo, $userId);
 
     return $versionId;
@@ -56,7 +64,7 @@ function saveDatasetVersion(
 // owner two identical entries. The exception is a Google Sheet sync, which
 // rewrites rows on a timer without versioning — so this is checked rather than
 // assumed. Compared on (row count, total quantity), which is cheap and catches
-// any realistic drift.
+// any realistic drift, and on prices, which the owner can edit after an import.
 function datasetMatchesNewestVersion(PDO $pdo, int $userId): bool
 {
     $stmt = $pdo->prepare(
@@ -80,8 +88,62 @@ function datasetMatchesNewestVersion(PDO $pdo, int $userId): bool
 
     if ((int) $newest['n'] === 0) return false;   // no version yet — must snapshot
 
+    $stmt = $pdo->prepare(
+        'SELECT COUNT(*)
+         FROM version_product_snapshots v
+         JOIN products p ON p.id = v.product_id
+         WHERE v.version_id = (
+             SELECT id FROM dataset_versions WHERE user_id = ?
+             ORDER BY created_at DESC, id DESC LIMIT 1
+         )
+         AND NOT (p.cost_price <=> v.cost_price AND p.selling_price <=> v.selling_price)'
+    );
+    $stmt->execute([$userId]);
+    if ((int) $stmt->fetchColumn() > 0) return false;
+
     return (int) $live['n'] === (int) $newest['n']
         && (int) $live['q'] === (int) $newest['q'];
+}
+
+// Puts back the prices saved with a version. Returns false for older versions,
+// saved before prices were kept, and leaves current prices alone in that case.
+function restoreProductPrices(PDO $pdo, int $userId, int $versionId): bool
+{
+    $stmt = $pdo->prepare('SELECT COUNT(*) FROM version_product_snapshots WHERE version_id = ?');
+    $stmt->execute([$versionId]);
+    if ((int) $stmt->fetchColumn() === 0) return false;
+
+    $pdo->prepare(
+        'UPDATE products p
+         JOIN version_product_snapshots v ON v.product_id = p.id
+         SET p.cost_price = v.cost_price, p.selling_price = v.selling_price,
+             p.orig_cost_price = v.orig_cost_price, p.orig_selling_price = v.orig_selling_price
+         WHERE v.version_id = ? AND p.user_id = ?'
+    )->execute([$versionId, $userId]);
+    return true;
+}
+
+// Marks the version the store's sales now come from.
+function setCurrentVersion(PDO $pdo, int $userId, int $versionId): void
+{
+    $pdo->prepare('UPDATE dataset_versions SET is_current = (id = ?) WHERE user_id = ?')
+        ->execute([$versionId, $userId]);
+}
+
+// After a restore, a product is active exactly when the restored data has sales for it.
+function syncProductsActiveToSales(PDO $pdo, int $userId): void
+{
+    $pdo->prepare(
+        'UPDATE products p
+         LEFT JOIN (SELECT DISTINCT product_id FROM sales) s ON s.product_id = p.id
+         SET p.deactivated_at = CASE
+                 WHEN s.product_id IS NOT NULL THEN NULL
+                 WHEN p.is_active = 1 THEN NOW()
+                 ELSE p.deactivated_at
+             END,
+             p.is_active = (s.product_id IS NOT NULL)
+         WHERE p.user_id = ?'
+    )->execute([$userId]);
 }
 
 // Keeps the most recent MAX_VERSIONS_PER_USER versions and deletes older ones.
@@ -107,7 +169,7 @@ function listDatasetVersions(PDO $pdo, int $userId): array
 {
     $stmt = $pdo->prepare(
         'SELECT id, label, note, rows_added, rows_changed, total_rows,
-                is_pre_restore_snapshot, created_at
+                is_pre_restore_snapshot, is_current, created_at
          FROM dataset_versions
          WHERE user_id = ?
          ORDER BY created_at DESC, id DESC'
@@ -156,17 +218,20 @@ function restoreSalesFromSnapshot(PDO $pdo, int $userId, int $versionId): void
 
 // Returns a version's snapshotted sales in the same CSV-ready shape as
 // getSalesForExport(). The snapshot only stores (product_id, sale_date,
-// quantity), so the descriptive columns (category, sku, prices) come from the
-// CURRENT products table — product metadata isn't versioned. Ownership is
+// quantity), so category and sku come from the CURRENT products table. Prices come
+// from the version when it saved them. Ownership is
 // enforced via the dataset_versions join. Used by api/export_version.php.
 function getVersionSalesForExport(PDO $pdo, int $userId, int $versionId): array
 {
     $stmt = $pdo->prepare(
         'SELECT ss.sale_date, p.name AS product_name, ss.quantity_sold,
-                p.category, p.subcategory, p.sku, p.cost_price, p.selling_price
+                ' . PRODUCT_CATEGORIES_SQL . ' AS category, p.sku,
+                IF(vp.version_id IS NULL, p.cost_price, vp.cost_price) AS cost_price,
+                IF(vp.version_id IS NULL, p.selling_price, vp.selling_price) AS selling_price
          FROM sales_snapshots ss
          JOIN dataset_versions v ON v.id = ss.version_id
          JOIN products p ON p.id = ss.product_id
+         LEFT JOIN version_product_snapshots vp ON vp.version_id = ss.version_id AND vp.product_id = ss.product_id
          WHERE ss.version_id = ? AND v.user_id = ?
          -- Same ordering as the live export (newest first) so both downloads read alike.
          ORDER BY ss.sale_date DESC, p.name'

@@ -134,8 +134,6 @@
         var now = new Date();
         setYearlyParts(now.getMonth() + 1, now.getDate());
         setMonthlyParts(0, now.getDate());
-        document.getElementById('modal-start').value    = '';
-        document.getElementById('modal-end').value      = '';
         document.getElementById('modal-duration').value = 1;
         setCustomDates([]);
 
@@ -157,8 +155,6 @@
         setYearlyParts(startParts.month, startParts.day);
         setMonthlyParts(ev.is_last_day == 1 ? 1 : 0, startParts.day);
 
-        document.getElementById('modal-start').value = ev.event_start;
-        document.getElementById('modal-end').value   = ev.event_end || '';
         document.getElementById('modal-duration').value =
             daysBetween(ev.event_start, ev.event_end) + 1;
         setCustomDates(ev.occurrences || []);
@@ -249,10 +245,8 @@
         document.getElementById('when-yearly').classList.toggle('hidden',  rec !== 'yearly');
         document.getElementById('when-monthly').classList.toggle('hidden', rec !== 'monthly');
         document.getElementById('when-custom').classList.toggle('hidden',  rec !== 'custom');
-        document.getElementById('when-once').classList.toggle('hidden',    rec !== 'none');
-        // One-time and custom events carry real dates, so they size themselves.
-        document.getElementById('duration-row').classList.toggle('hidden',
-            rec === 'none' || rec === 'custom');
+        // Custom events carry real dates, so they size themselves.
+        document.getElementById('duration-row').classList.toggle('hidden', rec === 'custom');
 
         // Start the list with one empty row so the field is never a blank box.
         if (rec === 'custom' && !document.querySelector('#custom-date-list .custom-date-row')) {
@@ -422,13 +416,6 @@
             };
         }
 
-        if (recurrence === 'none') {
-            var s = document.getElementById('modal-start').value;
-            var e = document.getElementById('modal-end').value;
-            if (!s) return { error: 'Start date is required.' };
-            if (e && e < s) return { error: 'End date must be on or after the start date.' };
-            return { start: s, end: e, isLastDay: 0 };
-        }
 
         var duration = parseInt(document.getElementById('modal-duration').value, 10);
         if (!duration || duration < 1) return { error: 'Length must be at least 1 day.' };

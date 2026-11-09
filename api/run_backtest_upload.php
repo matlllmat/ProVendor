@@ -18,6 +18,7 @@
 //                  dropped_samples }
 
 require_once __DIR__ . '/../config/bootstrap.php';
+require_once __DIR__ . '/../includes/flask_client.php';
 require_once __DIR__ . '/import_helpers.php';
 header('Content-Type: application/json');
 
@@ -148,7 +149,7 @@ require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../queries/backtest.query.php';
 $userId = (int) $_SESSION['user_id'];
 
-$stmt = $pdo->prepare('SELECT id, name, category FROM products WHERE user_id = ? AND is_active = 1');
+$stmt = $pdo->prepare('SELECT id, name, ' . PRODUCT_CATEGORIES_SQL . ' AS category FROM products p WHERE user_id = ? AND is_active = 1');
 $stmt->execute([$userId]);
 $byNameLower = [];
 foreach ($stmt->fetchAll() as $p) {
@@ -228,23 +229,13 @@ foreach ($byProductId as $pid => $info) {
         continue;
     }
 
-    $ch = curl_init('http://localhost:5000/forecast/product/evaluate_upload');
-    curl_setopt_array($ch, [
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => json_encode([
-            'user_id'    => $userId,
-            'product_id' => $pid,
-            'actuals'    => $actuals,
-        ]),
-        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 120,
-    ]);
-    $result  = curl_exec($ch);
-    $curlErr = curl_error($ch);
-    curl_close($ch);
+    [$result, , $flaskError] = flaskRequest('/forecast/product/evaluate_upload', json_encode([
+        'user_id'    => $userId,
+        'product_id' => $pid,
+        'actuals'    => $actuals,
+    ]), 120);
 
-    if ($curlErr) {
+    if ($flaskError) {
         $skipped[] = ['name' => $info['name'], 'reason' => 'Could not reach the forecast server.'];
         continue;
     }
@@ -267,9 +258,9 @@ foreach ($byProductId as $pid => $info) {
         'avg_daily'     => $avgDaily,
         'total_units'   => (int) $vol['total_units'],
         'accuracy_pct'  => $accPct,
-        'mape'          => (float) $decoded['mape'],
+        'wape'          => (float) $decoded['wape'],
         'mae'           => (float) $decoded['mae'],
-        'rmse'          => (float) $decoded['rmse'],
+        'actual_units'  => (float) $decoded['actual_units'],
         'n_test_days'   => (int) $decoded['n_test_days'],
         'already_known' => $alreadyKnown,
         'tone'          => $tone,
@@ -278,23 +269,27 @@ foreach ($byProductId as $pid => $info) {
 }
 
 // ── Catalogue-wide weighted average, same formula as the old cached summary ──
-$weightSum = 0.0; $mapeNum = 0.0; $maeNum = 0.0; $rmseNum = 0.0;
+$weightSum = 0.0; $maeNum = 0.0;
+$wapeErr = 0.0; $wapeSales = 0.0;   // pooled: total units missed / total units sold
 foreach ($evaluated as $row) {
+    if ($row['actual_units'] > 0) {
+        $wapeErr   += $row['wape'] / 100 * $row['actual_units'];
+        $wapeSales += $row['actual_units'];
+    }
+
     $w = (float) $row['total_units'];
     if ($w <= 0) continue;
     $weightSum += $w;
-    $mapeNum   += $w * $row['mape'];
     $maeNum    += $w * $row['mae'];
-    $rmseNum   += $w * $row['rmse'];
 }
+$weightedWape = $wapeSales > 0 ? $wapeErr / $wapeSales * 100 : null;
 
 $catalogue = [
     'evaluated_count'       => count($evaluated),
     'total_count'           => count($byProductId),
-    'weighted_mape'         => $weightSum > 0 ? round($mapeNum / $weightSum, 2) : null,
-    'weighted_mae'          => $weightSum > 0 ? round($maeNum  / $weightSum, 2) : null,
-    'weighted_rmse'         => $weightSum > 0 ? round($rmseNum / $weightSum, 2) : null,
-    'weighted_accuracy_pct' => $weightSum > 0 ? round(max(0.0, 100.0 - ($mapeNum / $weightSum)), 2) : null,
+    'weighted_wape'         => $weightedWape !== null ? round($weightedWape, 2) : null,
+    'weighted_mae'          => $weightSum > 0 ? round($maeNum / $weightSum, 2) : null,
+    'weighted_accuracy_pct' => $weightedWape !== null ? round(max(0.0, 100.0 - $weightedWape), 2) : null,
 ];
 
 // Worst offenders first — same "impact" ordering as the old breakdown table.
@@ -311,9 +306,8 @@ saveBacktestRun($pdo, $userId, [
     'stored_path'           => $storedRelPath,
     'evaluated_count'       => $catalogue['evaluated_count'],
     'total_count'           => $catalogue['total_count'],
-    'weighted_mape'         => $catalogue['weighted_mape'],
+    'weighted_wape'         => $catalogue['weighted_wape'],
     'weighted_mae'          => $catalogue['weighted_mae'],
-    'weighted_rmse'         => $catalogue['weighted_rmse'],
     'weighted_accuracy_pct' => $catalogue['weighted_accuracy_pct'],
     'rows_parsed'           => count($allRows),
     'rows_dropped'          => $dropped,

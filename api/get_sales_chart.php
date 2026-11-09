@@ -36,7 +36,7 @@ if ($productId !== null) {
         'SELECT s.sale_date AS date, SUM(s.quantity_sold) AS actual
          FROM sales s
          JOIN products p ON p.id = s.product_id
-         WHERE p.user_id = ? AND p.category = ?
+         WHERE p.user_id = ? AND ' . PRODUCT_IN_CATEGORY_SQL . '
          GROUP BY s.sale_date
          ORDER BY s.sale_date'
     );

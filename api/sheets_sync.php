@@ -134,6 +134,8 @@ try {
         }
     }
 
+    $productCategories = categoriesByProduct($agg['pairs']);
+
     $existing     = getExistingSalesWithIdsByName($pdo, $userId);
     $productCache = [];
     $insertBatch  = [];
@@ -149,7 +151,7 @@ try {
         // history moved — which is what the accuracy invalidation below needs.
         if (!isset($productCache[$r['product']])) {
             $productCache[$r['product']] = upsertProduct(
-                $pdo, $userId, $r['product'], $r['sku'], $r['category'], $r['subcategory'],
+                $pdo, $userId, $r['product'], $r['sku'], $productCategories[mb_strtolower($r['product'])] ?? [],
                 $latestByProduct[$r['product']]['cost']  ?? null,
                 $latestByProduct[$r['product']]['price'] ?? null
             );

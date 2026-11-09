@@ -4,6 +4,7 @@
 // Saves each result to the forecasts table.
 
 require_once __DIR__ . '/../config/bootstrap.php';
+require_once __DIR__ . '/../includes/flask_client.php';
 header('Content-Type: application/json');
 
 set_time_limit(300);
@@ -91,27 +92,17 @@ foreach ($productsIn as $p) {
         $residualRho = (float) $acc['accuracy_residual_rho'];
     }
 
-    $ch = curl_init('http://localhost:5000/optimize');
-    curl_setopt_array($ch, [
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => json_encode([
-            'forecast'        => $forecastRows,
-            'cost_price'      => $costPrice,
-            'selling_price'   => $sellingPrice,
-            'current_stock'   => $currentStock,
-            'residual_rho'    => $residualRho,
-            'shelf_life_days' => effectiveShelfLifeDays(
-                (bool) $productRow['is_perishable'],
-                $productRow['shelf_life_min_days'] !== null ? (int) $productRow['shelf_life_min_days'] : null
-            ),
-        ]),
-        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 30,
-    ]);
-    $optResult = curl_exec($ch);
-    $optErr    = curl_error($ch);
-    curl_close($ch);
+    [$optResult, , $optErr] = flaskRequest('/optimize', json_encode([
+        'forecast'        => $forecastRows,
+        'cost_price'      => $costPrice,
+        'selling_price'   => $sellingPrice,
+        'current_stock'   => $currentStock,
+        'residual_rho'    => $residualRho,
+        'shelf_life_days' => effectiveShelfLifeDays(
+            (bool) $productRow['is_perishable'],
+            $productRow['shelf_life_min_days'] !== null ? (int) $productRow['shelf_life_min_days'] : null
+        ),
+    ]), 30);
 
     if ($optErr || !$optResult) {
         $results[] = ['product_id' => $productId, 'product_name' => $productRow['name'], 'success' => false, 'error' => 'Optimization server unreachable.'];

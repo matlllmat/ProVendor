@@ -6,10 +6,11 @@
 // Returns the product id.
 // Inserts if the product doesn't exist yet.
 // If it does exist, updates any fields that are currently NULL but now have a value.
-function upsertProduct(PDO $pdo, int $userId, string $name, ?string $sku, ?string $category, ?string $subcategory, ?float $cost, ?float $price): int
+// $corrected flags values the owner typed in the review step; those always apply.
+function upsertProduct(PDO $pdo, int $userId, string $name, ?string $sku, array $categories, ?float $cost, ?float $price, array $corrected = []): int
 {
     $stmt = $pdo->prepare(
-        'SELECT id, sku, category, subcategory, cost_price, selling_price,
+        'SELECT id, sku, cost_price, selling_price,
                 orig_cost_price, orig_selling_price, is_active
          FROM products WHERE user_id = ? AND name = ? LIMIT 1'
     );
@@ -17,16 +18,13 @@ function upsertProduct(PDO $pdo, int $userId, string $name, ?string $sku, ?strin
     $existing = $stmt->fetch();
 
     if ($existing) {
-        // Identity attributes (sku, category, subcategory): keep the first value we
-        // ever saw — these don't change frequently and the user can edit them in My Store.
+        // SKU: keep the first value we ever saw.
         // Money attributes (cost_price, selling_price): last-write-wins, since prices
         // change over time and the canonical value is whatever the most recent import says.
         $updates = [];
         $params  = [];
 
-        if ($existing['sku']         === null && $sku         !== null) { $updates[] = 'sku = ?';         $params[] = $sku; }
-        if ($existing['category']    === null && $category    !== null) { $updates[] = 'category = ?';    $params[] = $category; }
-        if ($existing['subcategory'] === null && $subcategory !== null) { $updates[] = 'subcategory = ?'; $params[] = $subcategory; }
+        if ($sku !== null && ($existing['sku'] === null || !empty($corrected['sku']))) { $updates[] = 'sku = ?'; $params[] = $sku; }
         // Money is last-write-wins from the import, with one exception: a price the
         // owner has edited on the forecast page is theirs, and a re-upload must not
         // silently undo it. cost_price != orig_cost_price is exactly that signal —
@@ -34,13 +32,13 @@ function upsertProduct(PDO $pdo, int $userId, string $name, ?string $sku, ?strin
         // edit. We still refresh orig_* either way, so "Reset to imported price"
         // restores what the newest file says rather than a stale value.
         if ($cost !== null) {
-            $costEdited = $existing['orig_cost_price'] !== null
+            $costEdited = empty($corrected['cost']) && $existing['orig_cost_price'] !== null
                           && (float) $existing['cost_price'] !== (float) $existing['orig_cost_price'];
             if (!$costEdited) { $updates[] = 'cost_price = ?'; $params[] = $cost; }
             $updates[] = 'orig_cost_price = ?'; $params[] = $cost;
         }
         if ($price !== null) {
-            $priceEdited = $existing['orig_selling_price'] !== null
+            $priceEdited = empty($corrected['price']) && $existing['orig_selling_price'] !== null
                            && (float) $existing['selling_price'] !== (float) $existing['orig_selling_price'];
             if (!$priceEdited) { $updates[] = 'selling_price = ?'; $params[] = $price; }
             $updates[] = 'orig_selling_price = ?'; $params[] = $price;
@@ -58,16 +56,34 @@ function upsertProduct(PDO $pdo, int $userId, string $name, ?string $sku, ?strin
                 ->execute($params);
         }
 
+        setProductCategories($pdo, (int) $existing['id'], $categories);
         return (int) $existing['id'];
     }
 
     $stmt = $pdo->prepare(
-        'INSERT INTO products (user_id, name, sku, category, subcategory,
+        'INSERT INTO products (user_id, name, sku,
                                cost_price, selling_price, orig_cost_price, orig_selling_price)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+         VALUES (?, ?, ?, ?, ?, ?, ?)'
     );
-    $stmt->execute([$userId, $name, $sku, $category, $subcategory, $cost, $price, $cost, $price]);
-    return (int) $pdo->lastInsertId();
+    $stmt->execute([$userId, $name, $sku, $cost, $price, $cost, $price]);
+    $productId = (int) $pdo->lastInsertId();
+    setProductCategories($pdo, $productId, $categories);
+    return $productId;
+}
+
+// Replaces a product's categories. An upload without categories leaves them as
+// they are. INSERT IGNORE: the column's collation treats "Piñata" and "Pinata"
+// as the same value.
+function setProductCategories(PDO $pdo, int $productId, array $categories): void
+{
+    if (empty($categories)) return;
+
+    $pdo->prepare('DELETE FROM product_categories WHERE product_id = ?')->execute([$productId]);
+
+    $stmt = $pdo->prepare('INSERT IGNORE INTO product_categories (product_id, category, position) VALUES (?, ?, ?)');
+    foreach (array_values($categories) as $position => $category) {
+        $stmt->execute([$productId, $category, $position]);
+    }
 }
 
 // Deletes every sales row belonging to this user.
@@ -278,7 +294,7 @@ function getSalesForExport(PDO $pdo, int $userId): array
 {
     $stmt = $pdo->prepare(
         'SELECT s.sale_date, p.name AS product_name, s.quantity_sold,
-                p.category, p.subcategory, p.sku, p.cost_price, p.selling_price
+                ' . PRODUCT_CATEGORIES_SQL . ' AS category, p.sku, p.cost_price, p.selling_price
          FROM sales s
          JOIN products p ON p.id = s.product_id
          WHERE p.user_id = ?

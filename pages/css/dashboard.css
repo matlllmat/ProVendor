@@ -38,6 +38,9 @@
 }
 .db-card-title { font-size: 1rem; font-weight: 600; color: #261F0E; }
 .db-card-sub   { font-size: 0.72rem; color: #261F0E; opacity: 0.5; margin-top: 0.15rem; }
+.db-card-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.db-select-bar { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.db-select-count { font-size: 0.75rem; opacity: 0.6; white-space: nowrap; }
 
 .db-restock  { margin-bottom: 1.25rem; }
 .db-lower    { margin-bottom: 1.25rem; }
@@ -159,8 +162,55 @@
 .db-banner a { color: #1A6933; font-weight: 600; text-decoration: none; white-space: nowrap; }
 .db-banner a:hover { text-decoration: underline; }
 
+/* ── Re-forecast prompt ── */
+.db-reforecast {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.85rem 1.25rem;
+    flex-wrap: wrap;
+    padding: 0.95rem 1.15rem;
+    margin-bottom: 1.25rem;
+    background: rgba(38,31,14,0.05);
+    border: 1px solid #D2C8AE;
+    border-left: 4px solid #261F0E;
+    border-radius: 0.6rem;
+    color: #261F0E;
+}
+.db-reforecast.is-due {
+    background: rgba(255,87,34,0.1);
+    border-color: rgba(255,87,34,0.35);
+    border-left-color: #C43E12;
+}
+.db-reforecast-text { flex: 1 1 20rem; min-width: 0; }
+.db-reforecast-title { margin: 0; font-size: 0.98rem; font-weight: 700; }
+.db-reforecast.is-due .db-reforecast-title { color: #C43E12; }
+.db-reforecast-body { margin: 0.15rem 0 0; font-size: 0.8rem; line-height: 1.45; }
+.db-reforecast-actions { display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; }
+.db-reforecast-link { color: #1A6933; font-size: 0.82rem; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.db-reforecast-link:hover { text-decoration: underline; }
+.db-reforecast-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.68rem 1.3rem;
+    background: #C43E12;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 0.6rem;
+    box-shadow: 0 2px 7px rgba(196,62,18,0.35);
+    font-family: 'Lora', serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+.db-reforecast-btn:hover:not(:disabled) { opacity: 0.88; }
+.db-reforecast-btn:disabled { opacity: 0.55; box-shadow: none; cursor: not-allowed; }
+
 /* ── 2. Restock table ── */
-.db-restock-tools { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.db-restock-tools { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
 .db-select {
     background: #F0E8D0;
     border: 1px solid #D2C8AE;
@@ -171,7 +221,6 @@
     color: #261F0E;
     cursor: pointer;
 }
-.db-check { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; opacity: 0.75; cursor: pointer; white-space: nowrap; }
 .db-btn {
     border: 1px solid #D2C8AE;
     background: #F0E8D0;
@@ -186,6 +235,46 @@
     transition: background 0.14s;
 }
 .db-btn:hover { background: #D2C8AE; }
+
+/* Export dropdown: one trigger, CSV/PDF choices appear below it */
+.db-export { position: relative; display: inline-block; }
+.db-export-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.3rem);
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    min-width: 150px;
+    background: #FFFDF8;
+    border: 1px solid #D2C8AE;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 14px rgba(38,31,14,0.18);
+    overflow: hidden;
+}
+.db-export-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    background: none;
+    padding: 0.5rem 0.75rem;
+    font-family: 'Lora', serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #261F0E;
+    cursor: pointer;
+    text-decoration: none;
+}
+.db-export-item:hover { background: rgba(210,200,174,0.4); }
+.db-export-group-label {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    opacity: 0.5;
+    padding: 0.4rem 0.75rem 0.15rem;
+}
+.db-export-divider { border-top: 1px solid #D2C8AE; margin: 0.15rem 0; }
 
 /* Date-window filter: custom range inputs + the "showing …" note */
 .db-range { display: inline-flex; align-items: center; gap: 0.3rem; }
@@ -224,7 +313,12 @@
     border-bottom: 1px solid rgba(210,200,174,0.5);
     white-space: nowrap;
 }
-.db-t-left { text-align: left !important; }
+.db-t-left  { text-align: left !important; }
+/* Selection checkboxes are opt-in: hidden until "Export specific products…" is chosen. */
+.db-t-check { display: none; text-align: center !important; width: 1.8rem; padding-left: 0.4rem !important; padding-right: 0.2rem !important; }
+.db-restock.is-selecting .db-t-check { display: table-cell; }
+/* Simple view: only stock, order, order cost and profit stay next to the product. */
+.db-restock.is-simple .db-t-detail { display: none; }
 /* Cap the two text columns so long names don't push the numeric columns off the card. */
 .db-t-name { max-width: 165px; overflow: hidden; text-overflow: ellipsis; }
 .db-t-cat  { max-width: 115px; overflow: hidden; text-overflow: ellipsis; }
@@ -238,6 +332,11 @@
 .db-t-warn  { color: #FF5722; font-weight: 600; font-size: 0.72rem; }
 .db-t-green { color: #1A6933; font-weight: 600; }
 .db-rows-empty { padding: 2rem; text-align: center; opacity: 0.4; font-size: 0.8rem; }
+.db-row-hidden-page { display: none; }
+
+.db-pager { display: flex; align-items: center; justify-content: center; gap: 0.75rem; padding: 0.75rem 0; font-size: 0.78rem; }
+.db-pager-info { opacity: 0.6; }
+.db-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* ── Lower grid: attention + events ── */
 .db-lower {
@@ -261,6 +360,7 @@
 .db-attn-label { font-weight: 600; font-size: 0.8rem; }
 .db-attn-count { font-weight: 700; font-size: 0.8rem; opacity: 0.6; }
 .db-attn-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.45rem; }
+.db-attn-note { font-size: 0.75rem; line-height: 1.4; opacity: 0.7; margin-bottom: 0.45rem; }
 .db-attn-cta { font-size: 0.7rem; color: #1A6933; font-weight: 600; text-decoration: none; }
 .db-attn-cta:hover { text-decoration: underline; }
 
@@ -290,6 +390,10 @@
 
 /* ── 5. Category breakdown + top movers ── */
 .db-breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: 1.75rem; }
+/* A long category list scrolls inside its card instead of stretching the page. */
+.db-catlist { max-height: 15rem; overflow-y: auto; padding-right: 0.35rem; }
+.db-catnote { margin-top: 0.5rem; font-size: 0.68rem; opacity: 0.55; }
+.db-cat-print { display: none; }
 .db-catrow { display: grid; grid-template-columns: 90px 1fr auto; align-items: center; gap: 0.6rem; margin-bottom: 0.55rem; }
 .db-catrow-label { font-size: 0.72rem; opacity: 0.7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .db-catrow-bar { height: 8px; background: rgba(38,31,14,0.07); border-radius: 999px; overflow: hidden; }
@@ -298,13 +402,13 @@
 
 .db-movers-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
 .db-movers-toggle { display: inline-flex; gap: 0.1rem; background: rgba(38,31,14,0.05); border-radius: 999px; padding: 0.15rem; }
-.db-mt {
+.db-mt, .db-view-btn {
     border: none; background: transparent;
     font-family: 'Lora', serif; font-size: 0.66rem; font-weight: 600;
     padding: 0.25rem 0.55rem; border-radius: 999px; color: #261F0E;
     opacity: 0.5; cursor: pointer; transition: background 0.12s, opacity 0.12s;
 }
-.db-mt.active { background: #261F0E; color: #F0E8D0; opacity: 1; }
+.db-mt.active, .db-view-btn.active { background: #261F0E; color: #F0E8D0; opacity: 1; }
 .db-movers { list-style: none; margin: 0; padding: 0; }
 .db-mover {
     display: flex; align-items: center; justify-content: space-between;
@@ -335,12 +439,28 @@
 /* ── Print: isolate the restock table as a shopping list ── */
 @media print {
     body { background: #fff; }
-    header, footer, .db-head, .db-summary, .db-banner, .db-lower, .db-breakdown, .db-restock-tools { display: none !important; }
+    header, footer, .toast-container, .db-head, .db-reforecast, .db-summary, .db-banner, .db-lower, .db-breakdown, .db-restock-tools, .db-pager, .db-card-actions { display: none !important; }
     main { padding: 0 !important; max-width: none !important; }
     .db-card { border: none; box-shadow: none; padding: 0; }
+    /* Printing a shopping list shouldn't truncate it to whatever page was on
+       screen — only rows that failed the filter stay hidden (inline style). */
+    .db-row-hidden-page { display: table-row !important; }
     .db-print-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.75rem; font-size: 0.9rem; }
+    .db-t-check { display: none !important; }   /* selection checkboxes are UI chrome, not shopping-list data */
     .db-row { cursor: default; }
     .db-row:hover { background: none; }
+    /* The on-screen table scrolls horizontally when it's too wide (.db-table-wrap
+       has overflow-x: auto). Printing can't scroll a static page, so left as-is
+       this clips the table and bakes a dead scrollbar into the PDF. Let the table
+       reflow to the page width instead: drop the scroll clipping, shrink text/
+       padding, and let cells wrap instead of forcing nowrap overflow. */
+    .db-table-wrap { overflow: visible !important; }
+    .db-table { font-size: 0.65rem; table-layout: auto; }
+    .db-table th, .db-table td { padding: 0.3rem 0.25rem; white-space: normal; }
+    .db-t-name, .db-t-cat { max-width: none; overflow: visible; text-overflow: clip; }
+    /* Paper can't hover, so print every category. */
+    .db-t-cat .cat-list { display: none; }
+    .db-cat-print { display: inline; }
 }
 
 /* Batch edit is the actionable one in the restock toolbar — the others just export. */

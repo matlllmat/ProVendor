@@ -12,9 +12,10 @@ CREATE TABLE IF NOT EXISTS `users` (
     -- the Settings page. Every product forecasts this many days out unless it has
     -- its own products.forecast_horizon_days override.
     `forecast_horizon_days` INT NOT NULL DEFAULT 30,
-    -- 'manual' = the owner presses "Re-forecast all"; 'auto' = the app tops the
-    -- window back up to forecast_horizon_days by itself as days elapse.
-    `forecast_mode`         ENUM('manual','auto') NOT NULL DEFAULT 'manual',
+    -- Days after a forecast starts before the owner is reminded to re-forecast.
+    `forecast_reminder_days` INT NOT NULL DEFAULT 10,
+    -- Last time an event change that can affect the forecast was saved.
+    `events_changed_at` DATETIME DEFAULT NULL,
     `created_at` TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `users_email_unique` (`email`)
@@ -25,8 +26,6 @@ CREATE TABLE IF NOT EXISTS `products` (
     `user_id`                INT           NOT NULL,
     `name`                   VARCHAR(100)  NOT NULL,
     `sku`                    VARCHAR(100)  DEFAULT NULL,
-    `category`               VARCHAR(50)   DEFAULT NULL,
-    `subcategory`            VARCHAR(50)   DEFAULT NULL,
     -- Perishability — declared by the owner via the forecast page's batch
     -- editor, NOT derived from the CSV (a real POS export has no expiry column).
     -- is_perishable defaults off, matching most of a sari-sari catalogue.
@@ -53,11 +52,13 @@ CREATE TABLE IF NOT EXISTS `products` (
     -- control on the forecast page.
     `forecast_horizon_days`  INT           DEFAULT NULL,
     -- Forecast accuracy cache, populated by /forecast/product/evaluate.
-    -- accuracy_pct = 100 - MAPE on a held-out window. residual_rho is the
+    -- accuracy_pct = 100 - WAPE on a held-out window. residual_rho is the
     -- lag-1 autocorrelation of backtest residuals, fed back into /optimize
     -- to widen σ for products whose demand actually clusters day-to-day.
     `accuracy_pct`           DECIMAL(5,2)  DEFAULT NULL,
-    `accuracy_mape`          DECIMAL(8,2)  DEFAULT NULL,
+    -- WAPE (total error / total actual sales) and the units it was measured on.
+    `accuracy_wape`          DECIMAL(8,2)  DEFAULT NULL,
+    `accuracy_actual_units`  DECIMAL(12,2) DEFAULT NULL,
     `accuracy_mae`           DECIMAL(8,2)  DEFAULT NULL,
     `accuracy_rmse`          DECIMAL(8,2)  DEFAULT NULL,
     `accuracy_horizon_days`  INT           DEFAULT NULL,
@@ -72,11 +73,30 @@ CREATE TABLE IF NOT EXISTS `products` (
     -- from forecasting. Re-appearing in a later upload reactivates it.
     `is_active`              TINYINT(1)    NOT NULL DEFAULT 1,
     `deactivated_at`         TIMESTAMP     NULL DEFAULT NULL,
+    -- When this product's forecast was last really recalculated. Price and stock
+    -- edits rewrite forecasts.generated_at, so that can't answer this.
+    `prophet_run_at`         DATETIME      DEFAULT NULL,
     `created_at`             TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     CONSTRAINT `fk_products_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- A product can belong to several categories. `position` keeps them in the order
+-- of the file's columns.
+CREATE TABLE IF NOT EXISTS `product_categories` (
+    `product_id` INT         NOT NULL,
+    `category`   VARCHAR(50) NOT NULL,
+    `position`   INT         NOT NULL DEFAULT 0,
+    PRIMARY KEY (`product_id`, `category`),
+    CONSTRAINT `fk_product_categories_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Multiple categories (replaces products.category and products.subcategory):
+--   INSERT INTO `product_categories` (`product_id`, `category`, `position`)
+--     SELECT `id`, `category`, 0 FROM `products` WHERE `category` IS NOT NULL AND `category` <> '';
+--   INSERT IGNORE INTO `product_categories` (`product_id`, `category`, `position`)
+--     SELECT `id`, `subcategory`, 1 FROM `products` WHERE `subcategory` IS NOT NULL AND `subcategory` <> '';
+--   ALTER TABLE `products` DROP COLUMN `category`, DROP COLUMN `subcategory`;
 -- For existing databases, add the accuracy cache columns:
 --   ALTER TABLE `products`
 --     ADD COLUMN `accuracy_pct`          DECIMAL(5,2) DEFAULT NULL,
@@ -89,6 +109,24 @@ CREATE TABLE IF NOT EXISTS `products` (
 -- Forecast horizon columns (added later):
 --   ALTER TABLE `users`    ADD COLUMN `forecast_horizon_days` INT NOT NULL DEFAULT 30;
 --   ALTER TABLE `products` ADD COLUMN `forecast_horizon_days` INT DEFAULT NULL;
+-- WAPE accuracy measure:
+--   ALTER TABLE `products` ADD COLUMN `accuracy_wape` DECIMAL(8,2) DEFAULT NULL AFTER `accuracy_mae`,
+--                          ADD COLUMN `accuracy_actual_units` DECIMAL(12,2) DEFAULT NULL AFTER `accuracy_wape`;
+--   ALTER TABLE `backtest_runs` ADD COLUMN `weighted_wape` DECIMAL(8,2) DEFAULT NULL AFTER `weighted_mae`;
+-- WAPE replaces MAPE (accuracy tests are re-run to fill WAPE in):
+--   UPDATE `products` SET `accuracy_pct` = NULL, `accuracy_mae` = NULL, `accuracy_horizon_days` = NULL,
+--          `accuracy_residual_rho` = NULL, `accuracy_computed_at` = NULL WHERE `accuracy_wape` IS NULL;
+--   UPDATE `products` SET `accuracy_pct` = GREATEST(0, 100 - `accuracy_wape`) WHERE `accuracy_wape` IS NOT NULL;
+--   ALTER TABLE `products` DROP COLUMN `accuracy_mape`;
+--   DELETE FROM `backtest_runs` WHERE `weighted_wape` IS NULL;
+--   ALTER TABLE `backtest_runs` DROP COLUMN `weighted_mape`;
+-- Re-forecast reminder (replaces the manual/auto update mode):
+--   ALTER TABLE `users` ADD COLUMN `forecast_reminder_days` INT NOT NULL DEFAULT 10 AFTER `forecast_horizon_days`,
+--                       DROP COLUMN `forecast_mode`;
+--   ALTER TABLE `forecast_jobs` DROP COLUMN `mode`;
+-- Re-forecast notice after event changes:
+--   ALTER TABLE `users`    ADD COLUMN `events_changed_at` DATETIME DEFAULT NULL AFTER `forecast_reminder_days`;
+--   ALTER TABLE `products` ADD COLUMN `prophet_run_at` DATETIME DEFAULT NULL;
 -- Original imported price columns (added later, for "Reset to imported price"):
 --   ALTER TABLE `products`
 --     ADD COLUMN `orig_cost_price`    DECIMAL(10,2) DEFAULT NULL,
@@ -144,11 +182,29 @@ CREATE TABLE IF NOT EXISTS `dataset_versions` (
     -- a restore. The UI shows these with a distinct icon ("auto-saved before
     -- restoring v3") so they don't look like regular edits.
     `is_pre_restore_snapshot` TINYINT(1)   NOT NULL DEFAULT 0,
+    -- is_current = 1 marks the version the store's sales currently come from.
+    `is_current`              TINYINT(1)   NOT NULL DEFAULT 0,
     `created_at`              TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     KEY `dataset_versions_user_idx` (`user_id`, `created_at`),
     CONSTRAINT `fk_dataset_versions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Each product's prices as they were when the version was saved.
+CREATE TABLE IF NOT EXISTS `version_product_snapshots` (
+    `version_id`         INT           NOT NULL,
+    `product_id`         INT           NOT NULL,
+    `cost_price`         DECIMAL(10,2) DEFAULT NULL,
+    `selling_price`      DECIMAL(10,2) DEFAULT NULL,
+    `orig_cost_price`    DECIMAL(10,2) DEFAULT NULL,
+    `orig_selling_price` DECIMAL(10,2) DEFAULT NULL,
+    PRIMARY KEY (`version_id`, `product_id`),
+    CONSTRAINT `fk_vps_version` FOREIGN KEY (`version_id`) REFERENCES `dataset_versions` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_vps_product` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Active dataset mark (added later):
+--   ALTER TABLE `dataset_versions` ADD COLUMN `is_current` TINYINT(1) NOT NULL DEFAULT 0 AFTER `is_pre_restore_snapshot`;
 
 CREATE TABLE IF NOT EXISTS `sales_snapshots` (
     `version_id`    INT NOT NULL,
@@ -278,9 +334,6 @@ CREATE TABLE IF NOT EXISTS `forecast_jobs` (
     `user_id`         INT           NOT NULL,
     `status`          ENUM('queued','running','done','failed') NOT NULL DEFAULT 'queued',
     `horizon_days`    INT           NOT NULL DEFAULT 30,
-    -- 'full'   = refit Prophet for every product (import / horizon change)
-    -- 'extend' = only forecast the days the saved window is missing
-    `mode`            ENUM('full','extend') NOT NULL DEFAULT 'full',
     `total`           INT           NOT NULL DEFAULT 0,
     `done`            INT           NOT NULL DEFAULT 0,
     `failed`          INT           NOT NULL DEFAULT 0,
@@ -340,7 +393,7 @@ CREATE TABLE IF NOT EXISTS `backtest_runs` (
     `stored_path`            VARCHAR(255)  NOT NULL,
     `evaluated_count`        INT           NOT NULL DEFAULT 0,
     `total_count`            INT           NOT NULL DEFAULT 0,
-    `weighted_mape`          DECIMAL(8,2)  DEFAULT NULL,
+    `weighted_wape`          DECIMAL(8,2)  DEFAULT NULL,
     `weighted_mae`           DECIMAL(8,2)  DEFAULT NULL,
     `weighted_rmse`          DECIMAL(8,2)  DEFAULT NULL,
     `weighted_accuracy_pct`  DECIMAL(5,2)  DEFAULT NULL,

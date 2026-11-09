@@ -16,6 +16,8 @@ function getRestockOverview(PDO $pdo, int $userId): array
 {
     $products        = getProducts($pdo, $userId, '', '');
     $latestForecasts = getLatestForecasts($pdo, $userId);
+    $series          = getForecastSeries($pdo, $userId);
+    $today           = date('Y-m-d');
 
     $rows = [];
     foreach ($products as $p) {
@@ -29,6 +31,28 @@ function getRestockOverview(PDO $pdo, int $userId): array
         $stock    = ($fc && $fc['current_stock']   !== null) ? (int)   $fc['current_stock']   : null;
         $orderQty = ($fc && $fc['restock_qty']     !== null) ? (int)   $fc['restock_qty']     : null;
         $profit   = ($fc && $fc['est_profit']      !== null) ? (float) $fc['est_profit']      : null;
+
+        // Only today onward counts. The saved order and profit cover the whole
+        // forecast, so they're scaled by the share of its demand still ahead —
+        // the same proration the dashboard's date-window filter uses.
+        $ended = false;
+        if ($fc) {
+            $total = $remaining = 0.0;
+            $daysLeft = 0;
+            foreach ($series[$pid] ?? [] as $day) {
+                $total += $day['q'];
+                if ($day['d'] >= $today) {
+                    $remaining += $day['q'];
+                    $daysLeft++;
+                }
+            }
+            $ended = $daysLeft === 0;
+            $share = $total > 0 ? $remaining / $total : 0.0;
+
+            $demand   = $ended ? null : (int) round($remaining);
+            $orderQty = ($ended || $orderQty === null) ? null : (int) round($orderQty * $share);
+            $profit   = ($ended || $profit === null)   ? null : $profit * $share;
+        }
 
         $orderCost = ($orderQty !== null && $cost !== null) ? $orderQty * $cost : null;
 
@@ -44,7 +68,8 @@ function getRestockOverview(PDO $pdo, int $userId): array
             'est_profit'    => $profit,
             'order_cost'    => $orderCost,
             'has_price'     => $cost !== null && $price !== null,
-            'forecasted'    => $fc !== null,
+            'forecasted'    => $fc !== null && !$ended,
+            'forecast_ended'=> $ended,
             'generated_at'  => $fc['generated_at'] ?? null,
         ];
     }
@@ -64,17 +89,17 @@ function getRestockOverview(PDO $pdo, int $userId): array
 // Per-day forecast demand for every product, so the dashboard can scope the
 // restock overview to a date window (today / next N days / a custom range).
 // Returns [product_id => [ ['d' => 'YYYY-MM-DD', 'q' => float], ... ]] sorted by
-// date. One flat query, grouped in PHP.
-function getForecastSeries(PDO $pdo, int $userId): array
+// date, leaving out days before $fromDate. One flat query, grouped in PHP.
+function getForecastSeries(PDO $pdo, int $userId, string $fromDate = '1000-01-01'): array
 {
     $stmt = $pdo->prepare(
         'SELECT f.product_id, f.forecast_date, f.predicted_demand
          FROM forecasts f
          JOIN products p ON p.id = f.product_id
-         WHERE p.user_id = ?
+         WHERE p.user_id = ? AND f.forecast_date >= ?
          ORDER BY f.product_id, f.forecast_date'
     );
-    $stmt->execute([$userId]);
+    $stmt->execute([$userId, $fromDate]);
 
     $byProduct = [];
     foreach ($stmt->fetchAll() as $row) {

@@ -64,12 +64,10 @@ var ChartModal = (function () {
         var fmtPct  = function (v) { return v != null ? v.toFixed(1) + '%'    : '—'; };
         var fmtUnit = function (v) { return v != null ? v.toFixed(1)           : '—'; };
 
-        var mapeEl = document.getElementById('cm-metric-mape');
+        var wapeEl = document.getElementById('cm-metric-wape');
         var maeEl  = document.getElementById('cm-metric-mae');
-        var rmseEl = document.getElementById('cm-metric-rmse');
-        if (mapeEl) mapeEl.textContent = fmtPct(data.mape);
+        if (wapeEl) wapeEl.textContent = fmtPct(data.wape);
         if (maeEl)  maeEl.textContent  = fmtUnit(data.mae);
-        if (rmseEl) rmseEl.textContent = fmtUnit(data.rmse);
 
         var footer = document.getElementById('cm-metrics-footer');
         if (footer) {
@@ -132,9 +130,8 @@ var ChartModal = (function () {
                       '<strong>Historical accuracy: ' + pct + '%</strong>'
                     + ' &nbsp;·&nbsp; tested on the last ' + horizon + ' days of real sales'
                     + _refreshBtnHTML();
-                chip.title = 'MAPE-based: 100 − mean absolute % error on a held-out window.\n'
+                chip.title = 'WAPE-based: 100 − (total units missed ÷ total units sold) on a held-out window.\n'
                            + 'MAE = ' + (data.mae != null ? Math.round(data.mae) : '—') + ' units/day (average miss).\n'
-                           + 'RMSE = ' + (data.rmse != null ? Math.round(data.rmse) : '—') + ' units/day (penalizes large misses).\n'
                            + 'Residual ρ = ' + (data.residual_rho != null ? data.residual_rho.toFixed(2) : '0')
                            + ' (used to widen σ in the Newsvendor model).';
                 _wireRefreshBtn(chip, cfg);
@@ -503,23 +500,23 @@ var ChartModal = (function () {
             '<div id="cm-metrics-panel" class="cm-metrics-panel cm-info-panel" data-panel="accuracy" style="display:none">' +
                     '<p class="cm-metrics-eyebrow">Forecast Accuracy</p>' +
                     '<h3 class="cm-metrics-title">How well does this model predict for this product?</h3>' +
-                    '<p class="cm-metrics-sub">Three standard error metrics, computed on a held-out window of the most recent sales. ' +
-                       'These tell different stories — read all three together rather than picking one.</p>' +
+                    '<p class="cm-metrics-sub">Two error measures, computed on a held-out window of the most recent sales. ' +
+                       'WAPE is the main one; MAE shows the same miss in units.</p>' +
                     '<div class="cm-metrics-grid">' +
                     '<div class="cm-metric-card">' +
-                        '<p class="cm-metric-label">MAPE</p>' +
-                        '<p class="cm-metric-value" id="cm-metric-mape">—</p>' +
-                        '<p class="cm-metric-unit">average % error</p>' +
+                        '<p class="cm-metric-label">WAPE</p>' +
+                        '<p class="cm-metric-value" id="cm-metric-wape">—</p>' +
+                        '<p class="cm-metric-unit">total error &divide; total sales</p>' +
                         '<p class="cm-metric-explain">' +
-                            '<strong>Mean Absolute Percentage Error.</strong> How far off the forecast is on average, ' +
-                            'as a percentage of actual sales. <strong>Lower is better.</strong>' +
+                            '<strong>Weighted Absolute Percentage Error.</strong> All the units the forecast missed, ' +
+                            'added up and divided by all the units actually sold. <strong>Lower is better.</strong>' +
                         '</p>' +
                         '<ul class="cm-metric-scale">' +
-                            '<li><span class="cm-metric-tag cm-tag-good">under&nbsp;15%</span> excellent — trust the model</li>' +
-                            '<li><span class="cm-metric-tag cm-tag-ok">15&ndash;30%</span> typical for retail demand</li>' +
-                            '<li><span class="cm-metric-tag cm-tag-bad">over&nbsp;40%</span> model is struggling for this product</li>' +
+                            '<li><span class="cm-metric-tag cm-tag-good">under&nbsp;20%</span> good &mdash; trust the model</li>' +
+                            '<li><span class="cm-metric-tag cm-tag-ok">20&ndash;40%</span> fair &mdash; typical for slow sellers</li>' +
+                            '<li><span class="cm-metric-tag cm-tag-bad">over&nbsp;40%</span> the model is struggling for this product</li>' +
                         '</ul>' +
-                        '<p class="cm-metric-hint">Avoid for slow-moving items &mdash; a single zero-sale day inflates the average.</p>' +
+                        '<p class="cm-metric-hint">Fair for slow-moving items &mdash; one quiet day cannot inflate it.</p>' +
                     '</div>' +
                     '<div class="cm-metric-card">' +
                         '<p class="cm-metric-label">MAE</p>' +
@@ -534,21 +531,7 @@ var ChartModal = (function () {
                             '<li><span class="cm-metric-tag cm-tag-good">MAE&nbsp;5 on 50/day</span> ~10% miss — good</li>' +
                             '<li><span class="cm-metric-tag cm-tag-bad">MAE&nbsp;5 on 8/day</span> ~60% miss — bad</li>' +
                         '</ul>' +
-                        '<p class="cm-metric-hint">More trustworthy than MAPE on low-volume products with lots of zero-sale days.</p>' +
-                    '</div>' +
-                    '<div class="cm-metric-card">' +
-                        '<p class="cm-metric-label">RMSE</p>' +
-                        '<p class="cm-metric-value" id="cm-metric-rmse">—</p>' +
-                        '<p class="cm-metric-unit">units/day off</p>' +
-                        '<p class="cm-metric-explain">' +
-                            '<strong>Root Mean Square Error.</strong> Same units as MAE, but it <strong>punishes ' +
-                            'big single-day misses harder</strong>. Always read it next to MAE.' +
-                        '</p>' +
-                        '<ul class="cm-metric-scale">' +
-                            '<li><span class="cm-metric-tag cm-tag-good">RMSE&nbsp;≈&nbsp;MAE</span> errors are small &amp; consistent</li>' +
-                            '<li><span class="cm-metric-tag cm-tag-bad">RMSE&nbsp;»&nbsp;MAE</span> occasional huge misses — model has blind spots</li>' +
-                        '</ul>' +
-                        '<p class="cm-metric-hint">A big gap usually means the model is missing an event or sudden trend shift.</p>' +
+                        '<p class="cm-metric-hint">Read it against your typical daily sales &mdash; WAPE already does that for you.</p>' +
                     '</div>' +
                 '</div>' +
                     '<p id="cm-metrics-footer" class="cm-metrics-footer"></p>' +
@@ -1648,8 +1631,11 @@ var ChartModal = (function () {
                               .sort(function (a, b) { return Math.abs(b.total) - Math.abs(a.total); });
         var totalEvents = eventList.reduce(function (s, e) { return s + e.total; }, 0);
 
-        function signed(n)   { var r = Math.round(n); return (r >= 0 ? '+' : '') + r.toLocaleString(); }
-        function unsigned(n) { return Math.round(n).toLocaleString(); }
+        // Math.round() of a tiny negative residual (e.g. -0.03) yields -0, which
+        // some browsers render as "-0" via toLocaleString — normalize it away so
+        // a near-zero weekly/yearly net never prints as the nonsensical "+-0".
+        function signed(n)   { var r = Math.round(n) || 0; return (r >= 0 ? '+' : '') + r.toLocaleString(); }
+        function unsigned(n) { return (Math.round(n) || 0).toLocaleString(); }
 
         var html = ''
             + '<div class="cm-reasoning-header">'

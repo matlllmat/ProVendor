@@ -71,7 +71,7 @@
 
 .catalogue-accuracy-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: 0.7rem;
     margin-bottom: 0.5rem;
 }
@@ -293,7 +293,7 @@
 }
 .backtest-file-label:hover { border-color: rgba(38,31,14,0.5); opacity: 1; }
 
-/* ── Info tooltip (MAPE / MAE / RMSE explainers) ── */
+/* ── Info tooltip (WAPE / MAE explainers) ── */
 .info-tip {
     position: relative;
     display: inline-flex;

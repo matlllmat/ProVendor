@@ -4,51 +4,141 @@
 // Kept in one place so preflight and import always agree on what a "valid date" is —
 // otherwise preflight could green-light rows that import then silently drops.
 
-// Detects whether a date column is DD/MM/YYYY or MM/DD/YYYY by scanning sample values
-// for any value where the first or second part is > 12 (which forces the interpretation).
-// Returns:
-//   ['format' => 'Y-m-d' | 'd/m/Y' | 'm/d/Y' | 'd-m-Y' | 'm-d-Y' | 'Y/m/d' | null,
-//    'ambiguous' => bool]
-// 'format' is null when nothing matched — caller should fall back to strtotime.
-// 'ambiguous' = true means we picked a default (PH convention: DD/MM) because the
-// sample never had a day > 12 to disambiguate. The UI should warn the user.
-function sniffDateFormat(array $samples): array
+// The most rows one upload can hold. Larger files run the server out of memory
+// during the review step.
+const MAX_IMPORT_ROWS = 200000;
+const TOO_MANY_ROWS_MESSAGE = 'This file has more than 200,000 rows, which is more than ProVendor can check at once. Please upload a shorter period.';
+
+// Turns an uploaded .xlsx into the CSV the import steps read. Returns the
+// converter's result: ['sheet', 'sheets', 'header_row'] or ['error'].
+function convertWorkbookToCsv(string $source, string $target): array
+{
+    $python = __DIR__ . '/../python/.venv/Scripts/python.exe';
+    if (!is_file($python)) return ['error' => 'Excel files can\'t be read on this server. Please upload a CSV file.'];
+
+    $command = escapeshellarg($python) . ' ' . escapeshellarg(__DIR__ . '/../python/xlsx_to_csv.py') . ' '
+             . escapeshellarg($source) . ' ' . escapeshellarg($target) . ' 2>&1';
+    exec($command, $output);
+
+    $result = json_decode(implode('', $output), true);
+    return is_array($result) ? $result : ['error' => 'This file could not be read as an Excel workbook.'];
+}
+
+// Formats the owner can pick when the system isn't sure. Mirrors the wizard's
+// Date Format dropdown.
+const DATE_FORMAT_CHOICES = [
+    'Y-m-d' => 'YYYY-MM-DD',
+    'd/m/Y' => 'DD/MM/YYYY',
+    'm/d/Y' => 'MM/DD/YYYY',
+    'd-m-Y' => 'DD-MM-YYYY',
+    'm-d-Y' => 'MM-DD-YYYY',
+    'Y/m/d' => 'YYYY/MM/DD',
+    'j/n/y' => 'D/M/YY',
+    'n/j/y' => 'M/D/YY',
+];
+
+// Column of written-out dates such as "March 15, 2024".
+const DATE_FORMAT_NAMED = 'named';
+
+// Works out a date column's format from ALL of its values, so a pass here means
+// the whole file agrees. Returns:
+//   ['format' => a DATE_FORMAT_CHOICES key | DATE_FORMAT_NAMED | null, 'ambiguous' => bool]
+// The system is sure only when 'format' is set and 'ambiguous' is false. Otherwise
+// the owner has to choose: no value has a day above 12, the values disagree, or
+// the format isn't recognized.
+function sniffDateFormat(array $values): array
 {
     $clean = [];
-    foreach ($samples as $s) {
-        $s = trim((string) $s);
-        if ($s !== '') $clean[] = $s;
+    foreach ($values as $v) {
+        $v = trim((string) $v);
+        if ($v !== '') $clean[] = $v;
     }
     if (empty($clean)) return ['format' => null, 'ambiguous' => false];
 
-    // ISO-like: 4-digit year first, then separator + 2-digit month + day
-    if (preg_match('#^(\d{4})([-/])(\d{1,2})\2(\d{1,2})$#', $clean[0], $m)) {
-        $sep = $m[2];
-        return ['format' => "Y{$sep}m{$sep}d", 'ambiguous' => false];
+    // Year first, with or without a time after the day.
+    $yearFirst = '#^(\d{4})([-/])(\d{1,2})\2(\d{1,2})(?:[ T].*)?$#';
+    if (preg_match($yearFirst, $clean[0], $m)) {
+        $sep        = $m[2];
+        $consistent = count(preg_grep($yearFirst, $clean)) === count($clean);
+        return ['format' => "Y{$sep}m{$sep}d", 'ambiguous' => !$consistent];
     }
 
-    // Two-component-first format: DD/MM/YYYY or MM/DD/YYYY (and dash variants)
+    // DD/MM/YYYY or MM/DD/YYYY (and dash variants). A slot above 12 can only be the day.
     if (preg_match('#^\d{1,2}([-/])\d{1,2}\1\d{4}$#', $clean[0], $m)) {
-        $sep        = $m[1];
-        $sawFirstGt = false; // first slot > 12 → first slot is day → DD/MM
-        $sawSecondGt = false; // second slot > 12 → second slot is day → MM/DD
+        $sep         = $m[1];
+        $sawFirstGt  = false;
+        $sawSecondGt = false;
+        $consistent  = true;
 
         foreach ($clean as $v) {
-            if (!preg_match('#^(\d{1,2})[-/](\d{1,2})[-/]\d{4}$#', $v, $mm)) continue;
-            $a = (int) $mm[1];
-            $b = (int) $mm[2];
-            if ($a > 12) $sawFirstGt  = true;
-            elseif ($b > 12) $sawSecondGt = true;
+            if (!preg_match('#^(\d{1,2})[-/](\d{1,2})[-/]\d{4}$#', $v, $mm)) {
+                $consistent = false;
+                continue;
+            }
+            if ((int) $mm[1] > 12)     $sawFirstGt  = true;
+            elseif ((int) $mm[2] > 12) $sawSecondGt = true;
         }
 
-        if ($sawFirstGt)  return ['format' => "d{$sep}m{$sep}Y", 'ambiguous' => false];
-        if ($sawSecondGt) return ['format' => "m{$sep}d{$sep}Y", 'ambiguous' => false];
-
-        // Truly ambiguous — default to DD/MM (Philippine convention) and flag it.
-        return ['format' => "d{$sep}m{$sep}Y", 'ambiguous' => true];
+        return [
+            'format'    => ($sawSecondGt && !$sawFirstGt) ? "m{$sep}d{$sep}Y" : "d{$sep}m{$sep}Y",
+            'ambiguous' => !$consistent || $sawFirstGt === $sawSecondGt,
+        ];
     }
 
-    return ['format' => null, 'ambiguous' => false];
+    // Written-out months with a full year can only be read one way.
+    foreach ($clean as $v) {
+        if (!preg_match('/[A-Za-z]/', $v) || !preg_match('/\b\d{4}\b/', $v) || recoverUnambiguousDate($v) === null) {
+            return ['format' => null, 'ambiguous' => false];
+        }
+    }
+    return ['format' => DATE_FORMAT_NAMED, 'ambiguous' => false];
+}
+
+// The sniff result for every column, so the wizard knows the answer for whichever
+// column the owner assigns to Date. $rows are lists aligned with $headers.
+function sniffColumnDateFormats(array $headers, array $rows): array
+{
+    $formats = [];
+    foreach ($headers as $i => $header) {
+        $formats[$header] = sniffDateFormat(array_column($rows, $i));
+    }
+    return $formats;
+}
+
+// True when $raw is valid under $format, with no recovery.
+function dateFitsFormat(string $raw, string $format): bool
+{
+    $dt = DateTime::createFromFormat('!' . $format, $raw);
+    if (!$dt) return false;
+
+    $errors = DateTime::getLastErrors();
+    return (!$errors || ($errors['warning_count'] == 0 && $errors['error_count'] == 0))
+        && (int) $dt->format('Y') > 1000;   // a 2-digit year read by 'Y' would be year 0024
+}
+
+// Checks the owner's chosen format against the column. Returns null when it makes
+// sense, or a message when another format fits strictly more of the dates. Choices
+// the data can't separate are allowed, and the best-fitting format is never
+// refused, so a messy file always has a way forward.
+function dateFormatProblem(array $values, string $chosen): ?string
+{
+    $fits = array_fill_keys(array_keys(DATE_FORMAT_CHOICES), 0);
+    $example = null;
+
+    foreach ($values as $v) {
+        foreach (DATE_FORMAT_CHOICES as $format => $_) {
+            if (dateFitsFormat($v, $format)) $fits[$format]++;
+        }
+        if ($example === null && !dateFitsFormat($v, $chosen)) $example = $v;
+    }
+
+    arsort($fits);
+    $best = array_key_first($fits);
+    if ($fits[$best] <= ($fits[$chosen] ?? 0)) return null;
+
+    return DATE_FORMAT_CHOICES[$chosen] . ' doesn\'t make sense for this file: dates like "'
+         . mb_substr((string) $example, 0, 30) . '" can\'t be read that way. '
+         . DATE_FORMAT_CHOICES[$best] . ' fits better. Please choose again.';
 }
 
 // Parses a date string using the column's detected format, with a per-row recovery
@@ -66,19 +156,11 @@ function normalizeDateStrict(string $raw, ?string $format, bool &$usedFallback =
 
     $usedFallback = false;
 
+    if ($format === DATE_FORMAT_NAMED) return recoverUnambiguousDate($raw);
+
     // 1. Try the column's explicitly chosen/detected format first.
-    if ($format) {
-        $dt = DateTime::createFromFormat('!' . $format, $raw);
-        if ($dt) {
-            $errors = DateTime::getLastErrors();
-            // Accept the date as long as PHP didn't flag trailing characters or syntax warnings
-            if (!$errors || ($errors['warning_count'] == 0 && $errors['error_count'] == 0)) {
-                // Prevent 2-digit years getting parsed as literal year 0024 by 4-digit 'Y' formats
-                if ((int)$dt->format('Y') > 1000) {
-                    return $dt->format('Y-m-d');
-                }
-            }
-        }
+    if ($format && dateFitsFormat($raw, $format)) {
+        return DateTime::createFromFormat('!' . $format, $raw)->format('Y-m-d');
     }
 
     // 2. Recovery — only formats that can't be misinterpreted.
@@ -139,8 +221,7 @@ function recoverUnambiguousDate(string $raw): ?string
 // columns clamps through the helpers below instead.
 const FIELD_LIMITS = [
     'sku'         => 100,  // products.sku          VARCHAR(100)
-    'category'    => 50,   // products.category     VARCHAR(50)
-    'subcategory' => 50,   // products.subcategory  VARCHAR(50)
+    'category'    => 50,   // product_categories.category VARCHAR(50)
 ];
 const MONEY_MAX      = 99999999.99;  // DECIMAL(10,2)
 const VERSION_LABEL_MAX = 150;       // dataset_versions.label VARCHAR(150)
@@ -194,6 +275,84 @@ function clampFieldLength(?string $value, string $field): array
     return [$value, null];
 }
 
+// The columns the owner assigned to Category. Several columns are allowed.
+function mappingCategoryColumns(array $mapping): array
+{
+    return (array) ($mapping['category'] ?? []);
+}
+
+// Cleans category cells into one list without repeats. A single cell can hold
+// several categories separated by commas, which is how the CSV export writes
+// them, so an exported file can be uploaded again.
+// Returns [$categories, $shortened], where $shortened lists [$original, $applied]
+// for each value cut to fit the column.
+function parseCategories(array $cells): array
+{
+    $categories = [];
+    $shortened  = [];
+
+    foreach ($cells as $cell) {
+        foreach (explode(',', (string) $cell) as $part) {
+            $part = trim($part);
+            if ($part === '') continue;
+
+            [$value, $original] = clampFieldLength($part, 'category');
+            if ($original !== null) $shortened[] = [$original, $value];
+
+            $categories[mb_strtolower($value)] ??= $value;
+        }
+    }
+
+    return [array_values($categories), $shortened];
+}
+
+// Every category seen for each product across its rows, keyed by lowercase name.
+// $rows need 'product' and a 'category' list.
+function categoriesByProduct(array $rows): array
+{
+    $cells = [];
+    foreach ($rows as $r) {
+        foreach ($r['category'] as $category) {
+            $cells[mb_strtolower($r['product'])][] = $category;
+        }
+    }
+    return array_map(fn($c) => parseCategories($c)[0], $cells);
+}
+
+// A sale can't have happened after today. Returns the rejection reason, or null.
+function futureDateReason(string $date): ?string
+{
+    return $date > date('Y-m-d') ? 'Sale date ' . $date . ' is in the future' : null;
+}
+
+// Values that can be stored but look like mistakes. The row still imports unless
+// the owner changes it; these send it to the review step's issues area. Rows with
+// 'recheck' are re-tested live there as the owner edits, so their rule is mirrored
+// in reviewIssues() in assets/global_js/import_preview.js.
+function suspiciousValueWarnings(string $dateRaw, ?string $date, string $qtyRaw, ?int $qty, ?float $cost, ?float $price): array
+{
+    $warnings = [];
+    $add = function (string $field, string $original, string $reason, bool $recheck = false) use (&$warnings) {
+        $warnings[] = ['field' => $field, 'original' => $original, 'applied' => null, 'reason' => $reason, 'recheck' => $recheck];
+    };
+
+    if ($date !== null && preg_match('/[A-Za-z]/', $dateRaw) && !preg_match('/\b\d{4}\b/', $dateRaw)) {
+        $add('date', $dateRaw, 'This is not a full date, so it was read as ' . $date);
+    }
+
+    if ($qty !== null && preg_match('/e/i', $qtyRaw)) {
+        $add('qty', $qtyRaw, 'This was read as ' . number_format($qty));
+    }
+
+    if (($cost !== null && $cost <= 0) || ($price !== null && $price <= 0)) {
+        $add('price', ($cost ?? '') . ' / ' . ($price ?? ''), 'Cost and selling price should be above 0', true);
+    } elseif ($cost !== null && $price !== null && $cost >= $price) {
+        $add('price', $cost . ' / ' . $price, 'Cost is not below the selling price', true);
+    }
+
+    return $warnings;
+}
+
 // Clamps a money value to DECIMAL(10,2). Out-of-range becomes null (the sale is
 // worth keeping; the price isn't worth aborting the import over). Returns
 // [?float $value, ?string $reason].
@@ -215,8 +374,7 @@ function detectColumnMapping(array $headers, array $rows): array
         'product'     => null,
         'quantity'    => null,
         'sku'         => null,
-        'category'    => null,
-        'subcategory' => null,
+        'category'    => [],   // a list: several columns can be categories
         'cost'        => null,
         'price'       => null,
     ];
@@ -264,21 +422,10 @@ function detectColumnMapping(array $headers, array $rows): array
         }
 
         // Category
-        if ($suggestions['category'] === null
-            && (str_contains($lower, 'category') || str_contains($lower, 'group')
-                || str_contains($lower, 'dept') || str_contains($lower, 'type'))
+        if (str_contains($lower, 'category') || str_contains($lower, 'group')
+            || str_contains($lower, 'dept') || str_contains($lower, 'type')
         ) {
-            $suggestions['category'] = $col;
-            continue;
-        }
-
-        // Subcategory
-        if ($suggestions['subcategory'] === null
-            && (str_contains($lower, 'sub') || str_contains($lower, 'variant')
-                || str_contains($lower, 'packaging') || str_contains($lower, 'pack')
-                || str_contains($lower, 'size') || str_contains($lower, 'segment'))
-        ) {
-            $suggestions['subcategory'] = $col;
+            $suggestions['category'][] = $col;
             continue;
         }
 

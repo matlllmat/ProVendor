@@ -5,7 +5,7 @@
 // undoable from the version history.
 //
 // Input  (POST): { version_id: int }
-// Output (JSON): { success: true, pre_restore_version_id: int } or { error: ... }
+// Output (JSON): { success: true, pre_restore_version_id: int, prices_restored: bool } or { error: ... }
 
 require_once __DIR__ . '/../config/bootstrap.php';
 header('Content-Type: application/json');
@@ -48,6 +48,9 @@ try {
 
     // Step 2: wipe + repopulate sales from the target snapshot.
     restoreSalesFromSnapshot($pdo, $_SESSION['user_id'], $versionId);
+    $pricesRestored = restoreProductPrices($pdo, (int) $_SESSION['user_id'], $versionId);
+    setCurrentVersion($pdo, (int) $_SESSION['user_id'], $versionId);
+    syncProductsActiveToSales($pdo, (int) $_SESSION['user_id']);
 
     // Step 3: every product's accuracy cache is now stale relative to its
     // (different) sales history — clear it so the next forecast recomputes.
@@ -61,6 +64,7 @@ try {
     echo json_encode([
         'success'                => true,
         'pre_restore_version_id' => $preRestoreId,
+        'prices_restored'        => $pricesRestored,
     ]);
 } catch (PDOException $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();

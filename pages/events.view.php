@@ -229,6 +229,9 @@ require_once __DIR__ . '/../includes/header.php';
 <?php require_once __DIR__ . '/../includes/event_info_modal.php'; ?>
 <?php require_once __DIR__ . '/../includes/confirm_modal.php'; ?>
 <?php require_once __DIR__ . '/../includes/toast.php'; ?>
+<?php if (!empty($_SESSION['event_no_history_note'])): unset($_SESSION['event_no_history_note']); ?>
+<script>showToast("This event isn't in your sales history yet, so it won't change the forecast until it has happened and those sales are added.", 'info', { bottom: true, ms: 10000 });</script>
+<?php endif; ?>
 
 <!-- ════════════════════════════════════════════
      PAGE CONFIG + SCRIPT

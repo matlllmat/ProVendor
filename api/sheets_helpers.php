@@ -6,8 +6,7 @@
 // sheet's raw grid into the aggregated (product, date) rows the importer wants.
 
 require_once __DIR__ . '/import_helpers.php';
-
-const SHEETS_FLASK_BASE = 'http://localhost:5000';
+require_once __DIR__ . '/../includes/flask_client.php';
 
 // Reads a Google Sheet through the Flask service account.
 // Always returns an array; on failure it has ok=false plus a stable `code` so
@@ -15,19 +14,9 @@ const SHEETS_FLASK_BASE = 'http://localhost:5000';
 // "tell the user the ML server isn't running".
 function fetchSheet(string $url, int $timeout = 45): array
 {
-    $ch = curl_init(SHEETS_FLASK_BASE . '/sheets/read');
-    curl_setopt_array($ch, [
-        CURLOPT_POST           => true,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-        CURLOPT_POSTFIELDS     => json_encode(['url' => $url]),
-        CURLOPT_TIMEOUT        => $timeout,
-    ]);
-    $raw    = curl_exec($ch);
-    $errNo  = curl_errno($ch);
-    curl_close($ch);
+    [$raw, , $flaskError] = flaskRequest('/sheets/read', json_encode(['url' => $url]), $timeout);
 
-    if ($errNo !== 0 || $raw === false) {
+    if ($flaskError !== null) {
         return [
             'ok'    => false,
             'code'  => 'server_down',
@@ -84,11 +73,15 @@ function aggregateSheetRows(array $headers, array $rows, array $mapping, ?string
     $iProduct = $col('product');
     $iQty     = $col('quantity');
 
-    $iSku         = $col('sku');
-    $iCategory    = $col('category');
-    $iSubcategory = $col('subcategory');
-    $iCost        = $col('cost');
-    $iPrice       = $col('price');
+    $iSku   = $col('sku');
+    $iCost  = $col('cost');
+    $iPrice = $col('price');
+
+    // Saved mappings can name several Category columns.
+    $iCategories = [];
+    foreach (mappingCategoryColumns($mapping) as $name) {
+        if (isset($idx[$name])) $iCategories[] = $idx[$name];
+    }
 
     $pairs          = [];
     $dropped        = 0;
@@ -123,6 +116,7 @@ function aggregateSheetRows(array $headers, array $rows, array $mapping, ?string
         if (!$reason && $date === null) {
             $reason = 'Unrecognized date: "' . mb_substr($dateRaw, 0, 30) . '"';
         }
+        if (!$reason) $reason = futureDateReason($date);
         if (!$reason && (!is_numeric($qtyRaw) || (float) $qtyRaw <= 0
                          || (float) $qtyRaw != (int) $qtyRaw || (int) $qtyRaw > 999999)) {
             $reason = 'Quantity must be a whole number between 1 and 999,999';
@@ -158,8 +152,7 @@ function aggregateSheetRows(array $headers, array $rows, array $mapping, ?string
             'date'        => $date,
             'qty'         => $qty,
             'sku'         => $text($r, $iSku),
-            'category'    => $text($r, $iCategory),
-            'subcategory' => $text($r, $iSubcategory),
+            'category'    => parseCategories(array_map(fn($i) => $text($r, $i), $iCategories))[0],
             'cost'        => $number($r, $iCost),
             'price'       => $number($r, $iPrice),
         ];

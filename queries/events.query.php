@@ -116,6 +116,49 @@ function unhideEvent(PDO $pdo, int $eventId, int $userId): void
     $stmt->execute([$userId, $eventId]);
 }
 
+// ── Re-forecast notice after event changes ────────────────────────────────────
+
+// The forecast learns an event's effect from past sales on its dates, so only
+// an event with a date inside this user's sales history can change the forecast.
+function eventTouchesSalesHistory(PDO $pdo, int $userId, array $event): bool
+{
+    $range = getUserSaleDateRange($pdo, $userId);
+    if (empty($range['earliest'])) return false;
+    return expandEvents([$event], $range['earliest'], $range['latest']) !== [];
+}
+
+function markEventsChanged(PDO $pdo, int $userId): void
+{
+    $pdo->prepare('UPDATE users SET events_changed_at = ? WHERE id = ?')
+        ->execute([date('Y-m-d H:i:s'), $userId]);
+}
+
+// Records when a product's forecast was really recalculated. forecasts.generated_at
+// can't be used because price and stock edits rewrite it. $startedAt is taken before
+// Prophet reads the events, so a change made during the run still counts as newer.
+function markProductForecastRun(PDO $pdo, int $productId, string $startedAt): void
+{
+    $pdo->prepare('UPDATE products SET prophet_run_at = ? WHERE id = ?')
+        ->execute([$startedAt, $productId]);
+}
+
+// How many forecast products were last recalculated before the latest event change.
+function countProductsBehindEventChange(PDO $pdo, int $userId): int
+{
+    $stmt = $pdo->prepare(
+        'SELECT COUNT(*)
+         FROM products p
+         JOIN users u ON u.id = p.user_id
+         WHERE u.id = ?
+           AND u.events_changed_at IS NOT NULL
+           AND p.is_active = 1
+           AND (p.prophet_run_at IS NULL OR p.prophet_run_at <= u.events_changed_at)
+           AND EXISTS (SELECT 1 FROM forecasts f WHERE f.product_id = p.id)'
+    );
+    $stmt->execute([$userId]);
+    return (int) $stmt->fetchColumn();
+}
+
 // ── Custom-date occurrences ───────────────────────────────────────────────────
 
 // Loads the concrete dates for every 'custom' event in $events in one query and
@@ -232,15 +275,15 @@ function getProductImpactForEvent(
         SELECT
             p.id,
             p.name,
-            p.category,
-            SUM(s.quantity_sold)                                                        AS total_qty,
+            " . PRODUCT_CATEGORIES_SQL . " AS category,
+            SUM(s.quantity_sold)                                                      AS total_qty,
             COUNT(DISTINCT s.sale_date)                                                 AS total_days,
             SUM(CASE WHEN $windowSql THEN s.quantity_sold ELSE 0 END)                  AS event_qty,
             COUNT(DISTINCT CASE WHEN $windowSql THEN s.sale_date ELSE NULL END)        AS event_days
         FROM products p
         JOIN sales s ON s.product_id = p.id
         WHERE p.user_id = ?
-        GROUP BY p.id, p.name, p.category
+        GROUP BY p.id, p.name
         HAVING total_days > 0 AND event_days > 0
     ";
 
@@ -509,7 +552,7 @@ function getEventImpactCache(PDO $pdo, int $eventId, int $userId): array
         'SELECT
              eic.product_id,
              p.name             AS product_name,
-             p.category,
+             ' . PRODUCT_CATEGORIES_SQL . ' AS category,
              eic.coefficient,
              eic.mean_daily_sales,
              eic.occurrence_count,

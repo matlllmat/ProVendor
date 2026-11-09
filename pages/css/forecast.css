@@ -192,9 +192,10 @@
 
 /* ── Product row ── */
 /*
-   Grid layout keeps the badges pinned to the right regardless of
-   how wide the product name is. Using grid instead of flex avoids
-   the alignment issues that appear when <button> elements use flex.
+   List view is a table: the title row and every product row share one column
+   grid, so each detail lines up regardless of how wide the product name is.
+   Using grid instead of flex avoids the alignment issues that appear when
+   <button> elements use flex.
 */
 /* Product that isn't in the store's current dataset. Kept in the catalogue so
    the owner can see what happened to it (and its settings/history survive), but
@@ -217,9 +218,8 @@
 
 .product-row {
     display: grid;
-    grid-template-columns: 1fr auto auto;
     align-items: center;
-    gap: 1rem;
+    gap: 0 1rem;
     width: 100%;
     padding: 0.8rem 1.25rem;
     border: none;
@@ -339,7 +339,7 @@
     white-space: nowrap;
 }
 
-/* Right column: category and subcategory badges */
+/* Right column: category badge */
 .product-row-badges {
     display: flex;
     align-items: center;
@@ -362,17 +362,6 @@
 .product-row.active .product-row-category {
     background: rgba(38,31,14,0.13);
     color: rgba(38,31,14,0.8);
-}
-
-.product-row-subcategory {
-    font-size: 0.67rem;
-    font-weight: 600;
-    letter-spacing: 0.01em;
-    padding: 0.18rem 0.55rem;
-    border-radius: 999px;
-    background: rgba(26,105,51,0.1);
-    color: #1A6933;
-    white-space: nowrap;
 }
 
 .product-empty {
@@ -526,6 +515,91 @@
 .as-cards #product-list-empty-filter {
     grid-column: 1 / -1;
 }
+
+.as-cards .product-list-head { display: none; }
+
+/* ── List view: table columns ── */
+/* Too narrow for every column? The table scrolls inside its own box. */
+.product-list { overflow-x: auto; }
+
+.product-list:not(.as-cards) .product-row,
+.product-list-head {
+    grid-template-columns: [product] minmax(0, 1fr) [id] 2.5rem [sku] 6rem [category] 8rem [demand] 8.5rem [order] 8.5rem;
+    min-width: 54rem;
+}
+
+.product-list-head {
+    display: grid;
+    gap: 0 1rem;
+    align-items: end;
+    width: 100%;
+    padding: 0.65rem 1.25rem;
+    border-bottom: 1px solid #D2C8AE;
+    border-left: 3px solid transparent;   /* same offset as the rows' accent bar */
+    font-size: 0.62rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: rgba(38,31,14,0.6);
+}
+
+.plh-num { text-align: right; }
+
+/* Unwrap the groups the card layout uses, so each detail sits in its own column. */
+.product-list:not(.as-cards) .product-row-info,
+.product-list:not(.as-cards) .product-row-meta,
+.product-list:not(.as-cards) .product-row-forecast,
+.product-list:not(.as-cards) .product-row-badges { display: contents; }
+
+.product-list:not(.as-cards) .product-row-meta-sep,
+.product-list:not(.as-cards) .prf-unit,
+.product-list:not(.as-cards) .card-only { display: none; }
+
+.product-list:not(.as-cards) .product-row-name        { grid-column: product;     grid-row: 1; }
+.product-list:not(.as-cards) .product-row-id          { grid-column: id;          grid-row: 1; }
+.product-list:not(.as-cards) .product-row-sku         { grid-column: sku;         grid-row: 1; }
+.product-list:not(.as-cards) .product-row-category    { grid-column: category;    grid-row: 1; }
+.product-list:not(.as-cards) .prf-demand              { grid-column: demand;      grid-row: 1; }
+.product-list:not(.as-cards) .prf-order,
+.product-list:not(.as-cards) .prf-no-order            { grid-column: order;       grid-row: 1; }
+.product-list:not(.as-cards) .prf-empty               { grid-column: demand / span 2; grid-row: 1; }
+
+/* An inactive product's label sits under its name. */
+.product-list:not(.as-cards) .product-row-inactive-badge {
+    grid-column: product;
+    grid-row: 2;
+    justify-self: start;
+    margin-top: 0.2rem;
+}
+
+.product-list:not(.as-cards) .product-row-id,
+.product-list:not(.as-cards) .product-row-sku,
+.product-list:not(.as-cards) .product-row-category {
+    padding: 0;
+    border-radius: 0;
+    background: none;
+    font-size: 0.78rem;
+    font-weight: 400;
+    letter-spacing: 0;
+    line-height: 1.3;
+    color: rgba(38,31,14,0.75);
+    opacity: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.product-list:not(.as-cards) .prf-demand,
+.product-list:not(.as-cards) .prf-order,
+.product-list:not(.as-cards) .prf-no-order,
+.product-list:not(.as-cards) .prf-empty {
+    text-align: right;
+    font-size: 0.82rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.product-list:not(.as-cards) .prf-no-order,
+.product-list:not(.as-cards) .prf-empty { font-size: 0.72rem; }
 
 /* ── Filters row: categories on the left, view switcher on the right ── */
 .chart-filters-row {

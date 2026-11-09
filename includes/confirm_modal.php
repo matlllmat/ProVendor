@@ -29,7 +29,7 @@
         </div>
 
         <h3 id="confirm-title-text" class="text-lg font-semibold text-[#261F0E] mb-2 leading-snug"></h3>
-        <p id="confirm-message-text" class="text-sm text-[#261F0E] leading-relaxed mb-8" style="opacity:0.55"></p>
+        <p id="confirm-message-text" class="text-sm text-[#261F0E] leading-relaxed mb-8" style="opacity:0.55; white-space:pre-line"></p>
 
         <!-- Buttons -->
         <div class="flex gap-3">

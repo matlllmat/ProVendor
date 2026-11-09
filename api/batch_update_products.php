@@ -23,6 +23,7 @@
 // Output (JSON): { success, updated, repriced, skipped, failed, results: [...] }
 
 require_once __DIR__ . '/../config/bootstrap.php';
+require_once __DIR__ . '/../includes/flask_client.php';
 header('Content-Type: application/json');
 
 set_time_limit(300);
@@ -156,24 +157,14 @@ function runOptimize(PDO $pdo, int $userId, int $productId, array $forecastRows,
         $residualRho = (float) $acc['accuracy_residual_rho'];
     }
 
-    $ch = curl_init('http://localhost:5000/optimize');
-    curl_setopt_array($ch, [
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => json_encode([
-            'forecast'        => $forecastRows,
-            'cost_price'      => $cost,
-            'selling_price'   => $price,
-            'current_stock'   => $stock,
-            'residual_rho'    => $residualRho,
-            'shelf_life_days' => $shelfLifeDays,
-        ]),
-        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 30,
-    ]);
-    $raw = curl_exec($ch);
-    $err = curl_error($ch);
-    curl_close($ch);
+    [$raw, , $err] = flaskRequest('/optimize', json_encode([
+        'forecast'        => $forecastRows,
+        'cost_price'      => $cost,
+        'selling_price'   => $price,
+        'current_stock'   => $stock,
+        'residual_rho'    => $residualRho,
+        'shelf_life_days' => $shelfLifeDays,
+    ]), 30);
 
     if ($err || !$raw) return null;
     $data = json_decode($raw, true);

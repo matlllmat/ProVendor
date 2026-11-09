@@ -12,9 +12,11 @@
     var DISMISS_MS = 3500;
     var LEAVE_MS   = 220;   // matches the toast-leaving transition in app.css
 
-    window.showToast = function (message, type) {
+    // opts (optional): { bottom: true } for the lower-left corner, { ms: 10000 } to stay longer.
+    window.showToast = function (message, type, opts) {
         type = type || 'info';
-        var container = document.getElementById('toast-container');
+        opts = opts || {};
+        var container = document.getElementById(opts.bottom ? 'toast-container-bottom' : 'toast-container');
         if (!container) {
             // Page forgot to include the partial — fall back to alert() so the
             // message at least gets through. Log once for the dev.
@@ -37,7 +39,7 @@
         // next frame — gives the browser a tick to apply the initial styles.
         requestAnimationFrame(function () { toast.classList.add('toast-visible'); });
 
-        setTimeout(function () { dismiss(toast); }, DISMISS_MS);
+        setTimeout(function () { dismiss(toast); }, opts.ms || DISMISS_MS);
     };
 
     function dismiss(toast) {

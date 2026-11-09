@@ -42,6 +42,20 @@ def get_db():
 def health():
     return jsonify({'status': 'ok'})
 
+def weighted_ape(actual, predicted):
+    """WAPE: total absolute error divided by total actual sales, as a percentage.
+
+    It never divides by a single day's sales, so slow sellers with many
+    near-zero days don't distort it, and busy days count in proportion.
+    Returns (wape, actual_units); wape is None when nothing was sold at all.
+    """
+    actual_units = float(abs(actual).sum())
+    if actual_units <= 0:
+        return None, 0.0
+    wape = float(abs(actual - predicted).sum() / actual_units * 100)
+    return round(wape, 2), round(actual_units, 2)
+
+
 # ── Category-level forecast ───────────────────────────────────────────────────
 # Input  (JSON): { user_id, category (optional), days (default 30) }
 # Output (JSON): { historical: [{date, actual}], forecast: [{date, predicted, lower, upper}] }
@@ -60,7 +74,8 @@ def forecast_category():
                     SELECT s.sale_date AS ds, SUM(s.quantity_sold) AS y
                     FROM sales s
                     JOIN products p ON p.id = s.product_id
-                    WHERE p.user_id = %s AND p.category = %s
+                    JOIN product_categories pc ON pc.product_id = p.id
+                    WHERE p.user_id = %s AND pc.category = %s
                     GROUP BY s.sale_date
                     ORDER BY s.sale_date
                 """, (user_id, category))
@@ -495,9 +510,11 @@ def optimize():
     total_predicted = sum(r['predicted'] for r in window)
 
     # Estimate total std dev from Prophet confidence intervals.
-    # Each day's CI is ~95%, so σ_day ≈ (upper - lower) / (2 * 1.96).
+    # Prophet's interval_width defaults to 0.80 (we don't override it), so each
+    # day's CI is an 80% band, not 95% — the two-tailed z for 80% is 1.2816,
+    # not 1.96. σ_day ≈ (upper - lower) / (2 * 1.2816).
     # Independent-day baseline: total variance = sum of daily variances.
-    daily_var_sum = sum(((r['upper'] - r['lower']) / (2 * 1.96)) ** 2 for r in window)
+    daily_var_sum = sum(((r['upper'] - r['lower']) / (2 * 1.2816)) ** 2 for r in window)
     total_std     = math.sqrt(daily_var_sum) if daily_var_sum > 0 else total_predicted * 0.2
 
     # AR(1) variance correction. Real daily demand is rarely independent —
@@ -580,12 +597,12 @@ def optimize():
 # ── Per-product forecast accuracy backtest ────────────────────────────────────
 # Walks forward: trains Prophet on all-but-the-last-N days of this product's
 # sales, predicts the held-out window, and compares to actuals. Returns the
-# three standard error metrics — MAPE, MAE, RMSE — plus a headline accuracy %
+# two error measures — WAPE (the main one) and MAE — plus a headline accuracy %
 # and the lag-1 residual autocorrelation that feeds the Newsvendor AR(1)
 # variance correction.
 #
 # Input  (JSON): { user_id, product_id, horizon_days (optional, default auto) }
-# Output (JSON): { accuracy_pct, mape, mae, rmse, horizon_days, n_test_days, residual_rho }
+# Output (JSON): { accuracy_pct, wape, actual_units, mae, horizon_days, n_test_days, residual_rho }
 @app.route('/forecast/product/evaluate', methods=['POST'])
 def evaluate_product_forecast():
     body       = request.get_json()
@@ -677,22 +694,18 @@ def evaluate_product_forecast():
     predicted = forecast['yhat'].clip(lower=0).values
     actual    = test['y'].values
 
-    # The three standard error metrics. Each tells a different story:
-    #   MAPE — average % error. Friendly headline number, but distorts on
-    #          low-actual days, so we floor the denominator at 1.
-    #   MAE  — average absolute units off. Same scale as the data.
-    #   RMSE — same units as MAE but penalizes big misses much more (squares
-    #          each error). When RMSE >> MAE the forecast has occasional
-    #          large blow-outs even if it's generally close.
-    errors          = actual - predicted
-    denom           = pd.Series(actual).clip(lower=1).values
-    abs_pct_errors  = abs(errors) / denom
-    mape            = float(abs_pct_errors.mean() * 100)
-    mae             = float(abs(errors).mean())
-    rmse            = float(math.sqrt((errors ** 2).mean()))
+    # The two error measures:
+    #   WAPE — total units missed / total units sold. The main one: it never divides
+    #          by a single day's sales, so slow sellers don't distort it.
+    #   MAE  — average absolute units off per day. Same scale as the data.
+    errors = actual - predicted
+    mae    = float(abs(errors).mean())
+    wape, actual_units = weighted_ape(actual, predicted)
+    if wape is None:
+        return jsonify({'error': 'No sales in the test window to measure accuracy against.'}), 400
 
-    # Accuracy = 100 - MAPE, floored at 0. Reported as a single friendly number.
-    accuracy_pct = max(0.0, 100.0 - mape)
+    # Accuracy = 100 - WAPE, floored at 0. Reported as a single friendly number.
+    accuracy_pct = max(0.0, 100.0 - wape)
 
     # Lag-1 autocorrelation of residuals — feeds /optimize's AR(1) σ correction.
     residuals = actual - predicted
@@ -708,9 +721,9 @@ def evaluate_product_forecast():
 
     return jsonify({
         'accuracy_pct':  round(accuracy_pct, 2),
-        'mape':          round(mape, 2),
+        'wape':          wape,
         'mae':           round(mae, 2),
-        'rmse':          round(rmse, 2),
+        'actual_units':  actual_units,
         'horizon_days':  horizon,
         'n_test_days':   len(test),
         'residual_rho':  round(residual_rho, 4),
@@ -725,7 +738,7 @@ def evaluate_product_forecast():
 # the function above) rather than refactored into it, so the existing
 # known-history backtest stays untouched.
 # Input  (JSON): { user_id, product_id, actuals: [{date, qty}, ...] }
-# Output (JSON): { accuracy_pct, mape, mae, rmse, n_test_days } OR { error }
+# Output (JSON): { accuracy_pct, wape, actual_units, mae, n_test_days } OR { error }
 @app.route('/forecast/product/evaluate_upload', methods=['POST'])
 def evaluate_product_forecast_upload():
     body       = request.get_json()
@@ -806,19 +819,18 @@ def evaluate_product_forecast_upload():
     predicted = forecast['yhat'].clip(lower=0).values
     actual    = test['y'].values
 
-    errors         = actual - predicted
-    denom          = pd.Series(actual).clip(lower=1).values
-    abs_pct_errors = abs(errors) / denom
-    mape           = float(abs_pct_errors.mean() * 100)
-    mae            = float(abs(errors).mean())
-    rmse           = float(math.sqrt((errors ** 2).mean()))
-    accuracy_pct   = max(0.0, 100.0 - mape)
+    errors = actual - predicted
+    mae    = float(abs(errors).mean())
+    wape, actual_units = weighted_ape(actual, predicted)
+    if wape is None:
+        return jsonify({'error': 'No sales in the test window to measure accuracy against.'}), 400
+    accuracy_pct = max(0.0, 100.0 - wape)
 
     return jsonify({
         'accuracy_pct': round(accuracy_pct, 2),
-        'mape':         round(mape, 2),
+        'wape':         wape,
         'mae':          round(mae, 2),
-        'rmse':         round(rmse, 2),
+        'actual_units': actual_units,
         'n_test_days':  len(test),
     })
 

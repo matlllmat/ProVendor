@@ -1,6 +1,6 @@
 <?php
 // api/detect.php
-// Receives an uploaded CSV, saves it to uploads/, detects column types,
+// Receives an uploaded CSV or Excel file, saves it to uploads/, detects column types,
 // and returns suggested field mappings as JSON.
 
 require_once __DIR__ . '/../config/bootstrap.php';
@@ -36,8 +36,13 @@ if (empty($_FILES['csv']) || $_FILES['csv']['error'] !== UPLOAD_ERR_OK) {
 $file = $_FILES['csv'];
 
 // Validate extension
-if (strtolower(pathinfo($file['name'], PATHINFO_EXTENSION)) !== 'csv') {
-    echo json_encode(['error' => 'Only .csv files are accepted.']);
+$extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+if ($extension === 'xls') {
+    echo json_encode(['error' => 'Older .xls files can\'t be read. In Excel, use Save As and choose .xlsx or .csv.']);
+    exit;
+}
+if ($extension !== 'csv' && $extension !== 'xlsx') {
+    echo json_encode(['error' => 'Only .csv and .xlsx files are accepted.']);
     exit;
 }
 
@@ -51,10 +56,31 @@ if ($file['size'] > 10 * 1024 * 1024) {
 $tempName = 'import_' . session_id() . '.csv';
 $tempPath = __DIR__ . '/../uploads/' . $tempName;
 
-if (!move_uploaded_file($file['tmp_name'], $tempPath)) {
+$sourcePath = $extension === 'xlsx' ? $tempPath . '.xlsx' : $tempPath;
+if (!move_uploaded_file($file['tmp_name'], $sourcePath)) {
     echo json_encode(['error' => 'Failed to save uploaded file.']);
     exit;
 }
+
+// Row numbers in the preview should match the owner's spreadsheet, and a
+// workbook with several sheets needs to say which one was read.
+$rowOffset    = 0;
+$workbookNote = null;
+if ($extension === 'xlsx') {
+    $workbook = convertWorkbookToCsv($sourcePath, $tempPath);
+    @unlink($sourcePath);
+    if (isset($workbook['error'])) {
+        @unlink($tempPath);
+        echo json_encode(['error' => $workbook['error']]);
+        exit;
+    }
+    $rowOffset = (int) $workbook['header_row'] - 1;
+    if (count($workbook['sheets']) > 1) {
+        $workbookNote = 'This workbook has ' . count($workbook['sheets']) . ' sheets with data. Only "' . $workbook['sheet'] . '" was read.';
+    }
+}
+$_SESSION['temp_csv_row_offset']    = $rowOffset;
+$_SESSION['temp_csv_workbook_note'] = $workbookNote;
 
 // Excel on Windows writes CSV as ANSI (Windows-1252) by default, not UTF-8.
 // Those bytes are invalid UTF-8, and json_encode() returns false on invalid
@@ -102,33 +128,36 @@ if (!empty($headers[0]) && str_starts_with($headers[0], "\xEF\xBB\xBF")) {
     $headers[0] = substr($headers[0], 3);
 }
 
-// Read up to 20 sample rows for type detection
+// Keep up to 20 sample rows for column detection; dates are checked on every row.
 $sampleRows = [];
-$allDates   = [];
+$allRows    = [];
 $rowCount   = 0;
 
 while (($row = fgetcsv($handle)) !== false) {
     if (count($row) !== count($headers)) continue; // skip malformed rows
 
-    $mapped = array_combine($headers, $row);
+    $allRows[] = $row;
     if ($rowCount < 20) {
-        $sampleRows[] = $mapped;
+        $sampleRows[] = array_combine($headers, $row);
     }
     $rowCount++;
+
+    if ($rowCount > MAX_IMPORT_ROWS) {
+        fclose($handle);
+        @unlink($tempPath);
+        echo json_encode(['error' => TOO_MANY_ROWS_MESSAGE]);
+        exit;
+    }
 }
 fclose($handle);
 
 // ── Detect column types and suggest field mapping ─────────────────────────────
 $suggestions = detectColumnMapping($headers, $sampleRows);
 
-// ── Sniff date format for the suggested date column ───────────────────────────
-// Cached on session so preflight + import don't need to re-sniff. If the user
-// later picks a different date column in the mapping UI, preflight will re-sniff.
-$dateFormat = ['format' => null, 'ambiguous' => false];
-if ($suggestions['date'] !== null) {
-    $dateSamples = array_column($sampleRows, $suggestions['date']);
-    $dateFormat  = sniffDateFormat($dateSamples);
-}
+// ── Sniff the date format of every column ─────────────────────────────────────
+// The owner can assign any column to Date, and preflight checks the final choice.
+$dateFormats = sniffColumnDateFormats($headers, $allRows);
+$dateFormat  = $dateFormats[$suggestions['date']] ?? ['format' => null, 'ambiguous' => false];
 $_SESSION['temp_csv_date_format'] = $dateFormat;
 
 echo json_encode([
@@ -137,5 +166,6 @@ echo json_encode([
     'suggestions'        => $suggestions,
     'row_count'          => $rowCount,
     'date_format'        => $dateFormat,
+    'date_formats'       => $dateFormats,
     'encoding_converted' => $encodingConverted,
 ]);

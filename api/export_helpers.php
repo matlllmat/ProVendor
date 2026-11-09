@@ -32,7 +32,7 @@ function streamSalesCsv(array $rows, string $filename): void
     // UTF-8 BOM so Excel reads accented product names correctly.
     fwrite($out, "\xEF\xBB\xBF");
 
-    fputcsv($out, ['Date', 'Product', 'Quantity', 'Category', 'Subcategory', 'SKU', 'Cost Price', 'Selling Price']);
+    fputcsv($out, ['Date', 'Product', 'Quantity', 'Category', 'SKU', 'Cost Price', 'Selling Price']);
 
     foreach ($rows as $r) {
         fputcsv($out, [
@@ -40,7 +40,6 @@ function streamSalesCsv(array $rows, string $filename): void
             csvSafeCell($r['product_name']),
             $r['quantity_sold'],
             csvSafeCell($r['category']),
-            csvSafeCell($r['subcategory']),
             csvSafeCell($r['sku']),
             $r['cost_price'],
             $r['selling_price'],
@@ -52,7 +51,8 @@ function streamSalesCsv(array $rows, string $filename): void
 
 // Streams the restock overview (from getRestockOverview) as a CSV download named
 // $filename — a "shopping list" of suggested orders. The caller should exit after.
-function streamRestockCsv(array $rows, string $filename): void
+// $simple keeps only the columns of the dashboard's Simple view.
+function streamRestockCsv(array $rows, string $filename, bool $simple = false): void
 {
     ini_set('display_errors', '0');
 
@@ -63,10 +63,13 @@ function streamRestockCsv(array $rows, string $filename): void
     $out = fopen('php://output', 'w');
     fwrite($out, "\xEF\xBB\xBF");   // UTF-8 BOM for Excel
 
-    fputcsv($out, ['Product', 'Category', 'Forecast Demand', 'Current Stock', 'Suggested Order', 'Unit Cost', 'Order Cost', 'Est. Profit']);
+    $keep = $simple ? [0, 3, 4, 6, 7] : range(0, 7);
+    $pick = fn(array $cells) => array_map(fn($i) => $cells[$i], $keep);
+
+    fputcsv($out, $pick(['Product', 'Category', 'Forecast Demand', 'Current Stock', 'Suggested Order', 'Unit Cost', 'Order Cost', 'Est. Profit']));
 
     foreach ($rows as $r) {
-        fputcsv($out, [
+        fputcsv($out, $pick([
             csvSafeCell($r['name']),
             csvSafeCell($r['category']),
             $r['demand']     ?? '',
@@ -75,7 +78,7 @@ function streamRestockCsv(array $rows, string $filename): void
             $r['cost_price'] ?? '',
             $r['order_cost'] !== null ? number_format($r['order_cost'], 2, '.', '') : '',
             $r['est_profit'] !== null ? number_format($r['est_profit'], 2, '.', '') : '',
-        ]);
+        ]));
     }
 
     fclose($out);

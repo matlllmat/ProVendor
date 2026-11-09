@@ -4,6 +4,7 @@
 // Returns per-product forecast + historical arrays; does NOT run Newsvendor.
 
 require_once __DIR__ . '/../config/bootstrap.php';
+require_once __DIR__ . '/../includes/flask_client.php';
 header('Content-Type: application/json');
 
 set_time_limit(600);
@@ -52,22 +53,13 @@ foreach ($productIds as $rawId) {
         continue;
     }
 
-    $ch = curl_init('http://localhost:5000/forecast/product');
-    curl_setopt_array($ch, [
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => json_encode([
-            'user_id'    => $userId,
-            'product_id' => $productId,
-            'from_date'  => $fromDate,
-            'to_date'    => $toDate,
-        ]),
-        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 120,
-    ]);
-    $fcResult = curl_exec($ch);
-    $fcErr    = curl_error($ch);
-    curl_close($ch);
+    $startedAt = date('Y-m-d H:i:s');
+    [$fcResult, , $fcErr] = flaskRequest('/forecast/product', json_encode([
+        'user_id'    => $userId,
+        'product_id' => $productId,
+        'from_date'  => $fromDate,
+        'to_date'    => $toDate,
+    ]), 120);
 
     if ($fcErr || !$fcResult) {
         $results[] = ['product_id' => $productId, 'product_name' => $productRow['name'], 'success' => false, 'error' => 'Forecast server unreachable.'];
@@ -85,6 +77,8 @@ foreach ($productIds as $rawId) {
         $results[] = ['product_id' => $productId, 'product_name' => $productRow['name'], 'success' => false, 'error' => 'No forecast data returned.'];
         continue;
     }
+
+    markProductForecastRun($pdo, $productId, $startedAt);
 
     // Persist event regressor coefficients — same side-effect as the single-product flow.
     if (!empty($fcData['event_coefficients'])) {

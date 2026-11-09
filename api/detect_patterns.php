@@ -4,6 +4,7 @@
 // and returns pattern suggestions + weekly insights.
 
 require_once __DIR__ . '/../config/bootstrap.php';
+require_once __DIR__ . '/../includes/flask_client.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['user_id'])) {
@@ -22,21 +23,9 @@ $payload = json_encode([
     'existing_events' => $existingEvents,
 ]);
 
-$ch = curl_init('http://localhost:5000/detect_patterns');
-curl_setopt_array($ch, [
-    CURLOPT_POST           => true,
-    CURLOPT_POSTFIELDS     => $payload,
-    CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_TIMEOUT        => 60,
-]);
+[$result, $httpCode, $flaskError] = flaskRequest('/detect_patterns', $payload, 60);
 
-$result   = curl_exec($ch);
-$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-$curlErr  = curl_error($ch);
-curl_close($ch);
-
-if ($curlErr) {
+if ($flaskError) {
     echo json_encode(['error' => 'Cannot reach the forecast server. Make sure python/app.py is running.']);
     exit;
 }

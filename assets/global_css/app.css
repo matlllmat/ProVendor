@@ -85,6 +85,26 @@ input::placeholder {
     pointer-events: none;           /* container is click-through; toasts themselves catch clicks */
 }
 
+/* A product's categories: the first one and a "+N" count, on one line. */
+.cat-list { display: inline-flex; align-items: center; gap: 0.3rem; max-width: 100%; vertical-align: bottom; }
+.cat-first { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cat-more {
+    flex: none;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    background: rgba(38,31,14,0.1);
+    font-size: 0.65rem;
+    font-weight: 700;
+    line-height: 1.5;
+}
+
+.toast-container-bottom {
+    top: auto;
+    right: auto;
+    bottom: 1.25rem;
+    left: 1.25rem;
+}
+
 .toast {
     display: flex;
     align-items: center;
@@ -118,6 +138,7 @@ input::placeholder {
 .toast-success { border-left-color: #1A6933; }
 .toast-error   { border-left-color: #FF1A1A; }
 .toast-info    { border-left-color: #261F0E; }
+.toast-warning { border-left-color: #FF5722; }
 
 .toast-message {
     flex: 1;

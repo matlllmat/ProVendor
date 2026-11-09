@@ -16,3 +16,4 @@ flask - Blueprint
 gspread                       (pip install gspread — pulls in google-auth)
 os, re, json
 pandas as pd 
+openpyxl, defusedxml           (pip install openpyxl defusedxml — reads .xlsx uploads)

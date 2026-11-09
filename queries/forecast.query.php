@@ -6,10 +6,11 @@
 function getCategories(PDO $pdo, int $userId): array
 {
     $stmt = $pdo->prepare(
-        'SELECT DISTINCT category
-         FROM products
-         WHERE user_id = ? AND category IS NOT NULL AND category != ""
-         ORDER BY category'
+        'SELECT DISTINCT pc.category
+         FROM product_categories pc
+         JOIN products p ON p.id = pc.product_id
+         WHERE p.user_id = ?
+         ORDER BY pc.category'
     );
     $stmt->execute([$userId]);
     return $stmt->fetchAll(PDO::FETCH_COLUMN);
@@ -22,14 +23,14 @@ function getProducts(PDO $pdo, int $userId, string $search = '', string $categor
     // dropped out of the current dataset stays visible in the catalogue (greyed,
     // with an explanation) so the owner can see what happened to it. It's the
     // forecasting queries below that skip it.
-    $sql    = 'SELECT id, name, sku, category, subcategory,
+    $sql    = 'SELECT id, name, sku, ' . PRODUCT_CATEGORIES_SQL . ' AS category,
                       is_perishable, shelf_life_min_days, shelf_life_max_days,
                       cost_price, selling_price,
                       orig_cost_price, orig_selling_price, forecast_horizon_days,
-                      accuracy_pct, accuracy_mape, accuracy_mae, accuracy_rmse,
+                      accuracy_pct, accuracy_wape, accuracy_mae,
                       accuracy_horizon_days, accuracy_residual_rho, accuracy_computed_at,
                       is_active, deactivated_at
-               FROM products WHERE user_id = ?';
+               FROM products p WHERE user_id = ?';
     $params = [$userId];
 
     if ($search !== '') {
@@ -40,7 +41,7 @@ function getProducts(PDO $pdo, int $userId, string $search = '', string $categor
     }
 
     if ($category !== '') {
-        $sql     .= ' AND category = ?';
+        $sql     .= ' AND ' . PRODUCT_IN_CATEGORY_SQL;
         $params[] = $category;
     }
 
@@ -116,7 +117,7 @@ function effectiveShelfLifeDays(bool $isPerishable, ?int $minDays): ?int
 function getProductAccuracy(PDO $pdo, int $userId, int $productId): ?array
 {
     $stmt = $pdo->prepare(
-        'SELECT accuracy_pct, accuracy_mape, accuracy_mae, accuracy_rmse,
+        'SELECT accuracy_pct, accuracy_wape, accuracy_mae,
                 accuracy_horizon_days, accuracy_residual_rho, accuracy_computed_at
          FROM products
          WHERE id = ? AND user_id = ? LIMIT 1'
@@ -130,42 +131,38 @@ function getProductAccuracy(PDO $pdo, int $userId, int $productId): ?array
 // after Flask returns. Stamps accuracy_computed_at = NOW().
 function saveProductAccuracy(
     PDO $pdo, int $userId, int $productId,
-    float $accuracyPct, float $mape, float $mae, float $rmse,
+    float $accuracyPct, float $wape, float $actualUnits, float $mae,
     int $horizonDays, float $residualRho
 ): void {
     $stmt = $pdo->prepare(
         'UPDATE products
          SET accuracy_pct          = ?,
-             accuracy_mape         = ?,
+             accuracy_wape         = ?,
+             accuracy_actual_units = ?,
              accuracy_mae          = ?,
-             accuracy_rmse         = ?,
              accuracy_horizon_days = ?,
              accuracy_residual_rho = ?,
              accuracy_computed_at  = CURRENT_TIMESTAMP
          WHERE id = ? AND user_id = ?'
     );
-    $stmt->execute([$accuracyPct, $mape, $mae, $rmse, $horizonDays, $residualRho, $productId, $userId]);
+    $stmt->execute([$accuracyPct, $wape, $actualUnits, $mae, $horizonDays, $residualRho, $productId, $userId]);
 }
 
 // Aggregates per-product accuracy into a single catalogue-level snapshot.
-// All three error metrics (MAPE, MAE, RMSE) are weighted by each product's
-// total historical sales volume — high-volume products dominate the headline
-// because they're what the business actually depends on.
 //
-// Returns:
-//   evaluated_count  — products with cached accuracy
-//   total_count      — total products owned by this user
-//   weighted_mape    — Σ(mape × units) / Σ(units) over evaluated products
-//   weighted_mae     — same weighting
-//   weighted_rmse    — same weighting
-//   weighted_accuracy_pct — 100 − weighted_mape, floored at 0 (panel headline)
+//   weighted_wape    — total units missed ÷ total units sold across every product's
+//                      test window (pooled, so busy products count in proportion).
+//                      The main measure.
+//   weighted_mae     — average units off per day, weighted by each product's
+//                      lifetime sales volume
+//   weighted_accuracy_pct — 100 − weighted_wape, floored at 0 (panel headline)
 //   oldest_computed_at — staleness indicator
 function getCatalogueAccuracy(PDO $pdo, int $userId): array
 {
     $stmt = $pdo->prepare(
         'SELECT
              p.id,
-             p.accuracy_mape, p.accuracy_mae, p.accuracy_rmse,
+             p.accuracy_wape, p.accuracy_actual_units, p.accuracy_mae,
              p.accuracy_computed_at,
              COALESCE((SELECT SUM(s.quantity_sold)
                        FROM sales s
@@ -179,52 +176,48 @@ function getCatalogueAccuracy(PDO $pdo, int $userId): array
     $rows = $stmt->fetchAll();
 
     $totalCount     = count($rows);
-    $evaluated      = array_values(array_filter($rows, fn($r) => $r['accuracy_mape'] !== null));
+    $evaluated      = array_values(array_filter($rows, fn($r) => $r['accuracy_wape'] !== null));
     $evaluatedCount = count($evaluated);
 
-    // Skip products with zero historical sales — they have no weight and would
-    // also (typically) have no meaningful accuracy. Sum is over the rest.
+    $wapeErr   = 0.0;   // Σ units missed, rebuilt from each product's WAPE
+    $wapeSales = 0.0;   // Σ units sold in the test windows
     $weightSum = 0.0;
-    $mapeNum   = 0.0;
     $maeNum    = 0.0;
-    $rmseNum   = 0.0;
     $oldest    = null;
 
     foreach ($evaluated as $row) {
+        $actual = (float) $row['accuracy_actual_units'];
+        if ($actual > 0) {
+            $wapeErr   += (float) $row['accuracy_wape'] / 100 * $actual;
+            $wapeSales += $actual;
+        }
+
+        // Products with no lifetime sales carry no weight in the MAE average.
         $w = (float) $row['total_units'];
-        if ($w <= 0) continue;
-        $weightSum += $w;
-        $mapeNum   += $w * (float) $row['accuracy_mape'];
-        $maeNum    += $w * (float) $row['accuracy_mae'];
-        $rmseNum   += $w * (float) $row['accuracy_rmse'];
+        if ($w > 0) {
+            $weightSum += $w;
+            $maeNum    += $w * (float) $row['accuracy_mae'];
+        }
 
         $ts = $row['accuracy_computed_at'];
         if ($ts && ($oldest === null || $ts < $oldest)) $oldest = $ts;
     }
 
-    if ($weightSum > 0) {
-        $wMape = $mapeNum / $weightSum;
-        $wMae  = $maeNum  / $weightSum;
-        $wRmse = $rmseNum / $weightSum;
-        $wAcc  = max(0.0, 100.0 - $wMape);
-    } else {
-        $wMape = $wMae = $wRmse = $wAcc = null;
-    }
+    $wWape = $wapeSales > 0 ? $wapeErr / $wapeSales * 100 : null;
 
     return [
         'evaluated_count'       => $evaluatedCount,
         'total_count'           => $totalCount,
         'total_units_weighted'  => (int) $weightSum,
-        'weighted_mape'         => $wMape !== null ? round($wMape, 2) : null,
-        'weighted_mae'          => $wMae  !== null ? round($wMae,  2) : null,
-        'weighted_rmse'         => $wRmse !== null ? round($wRmse, 2) : null,
-        'weighted_accuracy_pct' => $wAcc  !== null ? round($wAcc,  2) : null,
+        'weighted_wape'         => $wWape !== null ? round($wWape, 2) : null,
+        'weighted_mae'          => $weightSum > 0 ? round($maeNum / $weightSum, 2) : null,
+        'weighted_accuracy_pct' => $wWape !== null ? round(max(0.0, 100.0 - $wWape), 2) : null,
         'oldest_computed_at'    => $oldest,
     ];
 }
 
 // Per-product accuracy breakdown for the Reports page. Joins each product
-// with its lifetime sales volume so the table can show context (a 100-MAPE
+// with its lifetime sales volume so the table can show context (a 100% WAPE
 // product matters very differently if it sells 5 units/day vs 500).
 //
 // Sort order is deliberate:
@@ -237,8 +230,8 @@ function getProductAccuracyBreakdown(PDO $pdo, int $userId): array
 {
     $stmt = $pdo->prepare(
         'SELECT
-             p.id, p.name, p.category,
-             p.accuracy_pct, p.accuracy_mape, p.accuracy_mae, p.accuracy_rmse,
+             p.id, p.name, ' . PRODUCT_CATEGORIES_SQL . ' AS category,
+             p.accuracy_pct, p.accuracy_wape, p.accuracy_mae,
              p.accuracy_horizon_days, p.accuracy_residual_rho, p.accuracy_computed_at,
              COALESCE(stats.total_units, 0) AS total_units,
              COALESCE(stats.sale_days,   0) AS sale_days
@@ -271,9 +264,9 @@ function invalidateProductAccuracy(PDO $pdo, array $productIds): void
     $pdo->prepare(
         "UPDATE products
          SET accuracy_pct          = NULL,
-             accuracy_mape         = NULL,
              accuracy_mae          = NULL,
-             accuracy_rmse         = NULL,
+             accuracy_wape         = NULL,
+             accuracy_actual_units = NULL,
              accuracy_horizon_days = NULL,
              accuracy_residual_rho = NULL,
              accuracy_computed_at  = NULL
@@ -437,7 +430,7 @@ function getDemandCalendarData(PDO $pdo, int $userId, ?int $productId = null, st
         $where  = 'p.user_id = ? AND p.id = ?';
         $params = [$userId, $productId];
     } elseif ($category !== '') {
-        $where  = 'p.user_id = ? AND p.category = ?';
+        $where  = 'p.user_id = ? AND ' . PRODUCT_IN_CATEGORY_SQL;
         $params = [$userId, $category];
     } else {
         $where  = 'p.user_id = ?';
@@ -555,11 +548,11 @@ function getDemandCalendarData(PDO $pdo, int $userId, ?int $productId = null, st
 
 // ── Forecast coverage ────────────────────────────────────────────────────────
 // How far ahead each product is actually forecast, versus how far it should be.
-// Drives the "up to date" indicator and tells the extend worker which products
-// have nothing to do — a product whose window already reaches the required end
-// is skipped entirely, so no Prophet call is made for it.
+// Drives the dashboard's re-forecast prompt.
 //
 // Returns:
+//   oldest_start  — the earliest first forecast date across products. Price edits
+//                   re-save a forecast with the same dates, so this doesn't move
 //   required_end  — the last day the window should cover (today + horizon - 1)
 //   covered       — products already reaching required_end
 //   behind        — products whose window stops short (includes never-forecast)
@@ -570,7 +563,8 @@ function getForecastCoverage(PDO $pdo, int $userId, int $horizonDays): array
     $requiredEnd = date('Y-m-d', strtotime('+' . max(0, $horizonDays - 1) . ' days'));
 
     $stmt = $pdo->prepare(
-        'SELECT p.id, p.name, p.forecast_horizon_days, MAX(f.forecast_date) AS last_date
+        'SELECT p.id, p.name, p.forecast_horizon_days,
+                MIN(f.forecast_date) AS first_date, MAX(f.forecast_date) AS last_date
          FROM products p
          LEFT JOIN forecasts f ON f.product_id = p.id
          -- Only products in the current dataset need forecast coverage.
@@ -580,9 +574,13 @@ function getForecastCoverage(PDO $pdo, int $userId, int $horizonDays): array
     );
     $stmt->execute([$userId]);
 
-    $covered = 0; $behind = 0; $never = 0; $products = [];
+    $covered = 0; $behind = 0; $never = 0; $products = []; $oldestStart = null;
 
     foreach ($stmt->fetchAll() as $row) {
+        if ($row['first_date'] !== null && ($oldestStart === null || $row['first_date'] < $oldestStart)) {
+            $oldestStart = $row['first_date'];
+        }
+
         // A product with its own horizon override is measured against that.
         $end = $row['forecast_horizon_days'] !== null
             ? date('Y-m-d', strtotime('+' . max(0, (int) $row['forecast_horizon_days'] - 1) . ' days'))
@@ -607,6 +605,7 @@ function getForecastCoverage(PDO $pdo, int $userId, int $horizonDays): array
     }
 
     return [
+        'oldest_start' => $oldestStart,
         'required_end' => $requiredEnd,
         'covered'      => $covered,
         'behind'       => $behind,      // extendable: has a forecast, window too short

@@ -89,7 +89,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <div>
                     <h2 class="text-lg font-semibold text-[#261F0E] mb-0.5">Upload your sales data</h2>
                     <p class="text-sm text-[#261F0E]" style="opacity:0.5">
-                        Export your transaction records as a CSV and upload below.
+                        Export your transaction records as a CSV or Excel file and upload below.
                     </p>
                 </div>
             </div>
@@ -115,11 +115,11 @@ require_once __DIR__ . '/../includes/header.php';
                     </div>
 
                     <p id="drop-text" class="text-[#261F0E] font-semibold text-sm mb-1">
-                        Drop your CSV here, or click to browse
+                        Drop your CSV or Excel file here, or click to browse
                     </p>
-                    <p class="text-[#261F0E] text-xs" style="opacity:0.4">Supports .csv files only</p>
+                    <p class="text-[#261F0E] text-xs" style="opacity:0.4">Supports .csv and .xlsx files</p>
 
-                    <input type="file" id="csv-file" accept=".csv" class="hidden" onchange="handleFileSelect(event)">
+                    <input type="file" id="csv-file" accept=".csv,.xlsx" class="hidden" onchange="handleFileSelect(event)">
                 </div>
 
                 <!-- Column requirements -->
@@ -229,7 +229,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <div>
                     <h2 class="text-lg font-semibold text-[#261F0E] mb-0.5">Confirm column mapping</h2>
                     <p class="text-sm text-[#261F0E]" style="opacity:0.5">
-                        ProVendor auto-detected your CSV columns. Adjust any mismatches before importing.
+                        ProVendor auto-detected your columns. Adjust any mismatches before importing.
                     </p>
                 </div>
                 <button onclick="goToStep(1)"
@@ -298,6 +298,7 @@ require_once __DIR__ . '/../includes/header.php';
 
                 <!-- Preflight results -->
                 <div id="preflight-container"></div>
+                <script src="<?php echo BASE_URL; ?>/assets/global_js/import_preview.js?v=<?php echo filemtime(__DIR__ . '/../assets/global_js/import_preview.js'); ?>"></script>
 
                 <!-- Actions -->
                 <div class="flex items-center justify-between pt-5 border-t border-[#D2C8AE]">
@@ -398,8 +399,8 @@ function handleDrop(e) {
     handleDragLeave(e);
     const file = e.dataTransfer.files[0];
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-        document.getElementById('drop-text').textContent = 'Only .csv files are accepted';
+    if (!/\.(csv|xlsx)$/i.test(file.name)) {
+        document.getElementById('drop-text').textContent = 'Only .csv and .xlsx files are accepted';
         return;
     }
     droppedFile = file;
@@ -462,8 +463,7 @@ var COL_FIELDS = [
     { key: 'product',     label: 'Product (Primary)',   required: true  },
     { key: 'quantity',    label: 'Quantity',            required: true  },
     { key: 'sku',         label: 'Product (Secondary)', required: false },
-    { key: 'category',    label: 'Category',            required: false },
-    { key: 'subcategory', label: 'Sub-Category',        required: false },
+    { key: 'category',    label: 'Category',            required: false, multiple: true },
     { key: 'cost',        label: 'Cost Price',          required: false },
     { key: 'price',       label: 'Selling Price',       required: false },
 ];
@@ -472,6 +472,7 @@ var colHeaders     = [];
 var colSample      = [];
 var colRowCount    = 0;
 var colAssignments = {};
+var colDateFormats = {};   // column name → what the server worked out about its dates
 var colPending     = null;
 var droppedFile    = null; // holds File from drag-and-drop (file input can't receive dragged files)
 
@@ -483,13 +484,15 @@ function populateMappingUI(data) {
     colSample      = data.sample  || [];
     colRowCount    = data.row_count;
     colAssignments = {};
+    colDateFormats = data.date_formats || {};
 
     COL_FIELDS.forEach(function(f) {
-        var suggested = data.suggestions[f.key];
-        if (suggested) {
+        [].concat(data.suggestions[f.key] || []).forEach(function(suggested) {
             var idx = colHeaders.indexOf(suggested);
-            if (idx !== -1) colAssignments[f.key] = idx;
-        }
+            if (idx === -1) return;
+            if (f.multiple) colAssignments[f.key] = (colAssignments[f.key] || []).concat(idx);
+            else            colAssignments[f.key] = idx;
+        });
     });
 
     buildColumnTable();
@@ -584,16 +587,25 @@ function buildColumnTable() {
 }
 
 function isColAssigned(colIdx) {
-    var vals = Object.keys(colAssignments).map(function(k) { return colAssignments[k]; });
-    return vals.indexOf(colIdx) !== -1;
+    return getAssignedField(colIdx) !== null;
 }
 
 function getAssignedField(colIdx) {
     var keys = Object.keys(colAssignments);
     for (var k = 0; k < keys.length; k++) {
-        if (colAssignments[keys[k]] === colIdx) return keys[k];
+        if ([].concat(colAssignments[keys[k]]).indexOf(colIdx) !== -1) return keys[k];
     }
     return null;
+}
+
+function unassignColumn(colIdx) {
+    var field = getAssignedField(colIdx);
+    if (!field) return;
+    if (Array.isArray(colAssignments[field])) {
+        colAssignments[field] = colAssignments[field].filter(function(i) { return i !== colIdx; });
+        if (colAssignments[field].length) return;
+    }
+    delete colAssignments[field];
 }
 
 function escHtml(str) {
@@ -606,10 +618,20 @@ function escHtml(str) {
 
 function handleAssignment(colIdx, fieldKey) {
     if (!fieldKey) {
-        var prev = getAssignedField(colIdx);
-        if (prev) delete colAssignments[prev];
+        unassignColumn(colIdx);
         buildColumnTable();
         clearPreflight();
+        applyDateFormatLock(colDateFormats[colHeaders[colAssignments.date]]);
+        return;
+    }
+
+    // Category can be set on any number of columns, kept in column order.
+    if (fieldKey === 'category') {
+        unassignColumn(colIdx);
+        colAssignments.category = (colAssignments.category || []).concat(colIdx).sort(function(a, b) { return a - b; });
+        buildColumnTable();
+        clearPreflight();
+        applyDateFormatLock(colDateFormats[colHeaders[colAssignments.date]]);
         return;
     }
 
@@ -628,26 +650,29 @@ function handleAssignment(colIdx, fieldKey) {
             confirmText:  'Reassign',
             confirmStyle: 'warning',
             onConfirm: function() {
+                unassignColumn(colPending.colIdx);
                 colAssignments[colPending.fieldKey] = colPending.colIdx;
                 colPending = null;
                 buildColumnTable();
+                applyDateFormatLock(colDateFormats[colHeaders[colAssignments.date]]);
             }
         });
         return;
     }
 
-    var prevField = getAssignedField(colIdx);
-    if (prevField) delete colAssignments[prevField];
+    unassignColumn(colIdx);
 
     colAssignments[fieldKey] = colIdx;
     buildColumnTable();
     clearPreflight();
+    applyDateFormatLock(colDateFormats[colHeaders[colAssignments.date]]);
 }
 
 function buildMapping() {
     var mapping = {};
     Object.keys(colAssignments).forEach(function(fieldKey) {
-        mapping[fieldKey] = colHeaders[colAssignments[fieldKey]];
+        var col = colAssignments[fieldKey];
+        mapping[fieldKey] = Array.isArray(col) ? col.map(function(i) { return colHeaders[i]; }) : colHeaders[col];
     });
     if (!mapping.date || !mapping.product || !mapping.quantity) {
         showMappingError('Please assign the Date, Product (Primary), and Quantity columns before importing.');
@@ -671,7 +696,7 @@ function clearPreflight() {
 // ── Submit import (Step 3 confirm) ────────────────────────────────────────────
 async function submitImport() {
     if (preflightDone) {
-        await doImport(mappingCache);
+        ImportPreview.confirmUnresolved(function () { doImport(mappingCache); });
         return;
     }
 
@@ -692,7 +717,13 @@ async function submitImport() {
         var data = await res.json();
 
         if (data.error) {
-            showMappingError('Check failed: ' + data.error);
+            if (data.code === 'date_format') {
+                // Refused: clear the choice so the owner has to pick again.
+                document.getElementById('date-format-select').value = 'auto';
+                showMappingError(data.error);
+            } else {
+                showMappingError('Check failed: ' + data.error);
+            }
             btn.innerHTML = IMPORT_BTN_HTML;
             btn.disabled  = false;
             return;
@@ -702,7 +733,6 @@ async function submitImport() {
         // row before anything commits.
         renderPreviewCard(data);
         preflightDone = true;
-        refreshSummary();
     } catch(e) {
         showMappingError('Network error during check. Please try again.');
         btn.innerHTML = IMPORT_BTN_HTML;
@@ -710,470 +740,15 @@ async function submitImport() {
     }
 }
 
-// ── Editable preview state ────────────────────────────────────────────────────
-var previewRows   = [];
-var previewData   = null;
-var previewFilter = 'all';
-var previewPage   = 1;
-var PER_PAGE      = 15;
-var sortColumn    = null;
-var sortDir       = 'asc';
-
+// The review step itself lives in assets/global_js/import_preview.js.
 function renderPreviewCard(data) {
     applyDateFormatLock(data.date_format);
-
-    previewData = data;
-    previewRows = data.rows.map(function (r) {
-        r.originalStatus = r.status;
-        r.originalQty    = r.qty;
-        r.originalDate   = r.date;
-        r.edited         = false;
-        return r;
-    });
-
-    var html = '<div class="preview-card">';
-    html += '<div class="preview-card-title">Preview of changes</div>';
-    html += renderSummary();
-
-    var noteIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
-
-    html += renderReplaceNotice(data);
-
-    if (data.recovered_count > 0) {
-        var rc = data.recovered_count;
-        html += '<div class="recovery-notice">';
-        html += noteIcon;
-        html += '<span><strong>' + rc.toLocaleString() + ' row' + (rc !== 1 ? 's' : '') + '</strong> ignored the selected date format and were parsed automatically — their structure was unambiguous (e.g. ISO&nbsp;YYYY-MM-DD, or a day value above&nbsp;12). If any dates look wrong in the table, adjust the <strong>Date Format</strong> selector above and re-run.</span>';
-        html += '</div>';
-    }
-
-    // Lossless repairs — reported once, since nothing was lost.
-    var autoFixes = [];
-    if (data.encoding_converted) {
-        autoFixes.push('converted from Windows (ANSI) encoding');
-    }
-    if (data.money_reformatted > 0) {
-        autoFixes.push(data.money_reformatted.toLocaleString() + ' money value' +
-                       (data.money_reformatted !== 1 ? 's' : '') +
-                       ' had currency symbols or thousands separators removed');
-    }
-    if (autoFixes.length) {
-        html += '<div class="recovery-notice">' + noteIcon +
-                '<span><strong>Cleaned automatically:</strong> ' + autoFixes.join('; ') +
-                '. Nothing was lost — no action needed.</span></div>';
-    }
-
-    // Lossy repairs — the user should see these before committing.
-    if (data.warnings_count > 0) {
-        var wc = data.warnings_count;
-        html += '<div class="recovery-notice recovery-notice-warn">' + noteIcon +
-                '<span><strong>' + wc.toLocaleString() + ' row' + (wc !== 1 ? 's' : '') +
-                '</strong> had a value shortened or left empty so it would fit — the sales themselves were kept. ' +
-                'Use the <strong>Needs review</strong> filter to see exactly what changed.</span></div>';
-    }
-
-    html += '<div class="preview-toolbar">';
-    html += '<div class="preview-filter-chips" id="filter-chips">';
-    html += filterChip('all',     'All');
-    html += filterChip('new',     'New');
-    html += filterChip('overlap', 'Conflict');
-    html += filterChip('invalid', 'Invalid');
-    html += filterChip('noop',    'Unchanged');
-    if (data.warnings_count > 0) html += filterChip('review', 'Needs review');
-    html += '</div>';
-    // The "Replace existing values" toggle lived here. A store holds one dataset
-    // and this upload becomes it, so there are no conflicts left to resolve.
-    html += '</div>';
-
-    html += '<div class="preview-table-wrap"><table class="preview-table">';
-    html += '<thead><tr>';
-    html += sortableTh('row',      'Row');
-    html += sortableTh('product',  'Product');
-    html += sortableTh('date',     'Date');
-    html += sortableTh('qty',      'Qty');
-    html += sortableTh('existing', 'Existing');
-    html += sortableTh('status',   'Status');
-    html += '<th>Actions</th>';
-    html += '</tr></thead>';
-    html += '<tbody id="preview-tbody"></tbody>';
-    html += '</table></div>';
-
-    html += '<div class="preview-pagination" id="preview-pagination"></div>';
-
-    html += '<p class="preview-edit-help">Click <strong>Edit</strong> on any row to change its Qty or Date, then <strong>Save</strong>. Edited rows show a yellow indicator and are always applied on commit; un-edited conflicts respect the toggle above.</p>';
-
-    html += '</div>';
-    document.getElementById('preflight-container').innerHTML = html;
-    renderRows();
+    ImportPreview.render('preflight-container', data, refreshImportButton);
 }
 
-function renderSummary() {
-    var s   = computePreviewCounts(previewRows);
-    var tot = (previewData.csv_rows || 0).toLocaleString();
-
-    var html = '<div class="preview-summary">';
-    html += summaryRow('preview-summary-total',   'Total rows in file', tot);
-    html += summaryRow('preview-summary-new',     'Will be added',      s.new.toLocaleString());
-    if (s.overlap > 0) html += summaryRow('preview-summary-overlap', 'Conflicts with existing data', s.overlap.toLocaleString());
-    if (s.invalid > 0) html += summaryRow('preview-summary-invalid', 'Can’t be accepted',       s.invalid.toLocaleString());
-    if (s.noop > 0)    html += summaryRow('preview-summary-noop',    'Already match (no change)', s.noop.toLocaleString());
-    if (s.edited > 0)  html += summaryRow('preview-summary-edited',  'Manually edited', s.edited.toLocaleString());
-    html += '</div>';
-    return html;
-}
-
-function summaryRow(cls, label, value) {
-    return '<div class="preview-summary-row ' + cls + '">' +
-           '<span class="preview-summary-label">' + label + '</span>' +
-           '<span class="preview-summary-value">' + value + '</span></div>';
-}
-
-// What this upload does to the store's single dataset. Replacing is the one
-// action here that discards data, so the numbers are stated plainly rather than
-// left for the owner to infer — and a file that would shorten the history gets
-// a louder treatment than one that simply refreshes it.
-function renderReplaceNotice(data) {
-    var r = data.replaces;
-    if (!r) return '';
-    var icon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
-    var html = '';
-
-    if (r.rows_now === 0) {
-        html += '<div class="recovery-notice">' + icon +
-                '<span>This becomes your store\'s dataset: <strong>' +
-                r.rows_incoming.toLocaleString() + ' rows</strong> across <strong>' +
-                r.products_incoming + ' products</strong>.</span></div>';
-    } else {
-        var cls = r.narrows_history ? ' recovery-notice-warn' : '';
-        var body = 'Uploading replaces your current dataset — <strong>' +
-                   r.rows_now.toLocaleString() + ' rows</strong> (' + r.first_date_now +
-                   ' to ' + r.last_date_now + ') become <strong>' +
-                   r.rows_incoming.toLocaleString() + ' rows</strong> (' + r.first_date_new +
-                   ' to ' + r.last_date_new + '). The current data is saved to History first, '
-                   + 'so you can view, download or restore it afterwards.';
-
-        if (r.narrows_history) {
-            body = '<strong>This file covers a shorter period than your stored data.</strong> ' + body +
-                   ' If your export only covers recent weeks, re-export the full history before importing.';
-        }
-        if (r.products_leaving && r.products_leaving.length) {
-            var n = r.products_leaving.length;
-            body += ' <strong>' + n + ' product' + (n !== 1 ? 's' : '') + '</strong> (' +
-                    r.products_leaving.slice(0, 3).map(escHtml).join(', ') +
-                    (n > 3 ? ', +' + (n - 3) + ' more' : '') +
-                    ') ' + (n !== 1 ? 'are' : 'is') + ' not in this file and will be marked inactive — ' +
-                    'kept with their settings and history, just excluded from forecasting.';
-        }
-        html += '<div class="recovery-notice' + cls + '">' + icon + '<span>' + body + '</span></div>';
-    }
-
-    if (data.pruned_version) {
-        var p = data.pruned_version;
-        html += '<div class="recovery-notice recovery-notice-warn">' + icon +
-                '<span>You have the maximum of <strong>' + p.max + ' saved versions</strong>. ' +
-                'Importing will permanently delete the oldest — <strong>' + escHtml(p.label) +
-                '</strong> (' + p.total_rows.toLocaleString() + ' rows, saved ' + p.created_at +
-                '). Download it from History first if you want to keep it.</span></div>';
-    }
-
-    return html;
-}
-
-function filterChip(key, label) {
-    var active = previewFilter === key ? ' preview-filter-chip-active' : '';
-    return '<button type="button" class="preview-filter-chip' + active + '" ' +
-           'data-filter="' + key + '" onclick="setFilter(\'' + key + '\')">' + label + '</button>';
-}
-
-function setFilter(key) {
-    previewFilter = key;
-    previewPage   = 1; // changing filter shrinks/grows the row set — restart paging
-    document.querySelectorAll('#filter-chips .preview-filter-chip').forEach(function (el) {
-        el.classList.toggle('preview-filter-chip-active', el.dataset.filter === key);
-    });
-    renderRows();
-}
-
-function goToPage(p) {
-    previewPage = p;
-    renderRows();
-}
-
-function sortableTh(col, label) {
-    var active = sortColumn === col;
-    var arrow  = active ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
-    var cls    = 'preview-th-sortable' + (active ? ' preview-th-sorted' : '');
-    return '<th class="' + cls + '" data-col="' + col + '" onclick="setSort(\'' + col + '\')">' + label +
-           '<span class="preview-sort-arrow">' + arrow + '</span></th>';
-}
-
-function setSort(col) {
-    if (sortColumn === col) {
-        if (sortDir === 'asc')      sortDir    = 'desc';
-        else                      { sortColumn = null; sortDir = 'asc'; }
-    } else {
-        sortColumn = col;
-        sortDir    = 'asc';
-    }
-    previewPage = 1;
-    updateSortHeaders();
-    renderRows();
-}
-
-function updateSortHeaders() {
-    document.querySelectorAll('#preflight-container .preview-th-sortable').forEach(function (th) {
-        var col   = th.dataset.col;
-        var arrow = th.querySelector('.preview-sort-arrow');
-        if (sortColumn === col) {
-            th.classList.add('preview-th-sorted');
-            if (arrow) arrow.textContent = sortDir === 'asc' ? ' ▲' : ' ▼';
-        } else {
-            th.classList.remove('preview-th-sorted');
-            if (arrow) arrow.textContent = '';
-        }
-    });
-}
-
-function applySort() {
-    if (!sortColumn) {
-        var defaultOrder = { invalid: 0, overlap: 1, new: 2, noop: 3 };
-        previewRows.sort(function (a, b) {
-            var sa = defaultOrder[a.status] !== undefined ? defaultOrder[a.status] : 9;
-            var sb = defaultOrder[b.status] !== undefined ? defaultOrder[b.status] : 9;
-            if (sa !== sb) return sa - sb;
-            return a.rowNum - b.rowNum;
-        });
-        return;
-    }
-    var dir = sortDir === 'asc' ? 1 : -1;
-    previewRows.sort(function (a, b) { return compareRows(a, b, sortColumn) * dir; });
-}
-
-function compareRows(a, b, col) {
-    if (col === 'row')      return a.rowNum - b.rowNum;
-    if (col === 'product')  return String(a.product || '').localeCompare(String(b.product || ''));
-    if (col === 'date')     return String(a.date || '').localeCompare(String(b.date || ''));
-    if (col === 'qty') {
-        var aq = (a.qty === null || a.qty === undefined) ? -Infinity : a.qty;
-        var bq = (b.qty === null || b.qty === undefined) ? -Infinity : b.qty;
-        return aq - bq;
-    }
-    if (col === 'existing') {
-        var ae = a.existing_qty === undefined ? -Infinity : a.existing_qty;
-        var be = b.existing_qty === undefined ? -Infinity : b.existing_qty;
-        return ae - be;
-    }
-    if (col === 'status') {
-        var order = { invalid: 0, overlap: 1, new: 2, noop: 3 };
-        return (order[a.status] !== undefined ? order[a.status] : 9) -
-               (order[b.status] !== undefined ? order[b.status] : 9);
-    }
-    return 0;
-}
-
-function renderRows() {
-    var tbody = document.getElementById('preview-tbody');
-    if (!tbody) return;
-
-    applySort();
-
-    // 'review' is orthogonal to status — a row can be perfectly importable and
-    // still have had a value clamped to fit, which is exactly what needs eyes.
-    var filtered = [];
-    previewRows.forEach(function (r, idx) {
-        var match = previewFilter === 'all'
-            || (previewFilter === 'review' ? !!(r.warnings && r.warnings.length)
-                                           : r.status === previewFilter);
-        if (match) filtered.push({ row: r, idx: idx });
-    });
-
-    var totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
-    if (previewPage > totalPages) previewPage = totalPages;
-    if (previewPage < 1)          previewPage = 1;
-
-    var start = (previewPage - 1) * PER_PAGE;
-    var slice = filtered.slice(start, start + PER_PAGE);
-
-    var html = '';
-    slice.forEach(function (entry) { html += renderRow(entry.row, entry.idx); });
-    if (!html) html = '<tr><td colspan="7" class="preview-empty">No rows match this filter.</td></tr>';
-    tbody.innerHTML = html;
-
-    renderPagination(filtered.length, totalPages, start, slice.length);
-}
-
-function renderPagination(totalFiltered, totalPages, start, shown) {
-    var el = document.getElementById('preview-pagination');
-    if (!el) return;
-    if (totalFiltered === 0) { el.innerHTML = ''; return; }
-
-    var from = (start + 1).toLocaleString();
-    var to   = (start + shown).toLocaleString();
-    var tot  = totalFiltered.toLocaleString();
-
-    var html = '<div class="preview-pagination-info">Showing ' + from + '–' + to + ' of <strong>' + tot + '</strong></div>';
-    html += '<div class="preview-pagination-controls">';
-    html += '<button type="button" class="preview-page-btn" onclick="goToPage(1)"'                        + (previewPage === 1          ? ' disabled' : '') + '>« First</button>';
-    html += '<button type="button" class="preview-page-btn" onclick="goToPage(' + (previewPage - 1) + ')"' + (previewPage === 1          ? ' disabled' : '') + '>← Prev</button>';
-    html += '<span class="preview-pagination-page">Page ' + previewPage + ' of ' + totalPages + '</span>';
-    html += '<button type="button" class="preview-page-btn" onclick="goToPage(' + (previewPage + 1) + ')"' + (previewPage === totalPages ? ' disabled' : '') + '>Next →</button>';
-    html += '<button type="button" class="preview-page-btn" onclick="goToPage(' + totalPages       + ')"'  + (previewPage === totalPages ? ' disabled' : '') + '>Last »</button>';
-    html += '</div>';
-    el.innerHTML = html;
-}
-
-function renderRow(r, idx) {
-    var rowClass = 'preview-row preview-row-' + r.status + (r.edited ? ' preview-row-edited' : '');
-    var qtyVal   = r.qty === null || r.qty === undefined ? (r.raw_qty || '') : r.qty;
-    var dateVal  = r.date || r.raw_date || '';
-    var qtyDisp  = typeof qtyVal === 'number' ? qtyVal.toLocaleString() : escHtml(String(qtyVal));
-
-    var html = '<tr class="' + rowClass + '" data-idx="' + idx + '">';
-    html += '<td class="preview-row-num">' + r.rowNum + (r.agg_count > 1 ? ' <span class="preview-agg">+' + (r.agg_count - 1) + '</span>' : '') + '</td>';
-    html += '<td class="preview-product" title="' + escHtml(r.product) + '">' + escHtml(r.product || '(empty)') + '</td>';
-
-    // Date + Qty render as plain text by default; Edit swaps in the inputs.
-    if (r.editing) {
-        html += '<td><input type="text" class="preview-input preview-input-date" value="' + escHtml(String(dateVal)) + '" ' +
-                'placeholder="YYYY-MM-DD" onchange="onRowEdit(' + idx + ', \'date\', this.value)"></td>';
-        html += '<td><input type="number" min="1" step="1" class="preview-input preview-input-qty" value="' + escHtml(String(qtyVal)) + '" ' +
-                'onchange="onRowEdit(' + idx + ', \'qty\', this.value)"></td>';
-    } else {
-        html += '<td class="preview-cell-display">' + escHtml(String(dateVal)) + '</td>';
-        html += '<td class="preview-cell-display preview-cell-qty-display">' + qtyDisp + '</td>';
-    }
-
-    html += '<td class="preview-existing">' + (r.existing_qty !== undefined ? r.existing_qty.toLocaleString() : '<span class="preview-dash">—</span>') + '</td>';
-    html += '<td>' + statusBadge(r) + '</td>';
-    html += '<td class="preview-actions">' + renderActions(r, idx) + '</td>';
-    html += '</tr>';
-    return html;
-}
-
-function renderActions(r, idx) {
-    if (r.editing) {
-        return '<button type="button" class="preview-row-btn preview-row-btn-save"   onclick="saveEdit(' + idx + ')">Save</button>' +
-               '<button type="button" class="preview-row-btn preview-row-btn-cancel" onclick="cancelEdit(' + idx + ')">Cancel</button>';
-    }
-    return '<button type="button" class="preview-row-btn preview-row-btn-edit" onclick="startEdit(' + idx + ')">Edit</button>';
-}
-
-function startEdit(idx) {
-    var r = previewRows[idx];
-    if (!r) return;
-    r._snapshotQty  = r.qty;
-    r._snapshotDate = r.date;
-    r.editing       = true;
-    renderRows();
-}
-
-function saveEdit(idx) {
-    var r = previewRows[idx];
-    if (!r) return;
-    r.editing = false;
-    delete r._snapshotQty;
-    delete r._snapshotDate;
-    renderRows();
-    refreshSummary();
-}
-
-function cancelEdit(idx) {
-    var r = previewRows[idx];
-    if (!r) return;
-    if (r._snapshotQty !== undefined)  r.qty  = r._snapshotQty;
-    if (r._snapshotDate !== undefined) r.date = r._snapshotDate;
-    r.edited = (r.qty !== r.originalQty || r.date !== r.originalDate);
-    reclassifyRow(r);
-    r.editing = false;
-    delete r._snapshotQty;
-    delete r._snapshotDate;
-    renderRows();
-    refreshSummary();
-}
-
-function statusBadge(r) {
-    var label = { new: 'New', overlap: 'Conflict', invalid: 'Invalid', noop: 'Unchanged' }[r.status] || r.status;
-    var html = '<span class="preview-badge preview-badge-' + r.status + '">' + label + '</span>';
-    if (r.status === 'invalid' && r.reason) {
-        html += '<div class="preview-row-reason" title="' + escHtml(r.reason) + '">' + escHtml(r.reason) + '</div>';
-    }
-    if (r.warnings && r.warnings.length) {
-        var notes = r.warnings.map(function (w) {
-            return w.field + ': ' + w.reason + ' (was "' + w.original + '")';
-        });
-        html += '<div class="preview-row-warning" title="' + escHtml(notes.join('\n')) + '">' +
-                escHtml(notes.join(' · ')) + '</div>';
-    }
-    return html;
-}
-
-function onRowEdit(idx, field, value) {
-    var r = previewRows[idx];
-    if (!r) return;
-
-    if (field === 'qty')  r.qty  = value === '' ? null : Number(value);
-    if (field === 'date') r.date = value;
-
-    r.edited = (r.qty !== r.originalQty || r.date !== r.originalDate);
-    reclassifyRow(r);
-
-    // Update the visible cells in place — a full re-render would destroy the
-    // input the user is still focused on.
-    var tr = document.querySelector('#preview-tbody tr[data-idx="' + idx + '"]');
-    if (tr) {
-        tr.className = 'preview-row preview-row-' + r.status + (r.edited ? ' preview-row-edited' : '');
-        var statusTd = tr.children[5];
-        if (statusTd) statusTd.innerHTML = statusBadge(r);
-    }
-
-    refreshSummary();
-}
-
-function reclassifyRow(r) {
-    var qtyOk  = r.qty !== null && Number.isInteger(r.qty) && r.qty > 0;
-    var dateOk = /^\d{4}-\d{2}-\d{2}$/.test(String(r.date).trim()) && !isNaN(new Date(r.date).getTime());
-
-    if (!qtyOk || !dateOk) {
-        r.status = 'invalid';
-        r.reason = !qtyOk ? 'Quantity must be a positive whole number' : 'Date must be in YYYY-MM-DD format';
-        return;
-    }
-    delete r.reason;
-
-    if (r.originalStatus === 'invalid') { r.status = 'new'; return; }
-
-    if (r.date === r.originalDate && r.existing_qty !== undefined) {
-        r.status = (r.qty === r.existing_qty) ? 'noop' : 'overlap';
-        return;
-    }
-    if (r.originalStatus === 'overlap' || r.originalStatus === 'noop') {
-        r.status = 'new';
-        return;
-    }
-    r.status = r.originalStatus;
-}
-
-function refreshSummary() {
-    var card = document.querySelector('#preflight-container .preview-card');
-    if (!card) return;
-    var oldSummary = card.querySelector('.preview-summary');
-    if (oldSummary) {
-        var tmp = document.createElement('div');
-        tmp.innerHTML = renderSummary();
-        oldSummary.replaceWith(tmp.firstElementChild);
-    }
-
-    var s   = computePreviewCounts(previewRows);
+function refreshImportButton(counts) {
     var btn = document.getElementById('import-btn');
-
-    // Un-edited "overlap" rows (same product+date, different quantity) only commit
-    // when Replace is on — so they mustn't count toward an enabled button, or the
-    // owner clicks an import that provably applies nothing.
-    // Every valid row commits: this upload becomes the dataset, so there's no
-    // longer a class of rows held back pending a toggle.
-    var willCommit = s.new + s.edited;
-
-    if (willCommit === 0) {
+    if (counts.importable === 0) {
         btn.innerHTML     = 'No valid rows to import';
         btn.disabled      = true;
         btn.style.opacity = '0.55';
@@ -1184,28 +759,13 @@ function refreshSummary() {
     }
 }
 
-function computePreviewCounts(rows) {
-    var s = { new: 0, overlap: 0, invalid: 0, noop: 0, edited: 0 };
-    rows.forEach(function (r) {
-        if (s[r.status] !== undefined) s[r.status]++;
-        if (r.edited) s.edited++;
-    });
-    return s;
-}
-
 async function doImport(mapping, replace) {
     var btn = document.getElementById('import-btn');
     btn.textContent = 'Importing…';
     btn.disabled    = true;
 
-    var payloadRows = previewRows.filter(function (r) {
-        if (r.status === 'noop'    && !r.edited) return false;
-        if (r.status === 'invalid' && !r.edited) return false;
-        return true;
-    });
-
     var formData = new FormData();
-    formData.append('rows',     JSON.stringify(payloadRows));
+    formData.append('rows',     JSON.stringify(ImportPreview.payload()));
     formData.append('csv_rows', colRowCount);
 
     // Only the request itself is guarded here. Wrapping the code BELOW in the

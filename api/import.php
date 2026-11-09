@@ -27,6 +27,7 @@ if (!isset($_SESSION['user_id'])) {
 
 $rows    = json_decode($_POST['rows'] ?? '[]', true);
 $csvRows = (int) ($_POST['csv_rows'] ?? 0);
+unset($_POST['rows']);   // a large upload shouldn't be held in memory twice
 
 if (!is_array($rows) || empty($rows)) {
     echo json_encode(['error' => 'No rows submitted.']);
@@ -62,7 +63,18 @@ try {
         return $v === '' ? null : $v;
     };
 
-    foreach ($rows as $r) {
+    // Repeated text and category lists are shared between rows, and each submitted
+    // row is released once read, so the largest allowed file fits in memory.
+    $shared = [];
+    $share  = function (?string $s) use (&$shared): ?string {
+        return $s === null ? null : ($shared[$s] ??= $s);
+    };
+    $categoryLists = [];
+
+    foreach (array_keys($rows) as $i) {
+        $r = $rows[$i];
+        unset($rows[$i]);
+
         $rowNum      = isset($r['rowNum']) ? (int) $r['rowNum'] : 0;
         $productName = trim((string) ($r['product'] ?? ''));
         $dateRaw     = trim((string) ($r['date']    ?? ''));
@@ -78,6 +90,7 @@ try {
         if (!$reason && $date === null) {
             $reason = 'Unrecognized date format: "' . mb_substr($dateRaw, 0, 30) . '"';
         }
+        if (!$reason) $reason = futureDateReason($date);
 
         if (!$reason && (!is_numeric($qtyRaw) || (float) $qtyRaw <= 0 || (float) $qtyRaw != (int) $qtyRaw || (int) $qtyRaw > 999999)) {
             $reason = 'Quantity must be a whole number between 1 and 999,999';
@@ -101,9 +114,8 @@ try {
         // client and are editable there, so this is the last gate before MySQL:
         // an over-length category or a price past DECIMAL(10,2) would otherwise
         // throw at insert and roll back the entire import.
-        [$sku]         = clampFieldLength($optText($r['sku']         ?? null), 'sku');
-        [$category]    = clampFieldLength($optText($r['category']    ?? null), 'category');
-        [$subcategory] = clampFieldLength($optText($r['subcategory'] ?? null), 'subcategory');
+        [$sku]        = clampFieldLength($optText($r['sku'] ?? null), 'sku');
+        $categories   = $categoryLists[(string) ($r['category'] ?? '')] ??= parseCategories([$r['category'] ?? ''])[0];
 
         [$costParsed]  = parseMoney($r['cost']  ?? '');
         [$priceParsed] = parseMoney($r['price'] ?? '');
@@ -111,14 +123,12 @@ try {
         [$price]       = clampMoney($priceParsed);
 
         $clean[] = [
-            'rowNum'      => $rowNum,
-            'product'     => $productName,
-            'date'        => $date,
+            'product'     => $share($productName),
+            'date'        => $share($date),
             'qty'         => (int) $qtyRaw,
-            'edited'      => !empty($r['edited']),
-            'sku'         => $sku,
-            'category'    => $category,
-            'subcategory' => $subcategory,
+            'sku'         => $share($sku),
+            'category'    => $categories,
+            'corrected'   => array_flip((array) ($r['corrected'] ?? [])),
             'cost'        => $cost,
             'price'       => $price,
         ];
@@ -148,10 +158,24 @@ try {
         if ($r['cost'] !== null && $d > $latestByProduct[$pn]['cost_date']) {
             $latestByProduct[$pn]['cost']      = $r['cost'];
             $latestByProduct[$pn]['cost_date'] = $d;
+            $latestByProduct[$pn]['cost_corrected'] = isset($r['corrected']['cost']);
         }
         if ($r['price'] !== null && $d > $latestByProduct[$pn]['price_date']) {
             $latestByProduct[$pn]['price']      = $r['price'];
             $latestByProduct[$pn]['price_date'] = $d;
+            $latestByProduct[$pn]['price_corrected'] = isset($r['corrected']['price']);
+        }
+    }
+
+    $productCategories = categoriesByProduct($clean);
+
+    // An SKU typed in the review step replaces the stored one; the newest such row wins.
+    $correctedSku = [];
+    foreach ($clean as $r) {
+        if (!isset($r['corrected']['sku']) || $r['sku'] === null) continue;
+        $key = mb_strtolower($r['product']);
+        if (!isset($correctedSku[$key]) || $r['date'] > $correctedSku[$key]['date']) {
+            $correctedSku[$key] = ['sku' => $r['sku'], 'date' => $r['date']];
         }
     }
 
@@ -197,25 +221,31 @@ try {
                 $pdo,
                 $_SESSION['user_id'],
                 $r['product'],
-                $r['sku'],
-                $r['category'],
-                $r['subcategory'],
+                $correctedSku[mb_strtolower($r['product'])]['sku'] ?? $r['sku'],
+                $productCategories[mb_strtolower($r['product'])] ?? [],
                 $latestCost,
-                $latestPrice
+                $latestPrice,
+                [
+                    'sku'   => isset($correctedSku[mb_strtolower($r['product'])]),
+                    'cost'  => !empty($latestByProduct[$r['product']]['cost_corrected']),
+                    'price' => !empty($latestByProduct[$r['product']]['price_corrected']),
+                ]
             );
         }
         $pid = $productCache[$r['product']];
 
-        // No existing-pair check: the table was just cleared, so every valid row
-        // is simply inserted. preflight already collapsed duplicate
-        // (product, date) pairs within the file itself, which is what the
-        // sales_product_date_unique key requires.
-        $salesBatch[] = [
-            'product_id'    => $pid,
-            'quantity_sold' => $r['qty'],
-            'sale_date'     => $r['date'],
-        ];
+        // The table was just cleared, so there's nothing to check against. A row
+        // corrected in the preview can land on a product and date another row
+        // already has; those add together, like repeat sales in the file.
+        $saleKey = $pid . '|' . $r['date'];
+        if (isset($salesBatch[$saleKey])) {
+            $salesBatch[$saleKey] += $r['qty'];
+            continue;
+        }
+
+        $salesBatch[$saleKey] = $r['qty'];
     }
+    unset($clean);
 
     if (empty($salesBatch)) {
         // Rolling back also restores the dataset cleared above, so an upload that
@@ -231,7 +261,16 @@ try {
         exit;
     }
 
-    insertSalesBatch($pdo, $salesBatch);
+    $chunk = [];
+    foreach ($salesBatch as $saleKey => $quantity) {
+        [$productId, $saleDate] = explode('|', $saleKey, 2);
+        $chunk[] = ['product_id' => (int) $productId, 'quantity_sold' => $quantity, 'sale_date' => $saleDate];
+        if (count($chunk) === 500) {
+            insertSalesBatch($pdo, $chunk);
+            $chunk = [];
+        }
+    }
+    insertSalesBatch($pdo, $chunk);
 
     // Products that aren't in this upload are no longer sold. They're kept
     // (settings, history and snapshot references live on the row) but marked
@@ -251,6 +290,7 @@ try {
         count($salesBatch),
         0
     );
+    setCurrentVersion($pdo, (int) $_SESSION['user_id'], $versionId);
 
     $pdo->commit();
 

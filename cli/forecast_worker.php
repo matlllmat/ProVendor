@@ -35,11 +35,10 @@ ignore_user_abort(true);
 date_default_timezone_set('Asia/Manila');
 
 require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/flask_client.php';
 require_once __DIR__ . '/../queries/forecast.query.php';
 require_once __DIR__ . '/../queries/events.query.php';
 require_once __DIR__ . '/../queries/job.query.php';
-
-const FLASK_BASE = 'http://localhost:5000';
 
 // The worker is spawned with no attached console (writing to STDOUT/STDERR would
 // keep the spawning pipe open and block the request that launched it), so all
@@ -67,18 +66,14 @@ if (!in_array($job['status'], ['queued', 'running'], true)) {
 
 $userId        = (int) $job['user_id'];
 $globalHorizon = (int) $job['horizon_days'];
-// 'full'   — refit Prophet for every product (import / horizon change / manual run)
-// 'extend' — only forecast the days the saved window is missing, reusing the days
-//            already stored. Nothing is recomputed, and a product whose window
-//            already reaches far enough is skipped without touching Flask at all.
-$jobMode       = ($job['mode'] ?? 'full') === 'extend' ? 'extend' : 'full';
 
 markForecastJobRunning($pdo, $jobId);
 
 try {
     // ── Products to forecast ─────────────────────────────────────────────────
     $stmt = $pdo->prepare(
-        'SELECT id, name, cost_price, selling_price, forecast_horizon_days
+        'SELECT id, name, cost_price, selling_price, forecast_horizon_days,
+                is_perishable, shelf_life_min_days
          FROM products WHERE user_id = ? ORDER BY name'
     );
     $stmt->execute([$userId]);
@@ -93,6 +88,9 @@ try {
     // clamped to the day after it (mirrors computeDayRange in autorun_forecast.js).
     $range        = getUserSaleDateRange($pdo, $userId);
     $lastSaleDate = $range['latest'] ?? null;
+
+    // Stock is only stored on the forecast rows this run replaces, so read it first.
+    $savedForecasts = getLatestForecasts($pdo, $userId);
 
     $pdo->prepare('UPDATE forecast_jobs SET total = ? WHERE id = ?')
         ->execute([count($products), $jobId]);
@@ -114,21 +112,10 @@ try {
 
             [$fromDate, $toDate] = computeForecastWindow($horizon, $lastSaleDate);
 
-            if ($jobMode === 'extend') {
-                $forecastRows = extendForecast($pdo, $userId, $productId, $fromDate, $toDate);
-                // Already covers the window (or isn't extendable) — nothing to do.
-                // Progress is written here too, otherwise skipping the last product
-                // would leave the job showing one short of its total.
-                if ($forecastRows === null) {
-                    $done++;
-                    updateForecastJobProgress($pdo, $jobId, $done, $failed, $product['name']);
-                    continue;
-                }
-            } else {
-                $forecastRows = runProphet($pdo, $userId, $productId, $fromDate, $toDate);
-            }
+            $forecastRows = runProphet($pdo, $userId, $productId, $fromDate, $toDate);
+            $stock        = (int) ($savedForecasts[$productId]['current_stock'] ?? 0);
 
-            runNewsvendorAndSave($pdo, $userId, $productId, $product, $forecastRows);
+            runNewsvendorAndSave($pdo, $userId, $productId, $product, $forecastRows, $stock);
         } catch (Throwable $e) {
             $failed++;
             wlog("job $jobId: product $productId failed: " . $e->getMessage());
@@ -172,18 +159,7 @@ function computeForecastWindow(int $days, ?string $lastSaleDate): array
 // POSTs JSON to Flask and returns the decoded array, or throws.
 function flaskPost(string $path, array $payload, int $timeout): array
 {
-    $ch = curl_init(FLASK_BASE . $path);
-    curl_setopt_array($ch, [
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => json_encode($payload),
-        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => $timeout,
-    ]);
-    $raw    = curl_exec($ch);
-    $err    = curl_error($ch);
-    $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+    [$raw, $status, $err] = flaskRequest($path, json_encode($payload), $timeout);
 
     if ($err) {
         throw new RuntimeException('Forecast server unreachable (' . $err . ').');
@@ -206,54 +182,11 @@ function flaskPost(string $path, array $payload, int $timeout): array
     return $data;
 }
 
-// Rolls one product's window forward to [$fromDate, $toDate] WITHOUT recomputing
-// days it already has:
-//   • keeps every saved day that still falls inside the window (elapsed days drop
-//     off naturally, which is what keeps the window a constant length),
-//   • asks Prophet only for the days the window is missing at the end,
-//   • returns the merged series for re-optimization.
-// Returns null when the saved window already covers the whole range — the caller
-// then skips the product entirely, so an up-to-date catalogue costs zero Flask calls.
-function extendForecast(PDO $pdo, int $userId, int $productId, string $fromDate, string $toDate): ?array
-{
-    $saved = getProductForecast($pdo, $userId, $productId);
-    $existing = ($saved !== null && !empty($saved['forecast'])) ? $saved['forecast'] : [];
-
-    // Days still inside the wanted window, in order.
-    $keep = array_values(array_filter($existing, function ($r) use ($fromDate, $toDate) {
-        return $r['date'] >= $fromDate && $r['date'] <= $toDate;
-    }));
-
-    $haveEnd = null;
-    foreach ($keep as $r) {
-        if ($haveEnd === null || $r['date'] > $haveEnd) $haveEnd = $r['date'];
-    }
-
-    // Nothing usable saved for this window. If the product has NO forecast at all,
-    // skip it: extend runs happen daily, and retrying a product Prophet can't fit
-    // (too little history) would burn a failed Flask call every day forever. A full
-    // run — import, horizon change, or the manual button — is what gives a product
-    // its first forecast.
-    if ($haveEnd === null) {
-        if (empty($existing)) return null;
-        // It has a forecast, but entirely outside the wanted window (e.g. the
-        // horizon moved) — rebuild the window from scratch.
-        return runProphet($pdo, $userId, $productId, $fromDate, $toDate);
-    }
-
-    // Already reaches the end → nothing to do.
-    if ($haveEnd >= $toDate) return null;
-
-    $tailFrom = date('Y-m-d', strtotime($haveEnd . ' +1 day'));
-    $tail     = runProphet($pdo, $userId, $productId, $tailFrom, $toDate);
-
-    return array_merge($keep, $tail);
-}
-
 // Prophet forecast for one product; also persists its event regressor
 // coefficients (the same side-effect api/run_batch_prophet.php has).
 function runProphet(PDO $pdo, int $userId, int $productId, string $fromDate, string $toDate): array
 {
+    $startedAt = date('Y-m-d H:i:s');
     $data = flaskPost('/forecast/product', [
         'user_id'    => $userId,
         'product_id' => $productId,
@@ -263,6 +196,8 @@ function runProphet(PDO $pdo, int $userId, int $productId, string $fromDate, str
 
     $forecastRows = $data['forecast'] ?? [];
     if (empty($forecastRows)) throw new RuntimeException('No forecast data returned.');
+
+    markProductForecastRun($pdo, $productId, $startedAt);
 
     if (!empty($data['event_coefficients'])) {
         upsertEventImpactCache($pdo, $productId, $data['event_coefficients']);
@@ -277,11 +212,10 @@ function runProphet(PDO $pdo, int $userId, int $productId, string $fromDate, str
 // Newsvendor optimization + persistence. Unpriced products (no valid margin)
 // still get their demand forecast saved, just with no restock quantity —
 // matching api/run_batch_newsvendor.php.
-function runNewsvendorAndSave(PDO $pdo, int $userId, int $productId, array $product, array $forecastRows): void
+function runNewsvendorAndSave(PDO $pdo, int $userId, int $productId, array $product, array $forecastRows, int $stock): void
 {
     $cost  = (float) ($product['cost_price']    ?? 0);
     $price = (float) ($product['selling_price'] ?? 0);
-    $stock = 0;   // the catalogue run assumes no stock on hand; refined per product later
 
     if ($cost <= 0 || $price <= 0 || $price <= $cost) {
         saveForecastRows($pdo, $productId, $forecastRows, 0, $cost, $price, $stock, 0.0, 0, 0.0, null, null);
@@ -300,6 +234,10 @@ function runNewsvendorAndSave(PDO $pdo, int $userId, int $productId, array $prod
         'selling_price' => $price,
         'current_stock' => $stock,
         'residual_rho'  => $residualRho,
+        'shelf_life_days' => effectiveShelfLifeDays(
+            (bool) $product['is_perishable'],
+            $product['shelf_life_min_days'] !== null ? (int) $product['shelf_life_min_days'] : null
+        ),
     ], 60);
 
     saveForecastRows(

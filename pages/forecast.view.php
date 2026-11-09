@@ -248,6 +248,16 @@ require_once __DIR__ . '/../includes/header.php';
             <div class="product-empty">No products found.</div>
             <?php else: ?>
 
+                <!-- Column titles for the List view; Cards view hides this row. -->
+                <div class="product-list-head">
+                    <span>Product</span>
+                    <span>ID</span>
+                    <span>SKU</span>
+                    <span>Category</span>
+                    <span class="plh-num">Forecast demand (units)</span>
+                    <span class="plh-num">Suggested order (units)</span>
+                </div>
+
                 <?php foreach ($products as $product): ?>
                 <?php
                     $fc = $latestForecasts[$product['id']] ?? null;
@@ -285,7 +295,7 @@ require_once __DIR__ . '/../includes/header.php';
                             <span class="product-row-inactive-badge">Not in current data</span>
                             <span class="product-row-meta-sep">·</span>
                             <?php endif; ?>
-                            <span class="product-row-id">ID&nbsp;<?php echo $product['id']; ?></span>
+                            <span class="product-row-id"><span class="card-only">ID&nbsp;</span><?php echo $product['id']; ?></span>
                             <?php if ($product['sku']): ?>
                             <span class="product-row-meta-sep">·</span>
                             <span class="product-row-sku"><?php echo htmlspecialchars($product['sku']); ?></span>
@@ -302,7 +312,7 @@ require_once __DIR__ . '/../includes/header.php';
                                 <span class="prf-unit">units</span>
                             </span>
                             <?php if ((int) $fc['restock_qty'] > 0): ?>
-                            <span class="prf-order">Order <?php echo number_format((int) $fc['restock_qty']); ?></span>
+                            <span class="prf-order"><span class="card-only">Order </span><?php echo number_format((int) $fc['restock_qty']); ?></span>
                             <?php else: ?>
                             <span class="prf-no-order">No price set</span>
                             <?php endif; ?>
@@ -312,11 +322,8 @@ require_once __DIR__ . '/../includes/header.php';
                     </div>
 
                     <div class="product-row-badges">
-                        <?php if ($product['subcategory']): ?>
-                        <span class="product-row-subcategory"><?php echo htmlspecialchars($product['subcategory']); ?></span>
-                        <?php endif; ?>
                         <?php if ($product['category']): ?>
-                        <span class="product-row-category"><?php echo htmlspecialchars($product['category']); ?></span>
+                        <span class="product-row-category"><?php echo renderCategoryList(categoryList($product['category'])); ?></span>
                         <?php endif; ?>
                     </div>
 
@@ -374,9 +381,10 @@ const AUTO_PRODUCTS       = <?php echo json_encode(array_map(function ($p) {
     ];
 }, $catalogue)); ?>;
 
-// Accuracy reporting toggle (SHOW_ACCURACY_FEATURES in config/bootstrap.php).
-// chart_modal.js reads this to show/hide the per-product "Accuracy" tab.
-window.PV_SHOW_ACCURACY = <?php echo SHOW_ACCURACY_FEATURES ? 'true' : 'false'; ?>;
+// Per-product accuracy reporting removed from this page specifically — chart_modal.js
+// reads this flag to show/hide the per-product "Accuracy" tab/chip. Left false here
+// regardless of SHOW_ACCURACY_FEATURES, which still controls Reports/Dashboard.
+window.PV_SHOW_ACCURACY = false;
 </script>
 <script src="<?php echo BASE_URL; ?>/pages/js/chart.shared.js?v=<?php echo filemtime(__DIR__ . '/js/chart.shared.js'); ?>"></script>
 <script src="<?php echo BASE_URL; ?>/pages/js/chart_modal.js?v=<?php echo filemtime(__DIR__ . '/js/chart_modal.js'); ?>"></script>
@@ -661,7 +669,7 @@ function applyViewVisibility() {
 function filterProductList(category) {
     let visibleCount = 0;
     document.querySelectorAll('.product-row[data-product-id]').forEach(function(row) {
-        const matches     = !category || (row.dataset.category || '') === category;
+        const matches = !category || (row.dataset.category || '').split(', ').includes(category);
         row.style.display = matches ? '' : 'none';
         if (matches) visibleCount++;
     });
@@ -1747,7 +1755,7 @@ function updateProductCard(productId, totalPredicted, restockQty) {
     const demandNum = Number(totalPredicted || 0);
     const order      = Number(restockQty     || 0);
     const orderHtml = order > 0
-        ? '<span class="prf-order">Order ' + order.toLocaleString() + '</span>'
+        ? '<span class="prf-order"><span class="card-only">Order </span>' + order.toLocaleString() + '</span>'
         : '<span class="prf-no-order">No price set</span>';
 
     el.innerHTML =

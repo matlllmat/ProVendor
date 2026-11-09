@@ -24,8 +24,8 @@ require_once __DIR__ . '/../queries/user.query.php';
 $_rUser   = getUserById($pdo, $_SESSION['user_id']);
 $userName = $_rUser ? $_rUser['name'] : 'Store Owner';
 
-// Catalogue-level accuracy snapshot — volume-weighted MAPE/MAE/RMSE across
-// all evaluated products. This is the number to cite for "system accuracy."
+// Catalogue-level accuracy snapshot — pooled WAPE and volume-weighted MAE
+// across all evaluated products. This is the number to cite for "system accuracy."
 $catalogueAccuracy = getCatalogueAccuracy($pdo, $_SESSION['user_id']);
 
 // Per-product breakdown — surfaces which products are dragging the average

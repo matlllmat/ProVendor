@@ -13,6 +13,7 @@
 //      OR { error: string, available_days?: int }
 
 require_once __DIR__ . '/../config/bootstrap.php';
+require_once __DIR__ . '/../includes/flask_client.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../queries/forecast.query.php';
 header('Content-Type: application/json');
@@ -38,9 +39,8 @@ if (!$refresh) {
         echo json_encode([
             'cached'        => true,
             'accuracy_pct'  => (float) $cached['accuracy_pct'],
-            'mape'          => $cached['accuracy_mape']         !== null ? (float) $cached['accuracy_mape']         : null,
+            'wape'          => $cached['accuracy_wape']         !== null ? (float) $cached['accuracy_wape']         : null,
             'mae'           => $cached['accuracy_mae']          !== null ? (float) $cached['accuracy_mae']          : null,
-            'rmse'          => $cached['accuracy_rmse']         !== null ? (float) $cached['accuracy_rmse']         : null,
             'horizon_days'  => $cached['accuracy_horizon_days'] !== null ? (int)   $cached['accuracy_horizon_days'] : null,
             'residual_rho'  => $cached['accuracy_residual_rho'] !== null ? (float) $cached['accuracy_residual_rho'] : 0.0,
             'computed_at'   => $cached['accuracy_computed_at'],
@@ -55,21 +55,9 @@ $payload = json_encode([
     'product_id' => $productId,
 ]);
 
-$ch = curl_init('http://localhost:5000/forecast/product/evaluate');
-curl_setopt_array($ch, [
-    CURLOPT_POST           => true,
-    CURLOPT_POSTFIELDS     => $payload,
-    CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_TIMEOUT        => 120,
-]);
+[$result, $httpCode, $flaskError] = flaskRequest('/forecast/product/evaluate', $payload, 120);
 
-$result   = curl_exec($ch);
-$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-$curlErr  = curl_error($ch);
-curl_close($ch);
-
-if ($curlErr) {
+if ($flaskError) {
     echo json_encode(['error' => 'Cannot reach the forecast server. Make sure python/app.py is running.']);
     exit;
 }
@@ -92,9 +80,9 @@ if (isset($decoded['error'])) {
 saveProductAccuracy(
     $pdo, $userId, $productId,
     (float) $decoded['accuracy_pct'],
-    (float) $decoded['mape'],
+    (float) $decoded['wape'],
+    (float) $decoded['actual_units'],
     (float) $decoded['mae'],
-    (float) $decoded['rmse'],
     (int)   $decoded['horizon_days'],
     (float) $decoded['residual_rho']
 );
@@ -103,9 +91,8 @@ $saved = getProductAccuracy($pdo, $userId, $productId);
 echo json_encode([
     'cached'        => false,
     'accuracy_pct'  => (float) $saved['accuracy_pct'],
-    'mape'          => (float) $saved['accuracy_mape'],
+    'wape'          => (float) $saved['accuracy_wape'],
     'mae'           => (float) $saved['accuracy_mae'],
-    'rmse'          => (float) $saved['accuracy_rmse'],
     'horizon_days'  => (int)   $saved['accuracy_horizon_days'],
     'residual_rho'  => (float) $saved['accuracy_residual_rho'],
     'computed_at'   => $saved['accuracy_computed_at'],

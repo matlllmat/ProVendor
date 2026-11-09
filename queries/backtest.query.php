@@ -4,24 +4,23 @@
 // overwritten by each new run, deleted outright by "Clear".
 
 // Upserts the owner's saved run. $data keys: original_filename, stored_path,
-// evaluated_count, total_count, weighted_mape, weighted_mae, weighted_rmse,
+// evaluated_count, total_count, weighted_wape, weighted_mae,
 // weighted_accuracy_pct, rows_parsed, rows_dropped.
 function saveBacktestRun(PDO $pdo, int $userId, array $data): void
 {
     $stmt = $pdo->prepare(
         'INSERT INTO backtest_runs
              (user_id, original_filename, stored_path, evaluated_count, total_count,
-              weighted_mape, weighted_mae, weighted_rmse, weighted_accuracy_pct,
+              weighted_wape, weighted_mae, weighted_accuracy_pct,
               rows_parsed, rows_dropped)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
              original_filename     = VALUES(original_filename),
              stored_path           = VALUES(stored_path),
              evaluated_count       = VALUES(evaluated_count),
              total_count           = VALUES(total_count),
-             weighted_mape         = VALUES(weighted_mape),
+             weighted_wape         = VALUES(weighted_wape),
              weighted_mae          = VALUES(weighted_mae),
-             weighted_rmse         = VALUES(weighted_rmse),
              weighted_accuracy_pct = VALUES(weighted_accuracy_pct),
              rows_parsed           = VALUES(rows_parsed),
              rows_dropped          = VALUES(rows_dropped),
@@ -33,9 +32,8 @@ function saveBacktestRun(PDO $pdo, int $userId, array $data): void
         $data['stored_path'],
         $data['evaluated_count'],
         $data['total_count'],
-        $data['weighted_mape'],
+        $data['weighted_wape'],
         $data['weighted_mae'],
-        $data['weighted_rmse'],
         $data['weighted_accuracy_pct'],
         $data['rows_parsed'],
         $data['rows_dropped'],

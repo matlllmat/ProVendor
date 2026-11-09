@@ -51,7 +51,13 @@ if ($tempPath === null) {
     exit;
 }
 
+if (count($rows) > MAX_IMPORT_ROWS) {
+    echo json_encode(['error' => TOO_MANY_ROWS_MESSAGE]);
+    exit;
+}
+
 $_SESSION['temp_csv']      = $tempPath;
+unset($_SESSION['temp_csv_row_offset'], $_SESSION['temp_csv_workbook_note']);
 $_SESSION['temp_csv_name'] = $sheet['title'] . ' — ' . $sheet['worksheet'];
 
 // Remembered until the owner commits the import; import.php reads it to persist
@@ -71,10 +77,8 @@ foreach (array_slice($rows, 0, 20) as $row) {
 
 $suggestions = detectColumnMapping($headers, $sampleRows);
 
-$dateFormat = ['format' => null, 'ambiguous' => false];
-if ($suggestions['date'] !== null) {
-    $dateFormat = sniffDateFormat(array_column($sampleRows, $suggestions['date']));
-}
+$dateFormats = sniffColumnDateFormats($headers, $rows);
+$dateFormat  = $dateFormats[$suggestions['date']] ?? ['format' => null, 'ambiguous' => false];
 $_SESSION['temp_csv_date_format'] = $dateFormat;
 
 echo json_encode([
@@ -83,6 +87,7 @@ echo json_encode([
     'suggestions' => $suggestions,
     'row_count'   => count($rows),
     'date_format' => $dateFormat,
+    'date_formats' => $dateFormats,
     'sheet'       => [
         'title'     => $sheet['title'],
         'worksheet' => $sheet['worksheet'],

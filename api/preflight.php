@@ -10,7 +10,7 @@
 //     date_format: {...},
 //     csv_rows:    total raw rows in the file,
 //     summary:     { new, overlap, invalid, noop, total_aggregated },
-//     rows:        [ { rowNum, product, date, qty, sku, category, subcategory,
+//     rows:        [ { rowNum, product, date, qty, sku, category,
 //                      cost, price, status, existing_qty?, reason?, raw_date?,
 //                      raw_qty?, agg_count }, ... ]
 //   }
@@ -39,9 +39,8 @@ $colDate        = $mapping['date'];
 $colProduct     = $mapping['product'];
 $colQty         = $mapping['quantity'];
 $colSku         = $mapping['sku']         ?? null;
-$colCategory    = $mapping['category']    ?? null;
-$colSubcategory = $mapping['subcategory'] ?? null;
-$colCost        = $mapping['cost']        ?? null;
+$colCategories  = mappingCategoryColumns($mapping);
+$colCost       = $mapping['cost']        ?? null;
 $colPrice       = $mapping['price']       ?? null;
 
 // ── Read CSV ──────────────────────────────────────────────────────────────────
@@ -63,32 +62,42 @@ foreach ([$colDate, $colProduct, $colQty] as $col) {
     }
 }
 
-// First pass: sniff date format from up to 50 sample values, then read rest.
+// Read every row, keeping the date column so its format is judged on all of it.
 $dateColIdx   = array_search($colDate, $headers, true);
-$dateSamples  = [];
+$dateValues   = [];
 $bufferedRows = [];
 while (($row = fgetcsv($handle)) !== false) {
     $bufferedRows[] = $row;
     if ($dateColIdx !== false && count($row) === count($headers)) {
         $v = trim((string) ($row[$dateColIdx] ?? ''));
-        if ($v !== '' && count($dateSamples) < 50) $dateSamples[] = $v;
+        if ($v !== '') $dateValues[] = $v;
     }
-    if (count($bufferedRows) >= 50 && count($dateSamples) >= 50) break;
-}
-while (($row = fgetcsv($handle)) !== false) {
-    $bufferedRows[] = $row;
 }
 fclose($handle);
 
-$dateFormat = sniffDateFormat($dateSamples);
+$dateFormat = sniffDateFormat($dateValues);
+$dateIsSure = $dateFormat['format'] !== null && !$dateFormat['ambiguous'];
 
-// OVERRIDE WITH USER CHOICE IF PROVIDED
-$userFormat = $_POST['date_format'] ?? 'auto';
-if ($userFormat !== 'auto' && $userFormat !== '') {
-    $dateFormat = [
-        'format' => $userFormat,
-        'ambiguous' => false
-    ];
+// When the system is sure, its answer stands. Otherwise the owner must choose,
+// and a choice the dates contradict is sent back.
+if (!$dateIsSure) {
+    $userFormat = $_POST['date_format'] ?? 'auto';
+
+    if (!isset(DATE_FORMAT_CHOICES[$userFormat])) {
+        echo json_encode([
+            'error' => 'We can\'t tell the date format of this file. Please choose it.',
+            'code'  => 'date_format',
+        ]);
+        exit;
+    }
+
+    $problem = dateFormatProblem($dateValues, $userFormat);
+    if ($problem !== null) {
+        echo json_encode(['error' => $problem, 'code' => 'date_format']);
+        exit;
+    }
+
+    $dateFormat = ['format' => $userFormat, 'ambiguous' => false];
 }
 
 $_SESSION['temp_csv_date_format'] = $dateFormat;
@@ -106,7 +115,7 @@ $_SESSION['temp_csv_mapping'] = $mapping;
 $invalidRows    = [];
 $validByPair    = []; // pairKey => row data
 $recoveredCount = 0;  // valid rows whose date was parsed via the fallback, not the chosen format
-$rowNum         = 1;
+$rowNum         = 1 + (int) ($_SESSION['temp_csv_row_offset'] ?? 0);
 
 $pickField = function (array $r, ?string $col): ?string {
     if (!$col) return null;
@@ -118,7 +127,7 @@ $pickField = function (array $r, ?string $col): ?string {
 // so it's reported once at file level rather than flagged row by row.
 $moneyReformatted = 0;
 
-// Extracts the optional metadata (sku/category/subcategory/cost/price), clamped
+// Extracts the optional metadata (sku/categories/cost/price), clamped
 // to what the DB columns can actually hold. Without this, a 60-character
 // category or a price past DECIMAL(10,2) reached MySQL and threw, rolling back
 // the entire import with a generic error and no indication of which row.
@@ -127,23 +136,27 @@ $moneyReformatted = 0;
 // money) are recorded in 'warnings' for the user to review. A bad optional
 // field never invalidates the sale — quantity and date are the real data.
 $pickOptional = function (array $r) use (
-    $pickField, $colSku, $colCategory, $colSubcategory, $colCost, $colPrice, &$moneyReformatted
+    $pickField, $colSku, $colCategories, $colCost, $colPrice, &$moneyReformatted
 ): array {
     $out      = [];
     $warnings = [];
 
-    foreach (['sku' => $colSku, 'category' => $colCategory, 'subcategory' => $colSubcategory] as $field => $col) {
-        [$value, $original] = clampFieldLength($pickField($r, $col), $field);
-        if ($original !== null) {
-            $warnings[] = [
-                'field'    => $field,
-                'original' => $original,
-                'applied'  => $value,
-                'reason'   => 'Shortened to ' . FIELD_LIMITS[$field] . ' characters to fit',
-            ];
-        }
-        $out[$field] = $value;
+    $shortenedWarning = fn(string $field, string $original, string $applied) => [
+        'field'    => $field,
+        'original' => $original,
+        'applied'  => $applied,
+        'reason'   => 'Shortened to ' . FIELD_LIMITS[$field] . ' characters to fit',
+    ];
+
+    [$sku, $original] = clampFieldLength($pickField($r, $colSku), 'sku');
+    if ($original !== null) $warnings[] = $shortenedWarning('sku', $original, $sku);
+    $out['sku'] = $sku;
+
+    [$categories, $shortened] = parseCategories(array_map(fn($col) => $pickField($r, $col), $colCategories));
+    foreach ($shortened as [$original, $applied]) {
+        $warnings[] = $shortenedWarning('category', $original, $applied);
     }
+    $out['category'] = $categories ? implode(', ', $categories) : null;
 
     foreach (['cost' => $colCost, 'price' => $colPrice] as $field => $col) {
         $raw = $col ? trim((string) ($r[$col] ?? '')) : '';
@@ -177,22 +190,11 @@ $pickOptional = function (array $r) use (
 
 foreach ($bufferedRows as $row) {
     $rowNum++;
-    if (count($row) !== count($headers)) {
-        $invalidRows[] = [
-            'rowNum'    => $rowNum,
-            'agg_count' => 1,
-            'product'   => '',
-            'date'      => '',
-            'qty'       => null,
-            'raw_date'  => '',
-            'raw_qty'   => '',
-            'reason'    => 'Row has wrong number of columns',
-            'status'    => 'invalid',
-        ];
-        continue;
-    }
+    // A row with the wrong cell count is lined up by position so the owner can
+    // see and repair it: extra cells are dropped, missing ones are empty.
+    $wrongColumns = count($row) !== count($headers);
+    $r = array_combine($headers, array_slice(array_pad(array_map('strval', $row), count($headers), ''), 0, count($headers)));
 
-    $r           = array_combine($headers, $row);
     $productName = trim($r[$colProduct] ?? '');
     $dateRaw     = trim($r[$colDate]    ?? '');
     $qtyRaw      = trim($r[$colQty]     ?? '');
@@ -204,33 +206,44 @@ foreach ($bufferedRows as $row) {
     elseif ($qtyRaw === '')            $reason = 'Missing quantity';
 
     $usedFallback = false;
-    $date = $reason ? null : normalizeDateStrict($dateRaw, $dateFormat['format'], $usedFallback);
+    $date = $dateRaw === '' ? null : normalizeDateStrict($dateRaw, $dateFormat['format'], $usedFallback);
     if (!$reason && $usedFallback && $date !== null) $recoveredCount++;
     if (!$reason && $date === null) {
         $reason = 'Unrecognized date format: "' . mb_substr($dateRaw, 0, 30) . '"';
     }
-    if (!$reason && (!is_numeric($qtyRaw) || (float) $qtyRaw <= 0 || (float) $qtyRaw != (int) $qtyRaw || (int) $qtyRaw > 999999)) {
+    if (!$reason) $reason = futureDateReason($date);
+    $qtyIsValid = is_numeric($qtyRaw) && (float) $qtyRaw > 0 && (float) $qtyRaw == (int) $qtyRaw && (int) $qtyRaw <= 999999;
+    $qty = $qtyIsValid ? (int) $qtyRaw : null;
+    if (!$reason && $qty === null && $qtyRaw !== '') {
         $reason = 'Quantity must be a whole number between 1 and 999,999 (got "' . mb_substr($qtyRaw, 0, 20) . '")';
     }
+    if ($wrongColumns) $reason = 'Row has wrong number of columns';
+
+    // Every warning on the row, even when something else already blocks it.
+    $optional = $pickOptional($r);
+    $optional['warnings'] = array_merge(
+        $optional['warnings'],
+        suspiciousValueWarnings($dateRaw, $date, $qtyRaw, $qty, $optional['cost'], $optional['price'])
+    );
 
     if ($reason) {
         $invalidRows[] = [
             'rowNum'    => $rowNum,
             'agg_count' => 1,
             'product'   => $productName,
-            'date'      => $dateRaw,        // show raw so user sees what they typed
+            'date'      => $date ?? $dateRaw,   // raw only when it couldn't be read
             'qty'       => null,
             'raw_date'  => $dateRaw,
-            'raw_qty'   => $qtyRaw,
+            'raw_qty'   => $qty !== null ? (string) $qty : $qtyRaw,
             'reason'    => $reason,
+            'wrong_columns' => $wrongColumns,
             'status'    => 'invalid',
             // Optional fields preserved so the user can edit & re-submit without
             // losing sku/category/cost/price metadata that was valid on this row.
-        ] + $pickOptional($r);
+        ] + $optional;
         continue;
     }
 
-    $qty     = (int) $qtyRaw;
     $pairKey = mb_strtolower($productName) . '|' . $date;
 
     if (isset($validByPair[$pairKey])) {
@@ -243,7 +256,7 @@ foreach ($bufferedRows as $row) {
             'product'     => $productName,
             'date'        => $date,
             'qty'         => $qty,
-        ] + $pickOptional($r);
+        ] + $optional;
     }
 }
 
@@ -302,8 +315,7 @@ $stmt = $pdo->prepare(
 $stmt->execute([$_SESSION['user_id']]);
 $current = $stmt->fetch();
 
-$incomingDates    = array_column($outRows, 'date');
-$incomingDates    = array_values(array_filter($incomingDates, fn($d) => $d !== null && $d !== ''));
+$incomingDates    = array_column(array_filter($outRows, fn($r) => $r['status'] !== 'invalid'), 'date');
 $incomingProducts = [];
 foreach ($outRows as $r) {
     if ($r['status'] !== 'invalid' && $r['product'] !== '') {
@@ -357,14 +369,16 @@ if (count($versionsNow) >= MAX_VERSIONS_PER_USER) {
 }
 
 echo json_encode([
+    'today'              => date('Y-m-d'),
     'replaces'           => $replaces,
     'pruned_version'     => $prunedByThis,
     'date_format'        => $dateFormat,
     'csv_rows'           => count($bufferedRows),
-    'recovered_count'    => $recoveredCount,
+    'recovered_count'    => $dateIsSure ? 0 : $recoveredCount,
     'warnings_count'     => $warningsCount,
     'money_reformatted'  => $moneyReformatted,
     'encoding_converted' => !empty($_SESSION['temp_csv_encoding_conv']),
+    'workbook_note'      => $_SESSION['temp_csv_workbook_note'] ?? null,
     'summary'         => [
         'new'              => $newCount,
         'overlap'          => $overlapCount,

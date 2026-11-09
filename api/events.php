@@ -52,7 +52,21 @@ function parseOccurrences(string $raw): array
     return [$dates, null];
 }
 
+// Flags the dashboard when an event change can affect the forecast. If the event
+// has no past sales to learn from, queues a note for the Events page instead.
+// $before / $after are the event as it was and is now (false = not active).
+function reactToEventChange(PDO $pdo, int $userId, array|false $before, array|false $after): void
+{
+    if (($before && eventTouchesSalesHistory($pdo, $userId, $before))
+        || ($after && eventTouchesSalesHistory($pdo, $userId, $after))) {
+        markEventsChanged($pdo, $userId);
+    } elseif ($after && !empty(getUserSaleDateRange($pdo, $userId)['earliest'])) {
+        $_SESSION['event_no_history_note'] = true;
+    }
+}
+
 $action = $_POST['action'] ?? '';
+$userId = (int) $_SESSION['user_id'];
 
 switch ($action) {
 
@@ -60,7 +74,7 @@ switch ($action) {
         $name       = trim($_POST['name']        ?? '');
         $eventStart = trim($_POST['event_start'] ?? '');
         $eventEnd   = trim($_POST['event_end']   ?? '') ?: null;
-        $recurrence = $_POST['recurrence']       ?? 'none';
+        $recurrence = $_POST['recurrence']       ?? '';
         $isLastDay  = (int) ($_POST['is_last_day'] ?? 0);
         $color      = trim($_POST['color']       ?? '#FF5722');
         $impactNote = trim($_POST['impact_note'] ?? '') ?: null;
@@ -69,7 +83,7 @@ switch ($action) {
             echo json_encode(['error' => 'Name and start date are required.']);
             exit;
         }
-        if (!in_array($recurrence, ['none', 'yearly', 'monthly', 'custom'], true)) {
+        if (!in_array($recurrence, ['yearly', 'monthly', 'custom'], true)) {
             echo json_encode(['error' => 'Invalid recurrence.']);
             exit;
         }
@@ -108,6 +122,7 @@ switch ($action) {
         if ($recurrence === 'custom') {
             replaceEventOccurrences($pdo, $id, $occurrences);
         }
+        reactToEventChange($pdo, $userId, false, getEventById($pdo, $id, $userId));
         echo json_encode(['success' => true, 'id' => $id]);
         break;
 
@@ -116,7 +131,7 @@ switch ($action) {
         $name       = trim($_POST['name']          ?? '');
         $eventStart = trim($_POST['event_start']   ?? '');
         $eventEnd   = trim($_POST['event_end']      ?? '') ?: null;
-        $recurrence = $_POST['recurrence']         ?? 'none';
+        $recurrence = $_POST['recurrence']         ?? '';
         $isLastDay  = (int) ($_POST['is_last_day'] ?? 0);
         $color      = trim($_POST['color']         ?? '#FF5722');
         $impactNote = trim($_POST['impact_note']   ?? '') ?: null;
@@ -125,7 +140,7 @@ switch ($action) {
             echo json_encode(['error' => 'Invalid input.']);
             exit;
         }
-        if (!in_array($recurrence, ['none', 'yearly', 'monthly', 'custom'], true)) {
+        if (!in_array($recurrence, ['yearly', 'monthly', 'custom'], true)) {
             echo json_encode(['error' => 'Invalid recurrence.']);
             exit;
         }
@@ -144,11 +159,19 @@ switch ($action) {
             $eventEnd   = $occurrences[0]['end_date'];
         }
 
+        $before = getEventById($pdo, $id, $userId);
         $ok = updateEvent($pdo, $id, $_SESSION['user_id'], $name, $eventStart, $eventEnd, $recurrence, $isLastDay, $color, $impactNote);
         if ($ok) {
             // Always rewrite: switching a custom event to a rule-based one must
             // clear its stale dates, or expandEvents would still see them.
             replaceEventOccurrences($pdo, $id, $occurrences);
+
+            // Name, color and note edits can't change the forecast; only dates can.
+            $after = getEventById($pdo, $id, $userId);
+            $dates = fn($e) => [$e['event_start'], $e['event_end'], $e['recurrence'], (int) $e['is_last_day'], $e['occurrences']];
+            if ($dates($before) !== $dates($after)) {
+                reactToEventChange($pdo, $userId, $before, $after);
+            }
         }
         echo json_encode($ok
             ? ['success' => true]
@@ -162,7 +185,11 @@ switch ($action) {
             echo json_encode(['error' => 'Invalid event ID.']);
             exit;
         }
+        $before = getEventById($pdo, $id, $userId);
         $ok = deleteEvent($pdo, $id, $_SESSION['user_id']);
+        if ($ok) {
+            reactToEventChange($pdo, $userId, $before, false);
+        }
         echo json_encode($ok
             ? ['success' => true]
             : ['error'   => 'Event not found or not deletable.']
@@ -176,6 +203,7 @@ switch ($action) {
             exit;
         }
         hideEvent($pdo, $id, $_SESSION['user_id']);
+        reactToEventChange($pdo, $userId, getEventById($pdo, $id, $userId), false);
         echo json_encode(['success' => true]);
         break;
 
@@ -186,6 +214,7 @@ switch ($action) {
             exit;
         }
         unhideEvent($pdo, $id, $_SESSION['user_id']);
+        reactToEventChange($pdo, $userId, false, getEventById($pdo, $id, $userId));
         echo json_encode(['success' => true]);
         break;
 

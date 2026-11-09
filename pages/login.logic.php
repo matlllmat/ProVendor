@@ -56,7 +56,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($user && password_verify($password, $user['password'])) {
                 session_regenerate_id(true);
                 $_SESSION['user_id'] = $user['id'];
-                
+                $_SESSION['stock_notice_pending'] = true;   // shown once on the dashboard
+
                 // Assumes userHasSales is defined in user.query.php
                 $hasSales = function_exists('userHasSales') ? userHasSales($pdo, $user['id']) : false;
                 

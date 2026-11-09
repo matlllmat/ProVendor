@@ -38,7 +38,9 @@ def fit_forecast(train, horizon):
 def newsvendor(fc, cost, price):
     """app.py /optimize, with rho=0 and no stock on hand."""
     mu  = fc['yhat'].clip(lower=0).sum()
-    var = (((fc['yhat_upper'] - fc['yhat_lower']) / (2 * 1.96)) ** 2).sum()
+    # Prophet's interval_width defaults to 0.80 here too — divide by the 80% z
+    # (1.2816), not 1.96, to match the corrected formula in app.py.
+    var = (((fc['yhat_upper'] - fc['yhat_lower']) / (2 * 1.2816)) ** 2).sum()
     sd  = math.sqrt(var) if var > 0 else mu * 0.2
     z   = norm.ppf((price - cost) / price)
     return max(0, round(mu + z * sd)), mu

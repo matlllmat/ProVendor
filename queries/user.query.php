@@ -40,7 +40,7 @@ function getUserById(PDO $pdo, int $userId): array|false
 function getUserProfile(PDO $pdo, int $userId): array|false
 {
     $stmt = $pdo->prepare(
-        'SELECT id, name, store_name, email, forecast_horizon_days FROM users WHERE id = ? LIMIT 1'
+        'SELECT id, name, store_name, email, forecast_horizon_days, forecast_reminder_days FROM users WHERE id = ? LIMIT 1'
     );
     $stmt->execute([$userId]);
     return $stmt->fetch();
@@ -56,26 +56,24 @@ function getForecastHorizon(PDO $pdo, int $userId): int
 }
 
 // Sets the user's global forecast horizon. Caller clamps to the 1–60 range.
-// How the forecast window is kept current:
-//   'manual' — it only moves when the owner re-forecasts
-//   'auto'   — the app tops it back up to the horizon as days elapse
-function getForecastMode(PDO $pdo, int $userId): string
-{
-    $stmt = $pdo->prepare('SELECT forecast_mode FROM users WHERE id = ? LIMIT 1');
-    $stmt->execute([$userId]);
-    $mode = $stmt->fetchColumn();
-    return $mode === 'auto' ? 'auto' : 'manual';
-}
-
-function setForecastMode(PDO $pdo, int $userId, string $mode): void
-{
-    $pdo->prepare('UPDATE users SET forecast_mode = ? WHERE id = ?')
-        ->execute([$mode === 'auto' ? 'auto' : 'manual', $userId]);
-}
-
 function setForecastHorizon(PDO $pdo, int $userId, int $days): void
 {
     $pdo->prepare('UPDATE users SET forecast_horizon_days = ? WHERE id = ?')
+        ->execute([$days, $userId]);
+}
+
+// Days after a forecast starts before the owner is reminded to re-forecast.
+function getForecastReminderDays(PDO $pdo, int $userId): int
+{
+    $stmt = $pdo->prepare('SELECT forecast_reminder_days FROM users WHERE id = ? LIMIT 1');
+    $stmt->execute([$userId]);
+    $days = $stmt->fetchColumn();
+    return $days !== false ? (int) $days : 10;
+}
+
+function setForecastReminderDays(PDO $pdo, int $userId, int $days): void
+{
+    $pdo->prepare('UPDATE users SET forecast_reminder_days = ? WHERE id = ?')
         ->execute([$days, $userId]);
 }
 

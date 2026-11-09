@@ -1,7 +1,7 @@
 # python/compare_horizons.py
 # One-off analysis script: re-runs the backtest endpoint for every product at
 # multiple holdout horizons (7 / 30 / 60 days) and prints a comparison table.
-# Used to empirically see how holdout length affects MAPE/MAE/RMSE — the
+# Used to empirically see how holdout length affects WAPE/MAE — the
 # rationale for picking 30 days as the production default.
 #
 # Run:  python python/compare_horizons.py
@@ -49,41 +49,39 @@ def evaluate(product_id, horizon):
 
 def main():
     print(f'\nComparing backtest horizons (7 / 30 / 60 days) across {len(PRODUCTS)} products')
-    print(f'Each row = one product. Numbers = MAPE% | MAE units | RMSE units\n')
+    print(f'Each row = one product. Numbers = WAPE% | MAE units\n')
 
     # Header
     name_w = max(len(n) for _, n in PRODUCTS) + 2
-    print(' ' * name_w + '|   7-day holdout   |  30-day holdout   |  60-day holdout')
-    print(' ' * name_w + '|  MAPE  MAE  RMSE  |  MAPE  MAE  RMSE  |  MAPE  MAE  RMSE')
-    print('-' * (name_w + 60))
+    print(' ' * name_w + '|  7-day holdout | 30-day holdout | 60-day holdout')
+    print(' ' * name_w + '|   WAPE   MAE   |   WAPE   MAE   |   WAPE   MAE')
+    print('-' * (name_w + 48))
 
-    totals = {h: {'mape': [], 'mae': [], 'rmse': []} for h in HORIZONS}
+    totals = {h: {'wape': [], 'mae': []} for h in HORIZONS}
 
     for pid, name in PRODUCTS:
         cells = []
         for h in HORIZONS:
             d = evaluate(pid, h)
             if 'error' in d:
-                cells.append('     err     '.center(19))
+                cells.append('   err    '.center(16))
                 continue
-            mape, mae, rmse = d['mape'], d['mae'], d['rmse']
-            totals[h]['mape'].append(mape)
+            wape, mae = d['wape'], d['mae']
+            totals[h]['wape'].append(wape)
             totals[h]['mae'].append(mae)
-            totals[h]['rmse'].append(rmse)
-            cells.append(f' {mape:>5.1f} {mae:>5.1f} {rmse:>5.1f} ')
+            cells.append(f' {wape:>6.1f} {mae:>6.1f} ')
         print(f'{name:<{name_w}}|' + '|'.join(cells))
 
     # Simple (unweighted) averages — gives a feel for direction of change.
-    print('-' * (name_w + 60))
+    print('-' * (name_w + 48))
     avg_cells = []
     for h in HORIZONS:
-        if totals[h]['mape']:
-            am = sum(totals[h]['mape']) / len(totals[h]['mape'])
+        if totals[h]['wape']:
+            am = sum(totals[h]['wape']) / len(totals[h]['wape'])
             ae = sum(totals[h]['mae'])  / len(totals[h]['mae'])
-            ar = sum(totals[h]['rmse']) / len(totals[h]['rmse'])
-            avg_cells.append(f' {am:>5.1f} {ae:>5.1f} {ar:>5.1f} ')
+            avg_cells.append(f' {am:>6.1f} {ae:>6.1f} ')
         else:
-            avg_cells.append('     —       '.center(19))
+            avg_cells.append('    —     '.center(16))
     print(f'{"AVERAGE (simple)":<{name_w}}|' + '|'.join(avg_cells))
     print()
 

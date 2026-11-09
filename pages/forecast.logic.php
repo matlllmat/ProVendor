@@ -13,8 +13,9 @@ require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../queries/forecast.query.php';
 require_once __DIR__ . '/../queries/events.query.php';
 require_once __DIR__ . '/../queries/user.query.php';
+require_once __DIR__ . '/../includes/category_list.php';
 
-$_fUser   = getUserById($pdo, $_SESSION['user_id']);
+$_fUser  = getUserById($pdo, $_SESSION['user_id']);
 $userName = $_fUser ? $_fUser['name'] : 'Store Owner';
 
 // Only text search — category filtering is handled client-side by the chart tabs.

@@ -253,7 +253,41 @@
 
 .upload-btn-primary:hover { opacity: 0.85; }
 
-/* ── Section header actions (Export CSV + Update Sales Data) ── */
+/* "Replace Sales Data" menu: manual upload or Google Sheets. */
+.data-source { position: relative; }
+.data-source-menu {
+    position: absolute;
+    top: calc(100% + 0.4rem);
+    right: 0;
+    z-index: 50;
+    width: 18rem;
+    max-width: calc(100vw - 2rem);
+    padding: 0.3rem;
+    background: #F0E8D0;
+    border: 1px solid #D2C8AE;
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 32px rgba(38,31,14,0.18);
+}
+.data-source-menu[hidden] { display: none; }
+.data-source-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    width: 100%;
+    padding: 0.6rem 0.65rem;
+    border: none;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: #261F0E;
+    text-align: left;
+    cursor: pointer;
+}
+.data-source-item:hover { background: rgba(210,200,174,0.4); }
+.data-source-item svg { flex-shrink: 0; margin-top: 0.1rem; color: #1A6933; }
+.data-source-title { display: block; font-size: 0.8rem; font-weight: 600; }
+.data-source-desc  { display: block; font-size: 0.72rem; opacity: 0.6; line-height: 1.35; }
+
+/* ── Section header actions (Export CSV + Replace Sales Data) ── */
 .section-header-actions {
     display: flex;
     align-items: center;
@@ -1259,48 +1293,27 @@ tr:hover .qty-edit-btn { opacity: 0.45; }
 .preview-summary-total .preview-summary-label   { font-weight: 600; opacity: 0.9; }
 .preview-summary-total .preview-summary-value   { font-size: 1.1rem; }
 .preview-summary-new .preview-summary-value     { color: #1A6933; }
-.preview-summary-overlap .preview-summary-value { color: #b94000; }
 .preview-summary-invalid .preview-summary-value { color: #c10b0b; }
 .preview-summary-edited .preview-summary-value  { color: #d97706; }
-.preview-summary-noop .preview-summary-label,
-.preview-summary-noop .preview-summary-value    { opacity: 0.5; font-style: italic; }
 
-/* ── Editable preview table ───────────────────────────────────────────────── */
-.preview-toolbar {
+/* ── Review step: ready rows, then rows with issues ───────────────────────── */
+.preview-section { margin-top: 1.25rem; }
+
+.preview-section-title {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 0.625rem;
-    flex-wrap: wrap;
-}
-
-.preview-filter-chips {
-    display: flex;
-    gap: 0.375rem;
-    flex-wrap: wrap;
-}
-
-.preview-filter-chip {
-    background: transparent;
-    border: 1px solid #D2C8AE;
-    border-radius: 999px;
-    padding: 0.3rem 0.75rem;
-    font-size: 0.74rem;
-    font-weight: 600;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 700;
     color: #261F0E;
-    opacity: 0.7;
-    cursor: pointer;
-    transition: all 0.15s;
 }
 
-.preview-filter-chip:hover { opacity: 1; }
-
-.preview-filter-chip-active {
-    background: #261F0E;
-    color: #F0E8D0;
-    border-color: #261F0E;
-    opacity: 1;
+.preview-section-title span {
+    padding: 0.05rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(38,31,14,0.1);
+    font-size: 0.7rem;
 }
 
 .preview-table-wrap {
@@ -1334,23 +1347,6 @@ tr:hover .qty-edit-btn { opacity: 0.45; }
     z-index: 1;
 }
 
-/* Click-to-sort headers — non-sortable cells (Actions) skip these styles. */
-.preview-th-sortable {
-    cursor: pointer;
-    user-select: none;
-    transition: background 0.12s;
-}
-
-.preview-th-sortable:hover { background: rgba(38,31,14,0.12); }
-
-.preview-th-sorted { color: #1A6933; background: rgba(26,105,51,0.08); }
-
-.preview-sort-arrow {
-    font-size: 0.72rem;
-    margin-left: 0.15rem;
-    color: #1A6933;
-}
-
 .preview-table tbody td {
     padding: 0.35rem 0.75rem;
     border-bottom: 1px solid rgba(210,200,174,0.45);
@@ -1360,13 +1356,24 @@ tr:hover .qty-edit-btn { opacity: 0.45; }
 
 .preview-row { border-left: 3px solid transparent; }
 .preview-row-new     { border-left-color: rgba(26,105,51,0.4); }
-.preview-row-overlap { border-left-color: rgba(255,87,34,0.5); }
-.preview-row-invalid { border-left-color: rgba(255,26,26,0.5); background: rgba(255,26,26,0.04); }
-.preview-row-noop    { opacity: 0.55; }
+.preview-row-invalid { background: rgba(255,26,26,0.07); }
+.preview-row-invalid td:first-child { box-shadow: inset 3px 0 0 rgba(255,26,26,0.6); }
+.preview-row-fixed   { background: rgba(250,204,21,0.26); }
+.preview-row-fixed td:first-child { box-shadow: inset 3px 0 0 #eab308; }
 
-/* Edited rows trump everything visually so the user can scan for what they touched. */
-.preview-row-edited            { border-left-color: #d97706 !important; background: rgba(217,119,6,0.06); }
-.preview-row-edited .preview-input { border-color: #d97706; }
+.preview-row-dropped { background: rgba(38,31,14,0.07); }
+.preview-row-dropped td:first-child { box-shadow: inset 3px 0 0 rgba(38,31,14,0.3); }
+.preview-row-dropped:not(.preview-issue-note) td:not(.preview-actions) { opacity: 0.5; text-decoration: line-through; }
+.preview-badge-dropped { background: rgba(38,31,14,0.12); color: #261F0E; }
+.preview-summary-dropped .preview-summary-value { opacity: 0.6; }
+.preview-actions { text-align: right; white-space: nowrap; }
+.preview-table-issues { min-width: 960px; }
+.preview-issue-fields td { border-bottom: none !important; padding-bottom: 0.15rem !important; }
+.preview-issue-note td { padding-top: 0.15rem !important; }
+.preview-issue-note td > * { vertical-align: middle; }
+.preview-issue-message { margin-left: 0.5rem; font-size: 0.72rem; }
+.preview-issue-actions { margin-left: 0.5rem; white-space: nowrap; }
+.preview-issue-list { margin: 0.3rem 0 0.15rem 1.1rem; padding: 0; list-style: disc; font-size: 0.74rem; line-height: 1.5; color: #7f1d1d; }
 
 .preview-row-num {
     font-variant-numeric: tabular-nums;
@@ -1405,7 +1412,9 @@ tr:hover .qty-edit-btn { opacity: 0.45; }
     font-family: inherit;
 }
 
-.preview-input-date { min-width: 110px; }
+.preview-input-bad { border-color: #dc2626; background: #fecaca; box-shadow: 0 0 0 1px #dc2626; }
+.preview-input-date { min-width: 125px; }
+.preview-input-product { min-width: 190px; }
 .preview-input-qty  { min-width: 70px; text-align: right; font-variant-numeric: tabular-nums; }
 
 .preview-input:focus {
@@ -1414,32 +1423,7 @@ tr:hover .qty-edit-btn { opacity: 0.45; }
     box-shadow: 0 0 0 2px rgba(38,31,14,0.1);
 }
 
-.preview-existing {
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-    color: #261F0E;
-    opacity: 0.7;
-    white-space: nowrap;
-}
-
-/* Read-only date/qty cells — visible by default; Edit swaps them for inputs. */
-.preview-cell-display {
-    font-size: 0.78rem;
-    color: #261F0E;
-    white-space: nowrap;
-}
-
-.preview-cell-qty-display {
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-}
-
-/* Per-row action buttons (Edit / Save / Cancel). */
-.preview-actions {
-    white-space: nowrap;
-    text-align: right;
-}
-
+/* Per-row action buttons (Keep this row / Undo). */
 .preview-row-btn {
     background: transparent;
     border: 1px solid #D2C8AE;
@@ -1456,28 +1440,10 @@ tr:hover .qty-edit-btn { opacity: 0.45; }
 
 .preview-row-btn:first-child { margin-left: 0; }
 
-.preview-row-btn-edit:hover {
+.preview-row-btn:hover {
     background: #261F0E;
     color: #F0E8D0;
     border-color: #261F0E;
-}
-
-.preview-row-btn-save {
-    background: rgba(26,105,51,0.1);
-    color: #1A6933;
-    border-color: rgba(26,105,51,0.4);
-}
-
-.preview-row-btn-save:hover {
-    background: #1A6933;
-    color: #F0E8D0;
-    border-color: #1A6933;
-}
-
-.preview-row-btn-cancel:hover {
-    background: rgba(192,57,43,0.08);
-    color: #c0392b;
-    border-color: #c0392b;
 }
 
 .preview-dash { opacity: 0.35; }
@@ -1494,31 +1460,8 @@ tr:hover .qty-edit-btn { opacity: 0.45; }
 }
 
 .preview-badge-new     { background: rgba(26,105,51,0.12);  color: #1A6933; }
-.preview-badge-overlap { background: rgba(255,87,34,0.14);  color: #b94000; }
 .preview-badge-invalid { background: rgba(255,26,26,0.12);  color: #c10b0b; }
-.preview-badge-noop    { background: rgba(38,31,14,0.08);   color: #261F0E; opacity: 0.5; }
-
-.preview-row-reason {
-    font-size: 0.68rem;
-    color: #c10b0b;
-    margin-top: 0.2rem;
-    max-width: 260px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* Value was clamped to fit its column — the row still imports, but the change
-   is lossy so it's surfaced for review rather than applied silently. */
-.preview-row-warning {
-    font-size: 0.68rem;
-    color: #b45309;
-    margin-top: 0.2rem;
-    max-width: 260px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
+.preview-badge-fixed   { background: rgba(234,179,8,0.32);  color: #854d0e; }
 
 .preview-empty {
     text-align: center;
@@ -1808,6 +1751,9 @@ tr:hover .qty-edit-btn { opacity: 0.45; }
     color: #1A6933;
     border: 1px solid rgba(26,105,51,0.2);
 }
+
+.version-active { background: rgba(26,105,51,0.08); box-shadow: inset 3px 0 0 #1A6933; }
+.version-badge-active { background: #1A6933; color: #F0E8D0; border: 1px solid #1A6933; }
 
 .version-badge-changed {
     background: rgba(255,87,34,0.1);
@@ -2475,15 +2421,28 @@ tr:hover .qty-edit-btn { opacity: 0.45; }
 .sheet-switch.is-on::after { transform: translateX(1.05rem); }
 .sheet-switch:disabled { opacity: 0.5; cursor: wait; }
 
-/* Replaces the CSV upload button while a sheet is linked. */
-.sheet-csv-off {
+/* The live Google Sheet connection at the top of Version History. */
+.version-sheet { background: rgba(26,105,51,0.05); }
+.version-sheet .version-icon { color: #1A6933; opacity: 1; }
+a.version-label { text-decoration: none; }
+a.version-label:hover { text-decoration: underline; }
+
+.version-disconnect-btn {
+    background: transparent;
+    border: 1px solid rgba(192,57,43,0.35);
+    border-radius: 0.5rem;
+    padding: 0.3rem 0.7rem;
+    color: #c0392b;
     font-size: 0.72rem;
-    color: #261F0E;
-    opacity: 0.42;
-    line-height: 1.5;
-    max-width: 20rem;
-    text-align: right;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
 }
+.version-disconnect-btn:hover { background: rgba(192,57,43,0.08); }
+
+/* Date Format step: locked when the file proves its format. */
+#w-date-format-select:disabled { opacity: 0.6; cursor: not-allowed !important; }
+.date-format-hint { font-size: 0.72rem; font-weight: 600; color: #b94000; }
 
 /* ── Onboarding: the "or connect a sheet" alternative ── */
 .gs-alt {
