@@ -28,6 +28,12 @@ if (getSheetLink($pdo, (int) $_SESSION['user_id'])) {
     exit;
 }
 
+if (in_array($_FILES['csv']['error'] ?? UPLOAD_ERR_NO_FILE, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+    http_response_code(413);
+    echo json_encode(['error' => IMPORT_FILE_TOO_LARGE_MESSAGE]);
+    exit;
+}
+
 if (empty($_FILES['csv']) || $_FILES['csv']['error'] !== UPLOAD_ERR_OK) {
     echo json_encode(['error' => 'No file uploaded or upload error.']);
     exit;
@@ -47,8 +53,9 @@ if ($extension !== 'csv' && $extension !== 'xlsx') {
 }
 
 // Validate size — 10 MB max
-if ($file['size'] > 10 * 1024 * 1024) {
-    echo json_encode(['error' => 'File exceeds the 10 MB limit.']);
+if ($file['size'] > MAX_IMPORT_BYTES) {
+    http_response_code(413);
+    echo json_encode(['error' => IMPORT_FILE_TOO_LARGE_MESSAGE]);
     exit;
 }
 

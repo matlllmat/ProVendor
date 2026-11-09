@@ -3,6 +3,7 @@
 // Import Data + Profile page — two tabs in one place.
 
 require_once __DIR__ . '/import.logic.php';
+require_once __DIR__ . '/../api/import_helpers.php';
 
 $pageTitle = 'ProVendor — Settings';
 $pageCss   = 'import.css';
@@ -365,7 +366,7 @@ require_once __DIR__ . '/../includes/header.php';
                         <p id="w-drop-text" class="text-[#261F0E] font-semibold text-sm mb-1">
                             Drop your CSV or Excel file here, or click to browse
                         </p>
-                        <p class="text-[#261F0E] text-xs" style="opacity:0.4">Supports .csv and .xlsx files · Max 10 MB</p>
+                        <p class="text-[#261F0E] text-xs" style="opacity:0.4">Supports .csv and .xlsx files · Max 10 MB · Max 200,000 data rows</p>
                         <button type="button" onclick="downloadSampleCsv(event)"
                                 class="mt-3 text-xs text-[#261F0E] underline underline-offset-2 transition-opacity hover:opacity-60"
                                 style="opacity:0.38; background:none; border:none; cursor:pointer;">
@@ -1511,6 +1512,11 @@ function wSetFile(name) {
 async function wDetectColumns() {
     var file = wDroppedFile || document.getElementById('w-csv-file').files[0];
     if (!file) return;
+    // Reject before PHP's POST limit can turn the response into an error page.
+    if (file.size > <?php echo MAX_IMPORT_BYTES; ?>) {
+        alert(<?php echo json_encode(IMPORT_FILE_TOO_LARGE_MESSAGE); ?>);
+        return;
+    }
 
     var btn = document.getElementById('w-upload-btn');
     btn.textContent = 'Detecting…';
@@ -1521,6 +1527,10 @@ async function wDetectColumns() {
 
     try {
         var res  = await fetch('<?php echo BASE_URL; ?>/api/detect.php', { method: 'POST', body: formData });
+        if (res.status === 413) {
+            alert(<?php echo json_encode(IMPORT_FILE_TOO_LARGE_MESSAGE); ?>);
+            return;
+        }
         var data = await res.json();
 
         if (data.error) { alert('Detection failed: ' + data.error); return; }

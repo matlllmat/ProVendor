@@ -180,3 +180,9 @@
 .password-field .form-input::-ms-clear {
     display: none;
 }
+
+.signup-code-note { color: #746b57; font-size: 0.875rem; line-height: 1.6; overflow-wrap: anywhere; }
+.signup-code-input { text-align: center; font-size: 1.5rem; letter-spacing: 0.35em; }
+.signup-code-actions { display: flex; justify-content: space-between; gap: 1rem; }
+.signup-code-actions button { background: none; border: none; padding: 0; cursor: pointer; text-align: left; }
+.btn-submit:disabled, .signup-code-actions button:disabled { opacity: 0.45; cursor: not-allowed; }
